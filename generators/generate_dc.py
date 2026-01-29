@@ -166,11 +166,21 @@ class DCTopologyCreator(TopologyCreator):
             target_endpoint.role.value = interface_role
 
             # Check if either endpoint already has a cable attached
+            # Note: Accessing .peer can raise ValueError if the related node exists
+            # but doesn't have an ID/HFID (e.g., hasn't been saved yet). We catch
+            # this and treat it as "no existing cable".
             existing_cable_id = None
-            if source_endpoint.connector.peer:
-                existing_cable_id = source_endpoint.connector.peer.id
-            elif target_endpoint.connector.peer:
-                existing_cable_id = target_endpoint.connector.peer.id
+            try:
+                if source_endpoint.connector.peer:
+                    existing_cable_id = source_endpoint.connector.peer.id
+            except ValueError:
+                pass  # No existing cable or peer doesn't have an ID
+            if not existing_cable_id:
+                try:
+                    if target_endpoint.connector.peer:
+                        existing_cable_id = target_endpoint.connector.peer.id
+                except ValueError:
+                    pass  # No existing cable or peer doesn't have an ID
 
             # Create or update cable object connecting both endpoints
             # Uses DAC (Direct Attach Copper) passive cables for fabric links
