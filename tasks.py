@@ -26,31 +26,42 @@ INFRAHUB_ENTERPRISE = os.getenv("INFRAHUB_ENTERPRISE", "false").lower() == "true
 INFRAHUB_SERVICE_CATALOG = os.getenv("INFRAHUB_SERVICE_CATALOG", "false").lower() == "true"
 INFRAHUB_GIT_LOCAL = os.getenv("INFRAHUB_GIT_LOCAL", "false").lower() == "true"
 MAIN_DIRECTORY_PATH = Path(__file__).parent
+INFRAHUB_PROJECT_NAME = os.getenv("INFRAHUB_PROJECT_NAME", MAIN_DIRECTORY_PATH.name)
 
 
 # Download compose file and use with override
 def get_compose_command() -> str:
-    """Generate docker compose command with override support."""
+    """Generate docker compose command with override support.
+
+    Supports layered compose files:
+    1. docker-compose.yml (base, downloaded or local)
+    2. docker-compose.override.yml (committed overrides, uses env vars for ports)
+
+    The project name is controlled by INFRAHUB_PROJECT_NAME env var,
+    defaulting to the directory name.
+    """
     local_compose_file = MAIN_DIRECTORY_PATH / "docker-compose.yml"
     override_file = MAIN_DIRECTORY_PATH / "docker-compose.override.yml"
 
-    # Check if local docker-compose.yml exists
+    base_cmd = f"docker compose -p {INFRAHUB_PROJECT_NAME}"
+
+    # If we have a local docker-compose.yml, use it directly
     if local_compose_file.exists():
-        # Use local docker-compose.yml file
+        cmd = f"{base_cmd} -f {local_compose_file}"
         if override_file.exists():
-            return f"docker compose -p infrahub -f {local_compose_file} -f {override_file}"
-        return f"docker compose -p infrahub-bundle-dc -f {local_compose_file}"
+            cmd += f" -f {override_file}"
+        return cmd
 
     # Fall back to downloading from infrahub.opsmill.io
-    # Determine the base URL based on edition
     if INFRAHUB_ENTERPRISE:
         base_url = f"https://infrahub.opsmill.io/enterprise/{INFRAHUB_VERSION}"
     else:
         base_url = f"https://infrahub.opsmill.io/{INFRAHUB_VERSION}"
 
+    cmd = f"curl -s {base_url} | {base_cmd} -f -"
     if override_file.exists():
-        return f"curl -s {base_url} | docker compose -p infrahub -f - -f {override_file}"
-    return f"curl -s {base_url} | docker compose -p infrahub -f -"
+        cmd += f" -f {override_file}"
+    return cmd
 
 
 def get_compose_source() -> str:
@@ -119,6 +130,7 @@ def info(context: Context) -> None:
     info_msg = (
         f"[cyan]Edition:[/cyan] {edition}\n"
         f"[cyan]Version:[/cyan] {INFRAHUB_VERSION}\n"
+        f"[cyan]Project Name:[/cyan] {INFRAHUB_PROJECT_NAME}\n"
         f"[cyan]Compose Source:[/cyan] {COMPOSE_SOURCE}\n"
         f"[cyan]Service Catalog:[/cyan] {'Enabled' if INFRAHUB_SERVICE_CATALOG else 'Disabled'}\n"
         f"[cyan]Local Git Repository:[/cyan] {'Enabled' if INFRAHUB_GIT_LOCAL else 'Disabled'}\n"

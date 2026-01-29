@@ -1,4 +1,10 @@
 ---
+# Override file for bundle-dc project
+# Port configuration via environment variables for running multiple instances:
+#   INFRAHUB_PORT (default: 8000) - Infrahub server
+#   PREFECT_PORT (default: 4200) - Prefect task manager UI
+#   STREAMLIT_PORT (default: 8501) - Service catalog UI
+
 services:
   database:
     environment:
@@ -9,10 +15,15 @@ services:
       - NEO4J_dbms_memory_heap_max__size=4g
       - NEO4J_dbms_memory_pagecache_size=2g
 
+  # Override Infrahub server port for parallel instances
+  infrahub-server:
+    ports:
+      - "${INFRAHUB_PORT:-8000}:8000"
+
   # Expose prefect UI
   task-manager:
     ports:
-      - "4200:4200"
+      - "${PREFECT_PORT:-4200}:4200"
 
   # Mount local repository for local development
   # Used when INFRAHUB_GIT_LOCAL=true to work with local generator/transform changes
@@ -26,10 +37,10 @@ services:
       dockerfile: Dockerfile
     container_name: service-catalog
     ports:
-      - "8501:8501"
+      - "${STREAMLIT_PORT:-8501}:8501"
     environment:
       - INFRAHUB_ADDRESS=http://infrahub-server:8000
-      - INFRAHUB_UI_URL=http://localhost:8000
+      - INFRAHUB_UI_URL=${INFRAHUB_UI_URL:-http://localhost:8000}
       - INFRAHUB_API_TOKEN=${INFRAHUB_API_TOKEN:-06438eb2-8019-4776-878c-0941b1f1d1ec}
       - DEFAULT_BRANCH=main
       - GENERATOR_WAIT_TIME=60
