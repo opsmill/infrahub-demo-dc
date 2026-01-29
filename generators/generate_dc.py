@@ -14,6 +14,8 @@ The generator creates a fully operational spine-leaf fabric with route reflectio
 dual loopbacks (underlay + VTEP), and proper BGP peer group configuration.
 """
 
+from typing import Any
+
 from infrahub_sdk.generator import InfrahubGenerator
 from infrahub_sdk.protocols import CoreNumberPool
 
@@ -142,11 +144,15 @@ class DCTopologyCreator(TopologyCreator):
                 kind=InterfacePhysical,
                 name__value=connection["source_interface"],
                 device__name__value=connection["source"],
+                prefetch_relationships=True,
+                populate_store=True,
             )
             target_endpoint = await self.client.get(
                 kind=InterfacePhysical,
                 name__value=connection["destination_interface"],
                 device__name__value=connection["target"],
+                prefetch_relationships=True,
+                populate_store=True,
             )
 
             # Configure source interface
@@ -159,15 +165,36 @@ class DCTopologyCreator(TopologyCreator):
             target_endpoint.description.value = f"Peering connection to {' -> '.join(source_endpoint.hfid or [])}"
             target_endpoint.role.value = interface_role
 
-            # Create cable object connecting both endpoints
+            # Check if either endpoint already has a cable attached
+            # Note: Accessing .peer can raise ValueError if the related node exists
+            # but doesn't have an ID/HFID (e.g., hasn't been saved yet). We catch
+            # this and treat it as "no existing cable".
+            existing_cable_id = None
+            try:
+                if source_endpoint.connector.peer:
+                    existing_cable_id = source_endpoint.connector.peer.id
+            except ValueError:
+                pass  # No existing cable or peer doesn't have an ID
+            if not existing_cable_id:
+                try:
+                    if target_endpoint.connector.peer:
+                        existing_cable_id = target_endpoint.connector.peer.id
+                except ValueError:
+                    pass  # No existing cable or peer doesn't have an ID
+
+            # Create or update cable object connecting both endpoints
             # Uses DAC (Direct Attach Copper) passive cables for fabric links
+            cable_data: dict[str, Any] = {
+                "status": "connected",
+                "cable_type": "dac-passive",
+                "connected_endpoints": [source_endpoint.id, target_endpoint.id],
+            }
+            if existing_cable_id:
+                cable_data["id"] = existing_cable_id
+
             cable = await self.client.create(
                 kind=DcimCable,
-                data={
-                    "status": "connected",
-                    "cable_type": "dac-passive",
-                    "connected_endpoints": [source_endpoint.id, target_endpoint.id],
-                },
+                data=cable_data,
             )
 
             # Save the cable first so it exists in the database

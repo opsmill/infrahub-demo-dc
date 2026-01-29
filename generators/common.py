@@ -1125,11 +1125,15 @@ class TopologyCreator:
                 kind=(InterfacePhysical if connection_type == "management" else DcimConsoleInterface),
                 name__value=connection["source_interface"],
                 device__name__value=connection["source"],
+                prefetch_relationships=True,
+                populate_store=True,
             )
             target_endpoint = await self.client.get(
                 kind=(InterfacePhysical if connection_type == "management" else DcimConsoleInterface),
                 name__value=connection["destination_interface"],
                 device__name__value=connection["target"],
+                prefetch_relationships=True,
+                populate_store=True,
             )
 
             source_endpoint.status.value = "active"
@@ -1137,14 +1141,35 @@ class TopologyCreator:
             target_endpoint.status.value = "active"
             target_endpoint.description.value = f"Connection to {' -> '.join(source_endpoint.hfid or [])}"
 
-            # Create cable to connect the endpoints
+            # Check if either endpoint already has a cable attached
+            # Note: Accessing .peer can raise ValueError if the related node exists
+            # but doesn't have an ID/HFID (e.g., hasn't been saved yet). We catch
+            # this and treat it as "no existing cable".
+            existing_cable_id = None
+            try:
+                if source_endpoint.connector.peer:
+                    existing_cable_id = source_endpoint.connector.peer.id
+            except ValueError:
+                pass  # No existing cable or peer doesn't have an ID
+            if not existing_cable_id:
+                try:
+                    if target_endpoint.connector.peer:
+                        existing_cable_id = target_endpoint.connector.peer.id
+                except ValueError:
+                    pass  # No existing cable or peer doesn't have an ID
+
+            # Create or update cable to connect the endpoints
+            cable_data: dict[str, Any] = {
+                "status": "connected",
+                "cable_type": "cat6",  # Use cat6 for management/console connections
+                "connected_endpoints": [source_endpoint.id, target_endpoint.id],
+            }
+            if existing_cable_id:
+                cable_data["id"] = existing_cable_id
+
             cable = await self.client.create(
                 kind=DcimCable,
-                data={
-                    "status": "connected",
-                    "cable_type": "cat6",  # Use cat6 for management/console connections
-                    "connected_endpoints": [source_endpoint.id, target_endpoint.id],
-                },
+                data=cable_data,
             )
 
             # Save the cable first so it exists in the database
