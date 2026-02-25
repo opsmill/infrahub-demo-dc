@@ -115,8 +115,9 @@ nodes:
   - name: Rack
     namespace: Location
     inherit_from:
-      - "LocationGeneric"
-      - "LocationHosting"
+      - LocationGeneric
+      - LocationHosting
+      - CoreArtifactTarget
     include_in_menu: false
     menu_placement: "LocationGeneric"
     label: Rack
