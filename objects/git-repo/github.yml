@@ -2,8 +2,8 @@
 apiVersion: infrahub.app/v1
 kind: Object
 spec:
-  kind: CoreRepository
+  kind: CoreReadOnlyRepository
   data:
     - name: bundle-dc
       location: "https://github.com/opsmill/infrahub-bundle-dc.git"
-      default_branch: "main"
+      ref: "main"
