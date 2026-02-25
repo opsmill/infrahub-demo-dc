@@ -78,3 +78,5 @@ spec:
       description: Equinix POPs
     - name: network_segments
       description: Network Segments for VPN/VxLAN services
+    - name: racks
+      description: Racks
