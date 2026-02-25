@@ -475,6 +475,7 @@ class TopologyCreator:
                     "payload": {
                         "name": rack_name,
                         "shortname": rack_name,
+                        "member_of_groups": ["racks"],
                         "parent": row.id,
                     },
                     "store_key": rack_name,
