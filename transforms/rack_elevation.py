@@ -21,8 +21,8 @@ DEVICE_TYPE_FULL_DEPTH: str = "full_depth"
 U_HEIGHT: int = 20
 COLUMN_WIDTH: int = 250
 LABEL_COLUMN_WIDTH: int = 50
-PADDING: int = 30
-TITLE_HEIGHT: int = 50
+HORIZONTAL_PADDING: int = 250
+VERTICAL_HORIZONTAL_PADDING: int = 50
 
 
 class RackElevationTransform(InfrahubTransform):
@@ -66,13 +66,13 @@ class RackElevationTransform(InfrahubTransform):
         return self.generate_svg(rack_name, rack_height, devices)
 
     def generate_svg(self, rack_name: str, rack_height: int, devices: list[dict]) -> str:
-        # Calculate dimensions and positions on an x, y graph
-        total_width: int = PADDING + COLUMN_WIDTH + LABEL_COLUMN_WIDTH + COLUMN_WIDTH + PADDING
-        total_height: int = TITLE_HEIGHT + (rack_height * U_HEIGHT) + PADDING
-        front_x: int = PADDING
-        label_x: int = PADDING + COLUMN_WIDTH
-        rear_x: int = PADDING + COLUMN_WIDTH + LABEL_COLUMN_WIDTH
-        rack_top_y: int = TITLE_HEIGHT
+        # Calculate dimensions and positions
+        total_width: int = HORIZONTAL_PADDING + COLUMN_WIDTH + LABEL_COLUMN_WIDTH + COLUMN_WIDTH + HORIZONTAL_PADDING
+        total_height: int = VERTICAL_HORIZONTAL_PADDING + (rack_height * U_HEIGHT) + VERTICAL_HORIZONTAL_PADDING
+        front_x: int = HORIZONTAL_PADDING
+        label_x: int = HORIZONTAL_PADDING + COLUMN_WIDTH
+        rear_x: int = HORIZONTAL_PADDING + COLUMN_WIDTH + LABEL_COLUMN_WIDTH
+        rack_top_y: int = VERTICAL_HORIZONTAL_PADDING
         label_center_x: int = label_x + LABEL_COLUMN_WIDTH / 2
 
         # Calculate device positions and sizes
@@ -105,7 +105,7 @@ class RackElevationTransform(InfrahubTransform):
             label_column_width=LABEL_COLUMN_WIDTH,
             column_width=COLUMN_WIDTH,
             u_height=U_HEIGHT,
-            title_height=TITLE_HEIGHT,
+            title_height=VERTICAL_HORIZONTAL_PADDING,
             rack_top_y=rack_top_y,
             devices=devices,
         )
