@@ -53,8 +53,6 @@ class RackElevationTransform(InfrahubTransform):
             # Add device to list
             devices.append(
                 {
-                    "id": device["id"],
-                    "typename": device["__typename"],
                     "name": device[DEVICE_NAME]["value"],
                     "position": device[DEVICE_POSITION]["value"],
                     "rack_face": device[DEVICE_RACK_FACE]["value"],

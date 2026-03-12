@@ -34,7 +34,6 @@
   <!-- devices -->
   {%- for device in devices %}
   <!-- {{ device.name }} at U{{ device.position }}-U{{ device.position + device.height - 1 }} {{ "(full-depth)" if device.is_full_depth else "(" ~ device.rack_face ~ " only)" }} -->
-  <a href="/objects/{{ device.typename }}/{{ device.id }}">
   {%- if device.is_full_depth %}
   <rect x="{{ front_x + 2 }}" y="{{ device.y_position + 1 }}" width="{{ column_width - 4 }}" height="{{ device.y_size - 2 }}" fill="{{ device.color }}" stroke="#333" stroke-width="1" rx="3"/>
   {%- if device.height == 1 %}
@@ -61,6 +60,5 @@
   <text x="{{ x + column_width / 2 }}" y="{{ device.y_position + device.y_size / 2 + 10 }}" text-anchor="middle" class="device-type">{{ device.device_type }}</text>
   {%- endif %}
   {%- endif %}
-  </a>
   {%- endfor %}
 </svg>
