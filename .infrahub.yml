@@ -66,7 +66,6 @@ artifact_definitions:
     transformation: topology_clab
     parameters:
       name: name__value
-
   - name: Cable matrix for Topology
     artifact_name: topology-cabling
     content_type: text/csv
@@ -74,13 +73,20 @@ artifact_definitions:
     transformation: topology_cabling
     parameters:
       name: name__value
-
   # Equinix POP
   - name: equinix_pop_config
     artifact_name: equinix_pop
     content_type: text/plain
     targets: equinix_pop
     transformation: equinix_pop
+    parameters:
+      name: name__value
+  # Rack elevation
+  - name: rack_elevation
+    artifact_name: rack_elevation
+    content_type: image/svg+xml
+    targets: racks
+    transformation: rack_elevation
     parameters:
       name: name__value
 
@@ -111,6 +117,9 @@ check_definitions:
       device: name__value
 
 python_transforms:
+  - name: rack_elevation
+    class_name: RackElevationTransform
+    file_path: transforms/rack_elevation.py
   - name: topology_cabling
     class_name: TopologyCabling
     file_path: transforms/topology_cabling.py
@@ -188,6 +197,8 @@ queries:
     file_path: queries/config/juniper_firewall.gql
   - name: segment
     file_path: queries/segment/segment.gql
+  - name: rack_elevation_query
+    file_path: queries/visualization/rack_elevation.gql
 schemas:
   - schemas/
 menus:

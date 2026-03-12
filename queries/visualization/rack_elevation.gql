@@ -1,0 +1,52 @@
+query RackElevation($name: String!) {
+  LocationRack(name__value: $name) {
+    edges {
+      node {
+        __typename
+        name {
+          value
+        }
+        height {
+          value
+        }
+        devices {
+          edges {
+            node {
+              id
+              __typename
+              ... on DcimGenericDevice {
+                name {
+                  value
+                }
+                status {
+                  color
+                }
+              }
+              position {
+                value
+              }
+              rack_face {
+                value
+              }
+              device_type {
+                node {
+                  __typename
+                  display_label
+                  name {
+                    value
+                  }
+                  height {
+                    value
+                  }
+                  full_depth {
+                    value
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

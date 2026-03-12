@@ -31,6 +31,7 @@ nodes:
         kind: Text
         optional: true
         order_weight: 1300
+
   - name: Metro
     namespace: Location
     label: Metro
@@ -42,6 +43,7 @@ nodes:
     parent: LocationCountry
     children: LocationBuilding
     icon: healthicons:city
+
   - name: Building
     namespace: Location
     inherit_from:
@@ -75,6 +77,7 @@ nodes:
         peer: OrganizationGeneric
         optional: true
         cardinality: one
+
   - name: Pod
     namespace: Location
     inherit_from: ["LocationGeneric"]
@@ -85,6 +88,7 @@ nodes:
     parent: "LocationBuilding"
     icon: "mdi:home-floor-0"
     children: "LocationRow"
+
   - name: Row
     namespace: Location
     inherit_from:
@@ -107,11 +111,13 @@ nodes:
         peer: OrganizationGeneric
         optional: true
         cardinality: one
+
   - name: Rack
     namespace: Location
     inherit_from:
-      - "LocationGeneric"
-      - "LocationHosting"
+      - LocationGeneric
+      - LocationHosting
+      - CoreArtifactTarget
     include_in_menu: false
     menu_placement: "LocationGeneric"
     label: Rack
@@ -127,6 +133,12 @@ nodes:
         unique: false
         optional: true
         order_weight: 1100
+      - name: height
+        label: Height (U)
+        optional: false
+        default_value: 42
+        kind: Number
+        order_weight: 1300
     relationships:
       - name: owner
         peer: OrganizationGeneric
