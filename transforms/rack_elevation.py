@@ -73,7 +73,7 @@ class RackElevationTransform(InfrahubTransform):
         label_x: int = HORIZONTAL_PADDING + COLUMN_WIDTH
         rear_x: int = HORIZONTAL_PADDING + COLUMN_WIDTH + LABEL_COLUMN_WIDTH
         rack_top_y: int = VERTICAL_HORIZONTAL_PADDING
-        label_center_x: int = label_x + LABEL_COLUMN_WIDTH / 2
+        label_center_x: int = label_x + LABEL_COLUMN_WIDTH // 2
 
         # Calculate device positions and sizes
         for device in devices:
