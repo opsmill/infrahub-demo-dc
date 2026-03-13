@@ -50,7 +50,7 @@ docker-compose up
 
 ### Documentation
 
-For detailed setup instructions, configuration options, and usage guide, see [SERVICE_CATALOG.md](SERVICE_CATALOG.md).
+For detailed setup instructions, configuration options, and usage guide, see [docs/docs/service-catalog.mdx](docs/docs/service-catalog.mdx).
 
 ## License
 
