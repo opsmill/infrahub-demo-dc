@@ -39,7 +39,6 @@ npm run typecheck
   - **How-to guides** (task-oriented)
   - **Explanation** (understanding-oriented)
   - **Reference** (information-oriented)
-
 - Use sentence case for headings (lowercase except first word and proper nouns)
 - Specify language in fenced code blocks
 - Surround lists and code blocks with blank lines
