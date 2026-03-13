@@ -41,8 +41,8 @@ Jinja
 Junos
 loopback
 loopbacks
-Markdownlint
-markdownlint
+Rumdl
+rumdl
 Mermaid
 mermaid
 namespace

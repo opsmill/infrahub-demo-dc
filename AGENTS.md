@@ -105,7 +105,7 @@ See [tests/AGENTS.md](./tests/AGENTS.md) for detailed testing conventions.
 **IMPORTANT**: After making code changes, always run the full lint suite:
 
 ```bash
-uv run invoke lint  # Runs: markdownlint, yamllint, ruff, mypy
+uv run invoke lint  # Runs: rumdl, yamllint, ruff, mypy
 ```
 
 This ensures:

@@ -61,16 +61,16 @@ graph TB
 
 ```bash
 # Markdown linting
-markdownlint docs/docs/**/*.mdx
+rumdl check docs/docs/**/*.mdx
 
 # Auto-fix markdown issues
-markdownlint docs/docs/**/*.mdx --fix
+rumdl fmt docs/docs/**/*.mdx
 
 # Style guide checking
 vale $(find ./docs/docs -type f \( -name "*.mdx" -o -name "*.md" \))
 ```
 
-### Common Markdownlint Rules
+### Common Rumdl Rules
 
 - **MD032**: Lists must be surrounded by blank lines
 - **MD022**: Headings must be surrounded by blank lines
@@ -125,4 +125,4 @@ docs/
 2. **Missing blank lines** - Always surround lists/code blocks with blank lines
 3. **Title case headings** - Use sentence case instead
 4. **Missing code language** - Always specify language in code fences
-5. **Skipping linters** - Always run markdownlint and vale before committing
+5. **Skipping linters** - Always run rumdl and vale before committing

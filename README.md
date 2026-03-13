@@ -1,8 +1,8 @@
 # Infrahub demo
 
-<!-- markdownlint-disable -->
+<!-- rumdl-disable -->
 ![Infrahub Logo](https://assets-global.website-files.com/657aff4a26dd8afbab24944b/657b0e0678f7fd35ce130776_Logo%20INFRAHUB.svg)
-<!-- markdownlint-restore -->
+<!-- rumdl-enable -->
 
 [Infrahub](https://github.com/opsmill/infrahub) by [OpsMill](https://opsmill.com) acts as a central hub to manage the data, templates and playbooks that powers your infrastructure. At its heart, Infrahub is built on 3 fundamental pillars:
 
@@ -50,8 +50,8 @@ docker-compose up
 
 ### Documentation
 
-For detailed setup instructions, configuration options, and usage guide, see [SERVICE_CATALOG.md](SERVICE_CATALOG.md).
+For detailed setup instructions, configuration options, and usage guide, see the [bundle-dc docs](https://docs.infrahub.app/bundle-dc).
 
 ## License
 
-This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
+This project is licensed under the MIT License. See [LICENSE.txt](LICENSE.txt) for details.
