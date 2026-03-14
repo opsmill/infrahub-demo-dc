@@ -23,7 +23,7 @@ spec:
           name: DC-1
           shortname: DC-1
           parent: Katowice
-      device_type: ZIA-Gateway
+      device_type: [Zscaler, ZIA-Gateway]
       role: edge_firewall
       status: active
       cpu: 4
@@ -46,7 +46,7 @@ spec:
           name: DC-1
           shortname: DC-1
           parent: Katowice
-      device_type: ZIA-Gateway
+      device_type: [Zscaler, ZIA-Gateway]
       role: edge_firewall
       status: active
       cpu: 2
@@ -69,7 +69,7 @@ spec:
           name: DC-1
           shortname: DC-1
           parent: Katowice
-      device_type: ZIA-Gateway
+      device_type: [Zscaler, ZIA-Gateway]
       role: edge_firewall
       status: active
       cpu: 2

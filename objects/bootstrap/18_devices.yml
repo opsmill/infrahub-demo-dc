@@ -6,7 +6,7 @@ spec:
   data:
     - name: corp-firewall
       role: edge_firewall
-      device_type: SRX-1500
+      device_type: [Juniper, SRX-1500]
       platform: [Juniper, JunOS]
       location: PAR-1
       status: active
@@ -39,7 +39,7 @@ spec:
   data:
     - name: cisco-switch-01
       role: leaf
-      device_type: N9K-C93108TC-FX
+      device_type: [Cisco, N9K-C93108TC-FX]
       platform: [Cisco, NX-OS]
       location: LON-1
       status: active
@@ -59,7 +59,7 @@ spec:
 
     - name: juniper-switch-01
       role: spine
-      device_type: QFX5220-32CD
+      device_type: [Juniper, QFX5220-32CD]
       platform: [Juniper, JunOS]
       location: FRA-1
       status: active
@@ -79,7 +79,7 @@ spec:
 
     - name: arista-switch-01
       role: spine
-      device_type: DCS-7280DR3-24-F
+      device_type: [Arista, DCS-7280DR3-24-F]
       platform: [Arista, EOS]
       location: BCN-1
       status: active
@@ -99,7 +99,7 @@ spec:
 
     - name: edgecore-switch-01
       role: leaf
-      device_type: 5912-54X-O-AC-F
+      device_type: [Edgecore, 5912-54X-O-AC-F]
       platform: [Generic, Sonic OS]
       location: CHI-1
       status: active

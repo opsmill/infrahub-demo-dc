@@ -5,7 +5,7 @@ spec:
   kind: TemplateDcimVirtualDevice
   data:
     - template_name: C8000V_EDGE
-      device_type: C8000V
+      device_type: [Cisco, C8000V]
       role: edge
       status: active
       cpu: 2
@@ -24,7 +24,7 @@ spec:
           - edges
 
     - template_name: CloudGuard_EDGE
-      device_type: CloudGuard
+      device_type: [Check Point, CloudGuard]
       role: edge_firewall
       status: active
       cpu: 2
