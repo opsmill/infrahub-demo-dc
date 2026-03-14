@@ -22,7 +22,7 @@
   },
   "BGP_NEIGHBOR": {
 {% for neighbor in bgp.neighbors %}
-    "{{ neighbor.remote_ip | ipaddress_interface(attr='ip') }}": {
+    "{{ neighbor.remote_ip.split('/')[0] }}": {
       "local_addr": "{{ bgp.router_id or default_router_id }}",
       "asn": "{{ neighbor.remote_as }}",
       "holdtime": "10",
@@ -68,7 +68,7 @@
   },
   "BGP_NEIGHBOR_AF": {
 {% for neighbor in bgp.neighbors %}
-    "{{ neighbor.remote_ip | ipaddress_interface(attr='ip') }} | l2vpn_evpn": {
+    "{{ neighbor.remote_ip.split('/')[0] }} | l2vpn_evpn": {
       "admin_status": "up",
       "route_reflector_client": "true"
     }{{ "," if not loop.last }}

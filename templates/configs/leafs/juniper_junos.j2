@@ -8,7 +8,7 @@ system {
 
 {%- if ospf_configs and ospf_configs[0] and ospf_configs[0].router_id %}
     ## OSPF Router ID
-    ## router-id {{ ospf_configs[0].router_id | ipaddress_interface(attr='ip') }};
+    ## router-id {{ ospf_configs[0].router_id.split('/')[0] }};
 {%- endif %}
 
     services {
@@ -127,7 +127,7 @@ protocols {
 
 routing-options {
 {%-         if bgp_config.router_id and bgp_config.router_id.address %}
-    router-id {{ bgp_config.router_id.address | ipaddress_interface(attr='ip') }};
+    router-id {{ bgp_config.router_id.address.split('/')[0] }};
 {%-         endif %}
     autonomous-system {{ bgp_config.local_as.asn }};
 }
@@ -142,7 +142,7 @@ protocols {
         group {{ bgp_config.profile }} {
             type {{ 'internal' if bgp_config.session_type == 'INTERNAL' else 'external' }};
 {%-         if bgp_config.local_ip and bgp_config.local_ip.address %}
-            local-address {{ bgp_config.local_ip.address | ipaddress_interface(attr='ip') }};
+            local-address {{ bgp_config.local_ip.address.split('/')[0] }};
 {%-         endif %}
             family inet {
                 unicast {
@@ -159,7 +159,7 @@ protocols {
 {%-         endif %}
 
 {%-         for session in bgp_config.sessions %}
-            neighbor {{ session.remote_ip.address | ipaddress_interface(attr='ip') }} {
+            neighbor {{ session.remote_ip.address.split('/')[0] }} {
 {%-             if session.name %}
                 description "{{ session.name }}";
 {%-             endif %}

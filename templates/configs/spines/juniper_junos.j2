@@ -7,9 +7,9 @@ system {
     host-name {{ hostname }};
 
 {%- if ospf and ospf.router_id %}
-    router-id {{ ospf.router_id | ipaddress_interface(attr='ip') }};
+    router-id {{ ospf.router_id.split('/')[0] }};
 {%- elif loopbacks.loopback0 %}
-    router-id {{ loopbacks.loopback0 | ipaddress_interface(attr='ip') }};
+    router-id {{ loopbacks.loopback0.split('/')[0] }};
 {%- endif %}
 
     services {
@@ -138,7 +138,7 @@ routing-options {
 {%-     if bgp.router_id %}
     router-id {{ bgp.router_id }};
 {%-     elif loopbacks.loopback0 %}
-    router-id {{ loopbacks.loopback0 | ipaddress_interface(attr='ip') }};
+    router-id {{ loopbacks.loopback0.split('/')[0] }};
 {%-     endif %}
     autonomous-system {{ bgp.local_as }};
 }
@@ -147,7 +147,7 @@ protocols {
     bgp {
         group EVPN-OVERLAY-PEERS {
             type internal;
-            local-address {{ loopbacks.loopback0 | ipaddress_interface(attr='ip') if loopbacks.loopback0 else bgp.router_id }};
+            local-address {{ loopbacks.loopback0.split('/')[0] if loopbacks.loopback0 else bgp.router_id }};
             family inet {
                 unicast {
                     multipath;
@@ -156,10 +156,10 @@ protocols {
             family evpn {
                 signaling;
             }
-            cluster {{ bgp.router_id or loopbacks.loopback0 | ipaddress_interface(attr='ip') }};
+            cluster {{ bgp.router_id or loopbacks.loopback0.split('/')[0] }};
 
 {%-     for neighbor in bgp.neighbors %}
-            neighbor {{ neighbor.remote_ip | ipaddress_interface(attr='ip') }} {
+            neighbor {{ neighbor.remote_ip.split('/')[0] }} {
 {%-         if neighbor.name %}
                 description "{{ neighbor.name }} (Route Reflector Client)";
 {%-         else %}

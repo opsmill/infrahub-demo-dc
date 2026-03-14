@@ -9,8 +9,8 @@
 {%-     set session = peering %}
 {%-     set local_as = session.local_as.asn %}
 {%-     set remote_as = session.remote_as.asn %}
-{%-     set local_ip = session.local_ip.address | ipaddress_interface(attr='ip') %}
-{%-     set remote_ip = session.remote_ip.address | ipaddress_interface(attr='ip') %}
+{%-     set local_ip = session.local_ip.address.split('/')[0] %}
+{%-     set remote_ip = session.remote_ip.address.split('/')[0] %}
 
 {%-     if session.session_scope == 'EXTERNAL' and session.external_organization %}
 ! External peering with {{ session.external_organization.name }}
@@ -128,8 +128,8 @@ route-map {{ session.peer_group.name }}-LOCAL-PREF-IN permit 10
 ! Session: {{ peering.name }}
 !   Local AS: {{ peering.local_as.asn }}
 !   Remote AS: {{ peering.remote_as.asn }}
-!   Local IP: {{ peering.local_ip.address | ipaddress_interface(attr='ip') }}
-!   Remote IP: {{ peering.remote_ip.address | ipaddress_interface(attr='ip') }}
+!   Local IP: {{ peering.local_ip.address.split('/')[0] }}
+!   Remote IP: {{ peering.remote_ip.address.split('/')[0] }}
 !   Type: {{ peering.peering_type }}
 !   Scope: {{ peering.session_scope }}
 !   Admin State: {{ peering.admin_state }}

@@ -102,7 +102,7 @@ router ospf {{ ospf.process_id }}
 router bgp {{ bgp.local_as }}
   router-id {{ bgp.router_id }}
 {% for neighbor in bgp.neighbors %}
-  neighbor {{ neighbor.remote_ip | ipaddress_interface(attr='ip') }}
+  neighbor {{ neighbor.remote_ip.split('/')[0] }}
     remote-as {{ neighbor.remote_as }}
     update-source loopback0
     address-family l2vpn evpn

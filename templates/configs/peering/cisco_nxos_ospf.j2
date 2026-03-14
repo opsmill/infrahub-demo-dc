@@ -8,7 +8,7 @@
 {%- for peering in ospf_peering_sessions %}
 {%-     set session = peering %}
 {%-     set area = session.area.area_id %}
-{%-     set local_router_id = session.local_router_id.address | ipaddress_interface(attr='ip') %}
+{%-     set local_router_id = session.local_router_id.address.split('/')[0] %}
 
 {%-     if session.session_scope == 'EXTERNAL' and session.external_organization %}
 ! External OSPF peering with {{ session.external_organization.name }}
@@ -74,7 +74,7 @@ interface {{ interface.name }}
 {%-     if session.session_scope == 'EXTERNAL' %}
 ! External peering neighbor configuration
 {%-         if session.remote_router_id %}
-! Remote router ID: {{ session.remote_router_id.address | ipaddress_interface(attr='ip') }}
+! Remote router ID: {{ session.remote_router_id.address.split('/')[0] }}
 {%-         endif %}
 ! Network Type: {{ session.network_type }}
 ! Area Type: {{ session.area_type }}

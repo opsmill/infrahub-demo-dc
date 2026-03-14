@@ -101,7 +101,7 @@ router bgp {{ bgp.local_as }}
    maximum-paths 4 ecmp 64
 {# Configure BGP neighbors from enhanced transform data #}
 {%- for neighbor in bgp.neighbors %}
-{%-     set neighbor_ip = neighbor.remote_ip | ipaddress_interface(attr='ip') %}
+{%-     set neighbor_ip = neighbor.remote_ip.split('/')[0] %}
    ! {{ neighbor.description or 'BGP Neighbor' }}
    neighbor {{ neighbor_ip }} remote-as {{ neighbor.remote_as }}
    neighbor {{ neighbor_ip }} update-source Loopback0
@@ -112,11 +112,11 @@ router bgp {{ bgp.local_as }}
    address-family ipv4
       redistribute connected route-map RM-CONN-2-BGP
 {%- for neighbor in bgp.neighbors %}
-      neighbor {{ neighbor.remote_ip | ipaddress_interface(attr='ip') }} activate
+      neighbor {{ neighbor.remote_ip.split('/')[0] }} activate
 {%- endfor %}
    address-family evpn
 {%- for neighbor in bgp.neighbors %}
-      neighbor {{ neighbor.remote_ip | ipaddress_interface(attr='ip') }} activate
+      neighbor {{ neighbor.remote_ip.split('/')[0] }} activate
 {%- endfor %}
 {# L2VPN EVPN for VLANs #}
 {%- for vlan in vlans %}

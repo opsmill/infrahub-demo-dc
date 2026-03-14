@@ -79,7 +79,7 @@ ltm pool {{ clean_hostname }}_pool {
 
 # Virtual Server configuration for {{ vip.hostname }}
 ltm virtual {{ clean_hostname }}_vs {
-    destination {{ vip.ip_address | ipaddress_interface(attr='ip') }}:80
+    destination {{ vip.ip_address.split('/')[0] }}:80
 {%-             if vip.ssl_certificate %}
     profiles {
         http { }
@@ -120,7 +120,7 @@ ltm profile client-ssl {{ clean_hostname }}_clientssl {
 
 # HTTPS Virtual Server for {{ vip.hostname }}
 ltm virtual {{ clean_hostname }}_https_vs {
-    destination {{ vip.ip_address | ipaddress_interface(attr='ip') }}:443
+    destination {{ vip.ip_address.split('/')[0] }}:443
     profiles {
         http { }
         {{ clean_hostname }}_clientssl {
