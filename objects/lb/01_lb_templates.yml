@@ -12,7 +12,7 @@ spec:
       cpu: 2
       memory: 2
       interfaces:
-        kind: TemplateDcimVirtualInterface
+        kind: TemplateInterfaceVirtual
         data:
           - template_name: PROXY_private
             name: private
@@ -27,7 +27,7 @@ spec:
       cpu: 2
       memory: 2
       interfaces:
-        kind: TemplateDcimVirtualInterface
+        kind: TemplateInterfaceVirtual
         data:
           - template_name: PROXY_private
             name: private

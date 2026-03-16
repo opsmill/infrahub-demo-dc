@@ -3,7 +3,7 @@
 version: "1.0"
 
 generics:
-  - name: GenericDevice
+  - name: GenericDevice # DcimGenericDevice
     namespace: Dcim
     description: Generic Device object.
     label: Device
@@ -74,7 +74,7 @@ generics:
         kind: Attribute
         order_weight: 1250
 
-  - name: PhysicalDevice
+  - name: PhysicalDevice # DcimPhysicalDevice
     namespace: Dcim
     description: Generic holding attributes and relationships relevant for physical device.
     include_in_menu: false
@@ -113,13 +113,14 @@ generics:
       - name: location
         label: Location
         peer: LocationHosting
+        identifier: hosting__devices
         optional: false
         cardinality: one
         kind: Attribute
         order_weight: 1500
         identifier: hosting__devices
 
-  - name: Endpoint
+  - name: Endpoint # DcimEndpoint
     namespace: Dcim
     description: Generic Endpoint to receive a connector.
     include_in_menu: false
@@ -131,7 +132,7 @@ generics:
         order_weight: 1500
         kind: Attribute
 
-  - name: Connector
+  - name: Connector # DcimConnector
     namespace: Dcim
     description: Generic Connector to link two endpoints together.
     include_in_menu: false
@@ -143,7 +144,7 @@ generics:
         kind: Generic
 
     # Interfaces
-  - name: Interface
+  - name: Interface # DcimInterface
     namespace: Dcim
     description: "Generic Network Interface"
     label: Interface
@@ -291,7 +292,7 @@ generics:
         kind: Attribute
         order_weight: 3000
 
-  - name: Layer2
+  - name: Layer2  # InterfaceLayer2
     namespace: Interface
     include_in_menu: false
     description: "Layer 2 specific attributes for network interfaces"
@@ -314,7 +315,7 @@ generics:
         description: "Layer 2 mode of the interface"
         order_weight: 1500
 
-  - name: Layer3
+  - name: Layer3  # InterfaceLayer3
     namespace: Interface
     include_in_menu: false
     description: "Layer 3 specific attributes for network interfaces"
@@ -341,7 +342,7 @@ generics:
         description: "List of IP addresses associated with the interface"
         order_weight: 1150
 
-  - name: HasSubInterface
+  - name: HasSubInterface  # InterfaceHasSubInterface
     namespace: Interface
     description: A generic interface that can have sub-interfaces
     include_in_menu: false
@@ -358,7 +359,7 @@ generics:
 
 nodes:
   # --------------------  Device (Types, Platforms, Device, Interfaces )  --------------------
-  - name: DeviceType
+  - name: DeviceType  # DcimDeviceType
     namespace: Dcim
     description: A model of device
     label: Device Type
@@ -421,7 +422,7 @@ nodes:
         kind: Attribute
         order_weight: 2000
 
-  - name: Platform
+  - name: Platform  # DcimPlatform
     namespace: Dcim
     description: A Platform represent the type of software running on a device.
     label: Platform
@@ -477,13 +478,13 @@ nodes:
         order_weight: 1300
         optional: false
 
-  - name: Device
+  - name: Device  # DcimDevice
+    namespace: Dcim
     label: Network Device
     description: A configurable network device for managing and directing data traffic, including routers, switches...
     icon: clarity:network-switch-solid
     include_in_menu: false
     generate_template: true
-    namespace: Dcim
     inherit_from:
       - CoreArtifactTarget
       - DcimGenericDevice
@@ -547,7 +548,7 @@ nodes:
             description: Load Balancer part of a Fabric.
             color: "#38e7fb"
 
-  - name: VirtualDevice
+  - name: VirtualDevice # DcimVirtualDevice
     namespace: Dcim
     description: Generic holding attributes and relationships relevant for virtual device.
     include_in_menu: false
@@ -621,7 +622,7 @@ nodes:
       - InterfaceHasSubInterface
     include_in_menu: false
 
-  - name: Virtual
+  - name: Virtual # InterfaceVirtual
     namespace: Interface
     label: Virtual Interface
     description: "Virtual interface like VLAN or Loopback"

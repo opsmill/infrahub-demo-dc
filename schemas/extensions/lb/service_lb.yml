@@ -3,9 +3,9 @@
 version: "1.0"
 
 nodes:
-  - name: VIP
+  - name: VIP # ServiceVIP
     namespace: Service
-    description: A load balancer that distributes network traffic via Virtual IPs (VIPs) to frontend servers.
+    description: A Virtual IP service that distributes network traffic to backend servers.
     label: "VIP Service"
     icon: carbon:floating-ip
     include_in_menu: false
@@ -97,48 +97,69 @@ nodes:
         description: The IP address for this VIP service.
         order_weight: 22
         on_delete: no-action
-      - name: frontend_servers
-        peer: DcimGenericDevice
-        optional: false
-        cardinality: many
-        kind: Component
-        identifier: device_service
-        on_delete: no-action
-        order_weight: 1000
       - name: backend_servers
-        peer: LoadbalancerServer
+        peer: ServerBackend
         identifier: vip__backend_servers
         cardinality: many
-        kind: Generic
+        kind: Component
         description: The list of backend servers that the VIP service forwards traffic to.
         order_weight: 1100
         on_delete: no-action
       - name: health_checks
-        peer: LoadbalancerHealthCheck
+        peer: ServerHealthCheck
         identifier: vip__health_checks
         cardinality: many
-        kind: Generic
+        kind: Component
         description: The list of health checks associated with the VIP service.
         order_weight: 1200
         on_delete: no-action
+
 extensions:
   nodes:
-    - kind: LoadbalancerServer
+    # DcimVirtualDevice Extensions (for Load Balancers with ASN)
+    - kind: DcimVirtualDevice
+      relationships:
+        - name: asn
+          label: ASN
+          peer: RoutingAutonomousSystem
+          cardinality: one
+          kind: Attribute
+          optional: true
+          description: ASN to use for BGP peering (for load balancers).
+          order_weight: 3000
+
+    # IPAM Extensions
+    - kind: IpamIPAddress
+      relationships:
+        - name: vip_service
+          kind: Component
+          peer: ServiceVIP
+          identifier: vip_service__ip
+          description: "VIP service using this IP"
+          cardinality: one
+          label: VIP Service
+          optional: true
+          order_weight: 1620
+
+    # Server Extensions
+    - kind: ServerBackend
       relationships:
         - name: virtual_ips
-          label: Virtual IPs
-          kind: Component
+          label: Virtual IP Services
+          kind: Generic
           cardinality: many
           optional: true
           peer: ServiceVIP
           description: Virtual IP services using this server as a backend
           order_weight: 2000
           identifier: vip__backend_servers
-    - kind: LoadbalancerHealthCheck
+
+    # ServerHealthCheck Extensions
+    - kind: ServerHealthCheck
       relationships:
-        - name: health_checks
-          label: Health Checks
-          kind: Component
+        - name: vip_services
+          label: VIP Services
+          kind: Generic
           cardinality: many
           optional: true
           peer: ServiceVIP

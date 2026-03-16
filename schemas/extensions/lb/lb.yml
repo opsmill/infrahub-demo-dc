@@ -4,12 +4,12 @@ version: "1.0"
 
 nodes:
 
-  - name: Server
-    namespace: Loadbalancer
+  - name: Backend # ServerBackend
+    namespace: Server
     label: Backend Servers
     icon: mdi:server-plus
     include_in_menu: false
-    description: A specific server entity capable of handling multiple roles such as web server, database server, etc.
+    description: A backend server that receives traffic from load balancers (web, app, database servers, etc.)
     attributes:
       - name: hostname
         kind: Text
@@ -20,6 +20,24 @@ nodes:
         kind: Text
         optional: true
         order_weight: 1100
+      - name: environment
+        kind: Dropdown
+        description: Environment where the server is deployed.
+        choices:
+          - name: production
+            label: Production
+            description: Used in the production environment.
+            color: "#ADD8E6"  # Light Blue
+          - name: development
+            label: Development
+            description: Used in the development environment.
+            color: "#FFB6C1"  # Light Pink
+          - name: staging
+            label: Staging
+            description: Used in the staging environment.
+            color: "#FFDAB9"  # Peach Puff
+        order_weight: 1150
+        default_value: production
       - name: status
         kind: Dropdown
         choices:
@@ -67,8 +85,8 @@ nodes:
         kind: Component
         description: The list of VIP using this server as Backend.
 
-  - name: HealthCheck
-    namespace: Loadbalancer
+  - name: HealthCheck # ServerHealthCheck
+    namespace: Server
     label: Health-Checks
     icon: tabler:checkup-list
     menu_placement: LoadbalancerVIP
@@ -122,19 +140,20 @@ nodes:
         kind: Text
         computed_attribute:
           kind: Jinja2
-          jinja2_template: "{{ check__value }}-{{ rise__value }}-{{ fall__value }}-{{ timeout__value }}"
+          jinja2_template: "{{ check__value }} (rise={{ rise__value }} fall={{ fall__value }} timeout={{ timeout__value }}ms)"
         read_only: true  # You must set the attribute to read-only as the value will be handled by the system
         optional: false
-# extensions:
-#   nodes:
-#     # IPAM Extensions
-#     - kind: IpamIPAddress
-#       relationships:
-#         - name: server
-#           kind: Component
-#           peer: ServerBase
-#           identifier: server__priv_ip
-#           description: "Server using this IP"
-#           cardinality: one
-#           label: Server
-#           order_weight: 1600
+
+extensions:
+  nodes:
+    # IPAM Extensions
+    - kind: IpamIPAddress
+      relationships:
+        - name: backend_server
+          kind: Component
+          peer: ServerBackend
+          identifier: server__ip
+          description: "Backend server using this IP"
+          cardinality: one
+          label: Backend Server
+          order_weight: 1600

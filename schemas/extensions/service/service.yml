@@ -2,7 +2,7 @@
 ---
 version: "1.0"
 generics:
-  - name: Generic
+  - name: Generic # ServiceGeneric
     namespace: Service
     description: "Services"
     order_by:
@@ -47,10 +47,9 @@ generics:
         optional: false
         on_delete: no-action
 
-  - name: GenericDevice
+  - name: GenericDevice # ServiceGenericDevice
     namespace: Service
     description: "Services"
-    # state: absent
     include_in_menu: false
     # This is only owning relationships toward various services for interfaces
     relationships:
@@ -63,7 +62,7 @@ generics:
         identifier: device_services
         order_weight: 1000
 
-  - name: GenericInterfaces
+  - name: GenericInterfaces # ServiceGenericInterfaces
     namespace: Service
     description: "Services"
     include_in_menu: false
@@ -81,7 +80,7 @@ extensions:
     - kind: DcimGenericDevice
       relationships:
         - name: device_services # l3_gateway
-          peer: ServiceGeneric
+          peer: ServiceGenericDevice
           label: Services
           optional: true
           direction: outbound
@@ -93,7 +92,7 @@ extensions:
     - kind: DcimInterface
       relationships:
         - name: interface_services # l2_segment
-          peer: ServiceGeneric
+          peer: ServiceGenericInterfaces
           label: Interface Services # L2 Segment(s)
           identifier: interface_services
           optional: true

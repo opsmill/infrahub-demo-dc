@@ -5,17 +5,11 @@ spec:
   kind: DcimVirtualDevice
   data:
     - name: dc-1-lb-01
-      location:
-        kind: LocationBuilding
-        data:
-          name: DC-1
-          shortname: DC-1
-          parent: Katowice
       device_type: HA-PROXY
       object_template: HA-PROXY
       status: active
-      cpu: 2
-      memory: 2
+      # cpu: 2
+      # memory: 2
       member_of_groups:
         - loadbalancers
       primary_address:
@@ -39,7 +33,7 @@ spec:
               data:
                 address: 10.1.100.1
             backend_servers:
-              kind: LoadbalancerServer
+              kind: ServerBackend
               data:
                 - hostname: web-frontend-01
                   ip_address:
@@ -53,7 +47,7 @@ spec:
                     data:
                       address: 10.1.10.102
             health_checks:
-              kind: LoadbalancerHealthCheck
+              kind: ServerHealthCheck
               data:
                 - check: ssl
                   rise: 5
@@ -61,17 +55,11 @@ spec:
                   timeout: 20
 
     - name: dc-1-lb-02
-      location:
-        kind: LocationBuilding
-        data:
-          name: DC-1
-          shortname: DC-1
-          parent: Katowice
       object_template: NGINX
       topology: DC-1
       status: active
-      cpu: 2
-      memory: 2
+      # cpu: 2
+      # memory: 2
       member_of_groups:
         - loadbalancers
       primary_address:
@@ -94,7 +82,7 @@ spec:
               data:
                 address: 10.1.200.1
             backend_servers:
-              kind: LoadbalancerServer
+              kind: ServerBackend
               data:
                 - hostname: web-frontend-03
                   ip_address:
@@ -108,7 +96,7 @@ spec:
                     data:
                       address: 10.1.10.104
             health_checks:
-              kind: LoadbalancerHealthCheck
+              kind: ServerHealthCheck
               data:
                 - check: tcp
                   rise: 5
