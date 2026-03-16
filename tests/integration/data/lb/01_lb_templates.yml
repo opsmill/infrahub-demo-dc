@@ -5,7 +5,7 @@ spec:
   kind: TemplateDcimVirtualDevice
   data:
     - template_name: HA-PROXY
-      device_type: HA-PROXY
+      device_type: [HAProxy Technologies, HA-PROXY]
       platform: [Generic, Linux]
       role: load_balancer
       status: active
@@ -20,7 +20,7 @@ spec:
         member_of_groups:
           - loadbalancers
     - template_name: NGINX
-      device_type: NGINX
+      device_type: [F5 Networks, NGINX]
       platform: [Generic, Linux]
       role: load_balancer
       status: active
