@@ -11,7 +11,7 @@ spec:
           name: DC-1
           shortname: DC-1
           parent: Katowice
-      device_type: HA-PROXY
+      device_type: [HAProxy Technologies, HA-PROXY]
       object_template: HA-PROXY
       status: active
       cpu: 2

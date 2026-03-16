@@ -7,7 +7,7 @@ spec:
     expand_range: true
   data:
     - template_name: N9K-C9336C-FX2_SPINE
-      device_type: N9K-C9336C-FX2
+      device_type: [Cisco, N9K-C9336C-FX2]
       role: spine
       status: active
       interfaces:
@@ -25,7 +25,7 @@ spec:
             name: mgmt0
             role: management
     - template_name: N9K-C9336C-FX2_LEAF
-      device_type: N9K-C9336C-FX2
+      device_type: [Cisco, N9K-C9336C-FX2]
       role: leaf
       status: active
       interfaces:
@@ -43,7 +43,7 @@ spec:
             name: mgmt0
             role: management
     - template_name: N9K-C9316D-GX_SPINE
-      device_type: N9K-C9316D-GX
+      device_type: [Cisco, N9K-C9316D-GX]
       role: spine
       status: active
       interfaces:
@@ -61,7 +61,7 @@ spec:
             name: mgmt0
             role: management
     - template_name: N9K-C9316D-GX_LEAF
-      device_type: N9K-C9316D-GX
+      device_type: [Cisco, N9K-C9316D-GX]
       role: leaf
       status: active
       interfaces:
@@ -79,7 +79,7 @@ spec:
             name: mgmt0
             role: management
     - template_name: DCS-7280DR3-24-F_SPINE
-      device_type: DCS-7280DR3-24-F
+      device_type: [Arista, DCS-7280DR3-24-F]
       role: spine
       status: active
       interfaces:
@@ -97,7 +97,7 @@ spec:
             name: Management1
             role: management
     - template_name: CCS-720DP-48S-2F_LEAF
-      device_type: CCS-720DP-48S-2F
+      device_type: [Arista, CCS-720DP-48S-2F]
       role: leaf
       status: active
       interfaces:
@@ -115,7 +115,7 @@ spec:
             name: Management1
             role: management
     - template_name: SRX-1500_EDGE_FIREWALL
-      device_type: SRX-1500
+      device_type: [Juniper, SRX-1500]
       role: edge_firewall
       status: active
       interfaces:
@@ -130,7 +130,7 @@ spec:
             name: ge-0/0/[0-3]
             role: leaf
     - template_name: SRX-1500_DC_FIREWALL
-      device_type: SRX-1500
+      device_type: [Juniper, SRX-1500]
       role: dc_firewall
       status: active
       interfaces:
@@ -145,7 +145,7 @@ spec:
             name: ge-0/0/[0-3]
             role: leaf
     - template_name: C9200L-24P-4G_OOB
-      device_type: C9200L-24P-4G
+      device_type: [Cisco, C9200L-24P-4G]
       role: oob
       status: active
       interfaces:
@@ -160,7 +160,7 @@ spec:
             name: mgmt0
             role: management
     - template_name: SCG50R_CONSOLE
-      device_type: SCG50R
+      device_type: [Perle, SCG50R]
       role: console
       status: active
       interfaces:
@@ -172,7 +172,7 @@ spec:
             name: Ethernet[0-1]
             role: management
     - template_name: N9K-C9316D-GX_EDGE
-      device_type: N9K-C9316D-GX
+      device_type: [Cisco, N9K-C9316D-GX]
       role: edge
       status: active
       interfaces:
@@ -190,7 +190,7 @@ spec:
             name: mgmt0
             role: management
     - template_name: 5912-54X-O-AC-F_LEAF
-      device_type: 5912-54X-O-AC-F
+      device_type: [Edgecore, 5912-54X-O-AC-F]
       role: leaf
       status: active
       interfaces:
@@ -208,7 +208,7 @@ spec:
             name: eth0
             role: management
     - template_name: 7726-32X-O_SPINE
-      device_type: 7726-32X-O
+      device_type: [Edgecore, 7726-32X-O]
       role: spine
       status: active
       interfaces:
@@ -314,7 +314,7 @@ spec:
             name: Ethernet124
             role: uplink
     - template_name: QFX5220-32CD_SPINE
-      device_type: QFX5220-32CD
+      device_type: [Juniper, QFX5220-32CD]
       role: spine
       status: active
       interfaces:
@@ -329,7 +329,7 @@ spec:
             name: ge-0/0/[0-3]
             role: leaf
     - template_name: QFX5220-32CD_LEAF
-      device_type: QFX5220-32CD
+      device_type: [Juniper, QFX5220-32CD]
       role: leaf
       status: active
       interfaces:
