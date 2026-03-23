@@ -153,7 +153,7 @@ class NetworkSegmentGenerator(InfrahubGenerator):
                 continue
 
             # Query for customer interfaces on this device
-            interfaces = await self.client.all(
+            interfaces = await self.client.filters(
                 kind="InterfacePhysical",
                 device__ids=[device_id],
                 role__value="customer",
@@ -166,8 +166,9 @@ class NetworkSegmentGenerator(InfrahubGenerator):
 
         if interface_ids:
             # Update segment with interface associations
-            segment.interfaces.add(interface_ids)
-            await segment.save()
+            await segment.interfaces.fetch()
+            segment.interfaces.extend(interface_ids)
+            await segment.save(allow_upsert=True)
             self.logger.info(f"Associated {len(interface_ids)} interfaces with segment {segment_name}")
         else:
             self.logger.info(f"No customer interfaces found for segment {segment_name}")
