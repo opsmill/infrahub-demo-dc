@@ -210,6 +210,9 @@ def demo_dc_arista(context: Context, branch: str = "add-dc3") -> None:
     console.print(f"\n[cyan]→[/cyan] Creating branch: [bold]{branch}[/bold]")
     context.run(f"uv run infrahubctl branch create {branch}")
 
+    console.print("\n[yellow]→[/yellow] Waiting for branch to be ready...")
+    time.sleep(10)
+
     console.print(f"\n[cyan]→[/cyan] Loading DC Arista topology to branch: [bold]{branch}[/bold]")
     context.run(f"uv run infrahubctl object load objects/dc/dc-arista-s.yml --branch {branch}")
 
@@ -662,6 +665,23 @@ def demo_cloud(context: Context, branch: str = "demo-cloud") -> None:
         )
     )
     console.print()
+
+
+@task(optional=["branch", "device"], name="demo-conflict")
+def demo_conflict(context: Context, branch: str = "conflict-demo", device: str = "cisco-switch-01") -> None:
+    """Create a branch with a data conflict for testing conflict resolution."""
+    console.print()
+    console.print(
+        Panel(
+            f"[bold bright_red]Conflict Demo[/bold bright_red]\n"
+            f"[dim]Branch:[/dim] {branch}\n"
+            f"[dim]Device:[/dim] {device}",
+            border_style="bright_red",
+            box=box.SIMPLE,
+        )
+    )
+
+    context.run(f"uv run python scripts/create_conflict.py --branch {branch} --device {device}", pty=True)
 
 
 @task(name="docs")
