@@ -1,14 +1,14 @@
 ---
 # yamllint disable rule:truthy rule:truthy rule:line-length
-name: "Update Infrahub Test Containers Version"
+name: "Update infrahub-sdk-python  Version"
 
 on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Infrahub version to test"
+        description: "infrahub-sdk version to test"
         required: true
-        default: "1.8.1"
+        default: "1.19.0"
       run:
         description: "Whether to run integration tests"
         required: false
@@ -16,13 +16,7 @@ on:
         default: true
 
   repository_dispatch:
-    types: [trigger-infrahub-update]
-
-env:
-  # always needed
-  # INFRAHUB_API_TOKEN: ${{ secrets.INFRAHUB_API_TOKEN }}
-  INFRAHUB_TIMEOUT: 600
-  INFRAHUB_TESTING_LOG_LEVEL: INFO
+    types: [trigger-infrahub-sdk-python-update]
 
 jobs:
   update-dependencies:
@@ -37,25 +31,33 @@ jobs:
       cancel-in-progress: false
 
     env:
-      INFRAHUB_VERSION: ${{ github.event_name == 'repository_dispatch' && github.event.client_payload.version || github.event.inputs.version }}
-      BRANCH_NAME: ${{ matrix.branch-name }}-${{ github.event_name == 'repository_dispatch' && github.event.client_payload.version || github.event.inputs.version }}
+      INFRAHUB_SDK_VERSION: ${{ github.event_name == 'repository_dispatch' && github.event.client_payload.version || github.event.inputs.version }}
+      BRANCH_NAME: ${{ matrix.branch-name }}-infrahub-sdk-${{ github.event_name == 'repository_dispatch' && github.event.client_payload.version || github.event.inputs.version }}
     steps:
       - name: Check out code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
           python-version: '3.12'
 
-      - name: Install uv
-        run: |
-          pip install uv
-          uv sync
+      - name: "Install Poetry"
+        uses: "snok/install-poetry@v1"
+        with:
+          version: 1.8.5
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+          installer-parallel: true
 
-      - name: Update testcontainers to workflow version ${{ env.INFRAHUB_VERSION }}
+      - name: "Setup Python environment"
         run: |
-          uv add --group dev infrahub-testcontainers==${INFRAHUB_VERSION}
+          poetry config virtualenvs.create true --local
+          poetry env use 3.12
+
+      - name: Update testcontainers to workflow version ${{ env.INFRAHUB_SDK_VERSION }}
+        run: |
+          poetry add infrahub-sdk==${INFRAHUB_SDK_VERSION} -E all
 
       - name: Prepare the branch for the update
         id: prepare-branch
@@ -69,10 +71,10 @@ jobs:
         with:
           github-token: ${{ secrets.GH_UPDATE_PACKAGE_OTTO }}
           push-branch: ${{ env.BRANCH_NAME }}
-          commit-message: "chore: update test-containers to version ${{ env.INFRAHUB_VERSION }} and bump version in pyproject"
+          commit-message: "chore: update infrahub-sdk to version ${{ env.INFRAHUB_SDK_VERSION }} and bump version in pyproject"
           files: |
             pyproject.toml
-            uv.lock
+            poetry.lock
           name: opsmill-bot
           email: github-bot@opsmill.com
           rebase: ${{ env.BRANCH_EXISTS == 1 }}
@@ -81,7 +83,7 @@ jobs:
         run: |
           echo ${{ secrets.GH_UPDATE_PACKAGE_OTTO }} | gh auth login --with-token
           gh pr create \
-            --title "update test-containers to version ${{ env.INFRAHUB_VERSION }} against ${{ matrix.branch-name}}" \
-            --body "This PR updates test-containers to version ${{ env.INFRAHUB_VERSION }}." \
+            --title "update infrahub-sdk to version ${{ env.INFRAHUB_SDK_VERSION }} against ${{ matrix.branch-name}}" \
+            --body "This PR updates infrahub-sdk to version ${{ env.INFRAHUB_SDK_VERSION }}." \
             --base ${{ matrix.branch-name}} \
             --head ${{ env.BRANCH_NAME }}
