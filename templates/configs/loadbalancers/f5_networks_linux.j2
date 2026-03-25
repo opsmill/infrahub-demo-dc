@@ -35,106 +35,107 @@ sys snmp {
 }
 
 {%- if vips %}
-{%- for vip in vips %}
-{%- if vip.backend_servers %}
+{%-     for vip in vips %}
+{%-         if vip.backend_servers %}
+{%-             set clean_hostname = vip.hostname | replace('.', '_') | replace('-', '_') %}
 
 # Pool configuration for {{ vip.hostname }}
-ltm pool {{ vip.hostname | replace('.', '_') | replace('-', '_') }}_pool {
-    {%- if vip.balance == 'roundrobin' %}
+ltm pool {{ clean_hostname }}_pool {
+{%-             if vip.balance == 'roundrobin' %}
     load-balancing-mode round-robin
-    {%- elif vip.balance == 'leastconn' %}
+{%-             elif vip.balance == 'leastconn' %}
     load-balancing-mode least-connections-member
-    {%- elif vip.balance == 'source' %}
+{%-             elif vip.balance == 'source' %}
     load-balancing-mode source-address-hash
-    {%- elif vip.balance == 'random' %}
+{%-             elif vip.balance == 'random' %}
     load-balancing-mode ratio-member
-    {%- else %}
+{%-             else %}
     load-balancing-mode round-robin
-    {%- endif %}
+{%-             endif %}
 
-    {%- if vip.mode == 'http' %}
+{%-             if vip.mode == 'http' %}
     monitor http
-    {%- else %}
+{%-             else %}
     monitor tcp
-    {%- endif %}
+{%-             endif %}
 
     members {
-        {%- for server in vip.backend_servers %}
+{%-             for server in vip.backend_servers %}
         {{ server.ip_address }}:{{ server.port | default(80) }} {
             address {{ server.ip_address }}
-            {%- if server.max_fails %}
+{%-                 if server.max_fails %}
             ratio {{ server.max_fails }}
-            {%- endif %}
+{%-                 endif %}
         }
-        {%- endfor %}
+{%-             endfor %}
     }
 
-    {%- if vip.health_checks %}
-    {%- for check in vip.health_checks %}
+{%-             if vip.health_checks %}
+{%-                 for check in vip.health_checks %}
     # Health check: {{ check.check_type }} (rise={{ check.rise }}, fall={{ check.fall }}, timeout={{ check.timeout }}ms)
-    {%- endfor %}
-    {%- endif %}
+{%-                 endfor %}
+{%-             endif %}
 }
 
 # Virtual Server configuration for {{ vip.hostname }}
-ltm virtual {{ vip.hostname | replace('.', '_') | replace('-', '_') }}_vs {
+ltm virtual {{ clean_hostname }}_vs {
     destination {{ vip.ip_address.split('/')[0] }}:80
-    {%- if vip.ssl_certificate %}
+{%-             if vip.ssl_certificate %}
     profiles {
         http { }
         clientssl {
             context clientside
         }
     }
-    {%- elif vip.mode == 'http' %}
+{%-             elif vip.mode == 'http' %}
     profiles {
         http { }
         tcp { }
     }
-    {%- else %}
+{%-             else %}
     profiles {
         tcp { }
     }
-    {%- endif %}
+{%-             endif %}
 
-    pool {{ vip.hostname | replace('.', '_') | replace('-', '_') }}_pool
+    pool {{ clean_hostname }}_pool
     source-address-translation {
         type automap
     }
 
-    {%- if vip.mode == 'http' %}
+{%-             if vip.mode == 'http' %}
     rules {
         # HTTP processing rules can be added here
     }
-    {%- endif %}
+{%-             endif %}
 }
 
-{%- if vip.ssl_certificate %}
+{%-             if vip.ssl_certificate %}
 # SSL Certificate Profile for {{ vip.hostname }}
-ltm profile client-ssl {{ vip.hostname | replace('.', '_') | replace('-', '_') }}_clientssl {
+ltm profile client-ssl {{ clean_hostname }}_clientssl {
     cert {{ vip.ssl_certificate }}.crt
     key {{ vip.ssl_certificate }}.key
     chain {{ vip.ssl_certificate }}_chain.crt
 }
 
 # HTTPS Virtual Server for {{ vip.hostname }}
-ltm virtual {{ vip.hostname | replace('.', '_') | replace('-', '_') }}_https_vs {
+ltm virtual {{ clean_hostname }}_https_vs {
     destination {{ vip.ip_address.split('/')[0] }}:443
     profiles {
         http { }
-        {{ vip.hostname | replace('.', '_') | replace('-', '_') }}_clientssl {
+        {{ clean_hostname }}_clientssl {
             context clientside
         }
     }
-    pool {{ vip.hostname | replace('.', '_') | replace('-', '_') }}_pool
+    pool {{ clean_hostname }}_pool
     source-address-translation {
         type automap
     }
 }
-{%- endif %}
+{%-             endif %}
 
-{%- endif %}
-{%- endfor %}
+{%-         endif %}
+{%-     endfor %}
 {%- endif %}
 
 # System Statistics Configuration
@@ -173,4 +174,3 @@ ltm monitor tcp tcp_monitor {
     interval 30
     timeout 91
 }
-

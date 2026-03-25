@@ -18,19 +18,19 @@ vlan {{ vlan.vlan_id }}
 {#- Loopback Interfaces -#}
 {% for loopback_name, loopback_ip in loopbacks.items() %}
 interface {{ loopback_name }}
-{% if loopback_name == 'loopback0' %}
+{%     if loopback_name == 'loopback0' %}
   description {{ hostname }} Underlay Loopback Interface
   ip address {{ loopback_ip }}/32
   ip router ospf {{ ospf.process_id }} area {{ ospf.area }}
-{% elif loopback_name == 'loopback1' %}
+{%     elif loopback_name == 'loopback1' %}
   description {{ hostname }} VTEP Loopback Interface
   ip address {{ loopback_ip }}/32
 {#- loopback1 is NOT in OSPF, used only for iBGP EVPN overlay -#}
-{% else %}
+{%     else %}
   description {{ hostname }} {{ loopback_name }} Interface
   ip address {{ loopback_ip }}/32
   ip router ospf {{ ospf.process_id }} area {{ ospf.area }}
-{% endif %}
+{%     endif %}
 {% endfor %}
 
 {#- NVE Interface for VXLAN VTEP (using loopback1) -#}
@@ -40,59 +40,59 @@ interface nve1
   no shutdown
   host-reachability protocol bgp
   source-interface loopback1
-{% for vlan in vlans %}
+{%     for vlan in vlans %}
   member vni {{ vlan.vni }}
     ingress-replication protocol bgp
-{% endfor %}
+{%     endfor %}
 {% endif %}
 
 {#- All Physical Interfaces (sorted) -#}
 {% for interface in interfaces.all_physical %}
 interface {{ interface.name }}
-{% if interface.description %}
+{%     if interface.description %}
   description {{ interface.description }}
-{% elif interface.role == 'uplink' %}
+{%     elif interface.role == 'uplink' %}
   description Uplink interface
-{% elif interface.role == 'customer' %}
+{%     elif interface.role == 'customer' %}
   description Customer interface
-{% else %}
-  description {{ interface.role|title }} interface
-{% endif %}
-{% if interface.role == 'uplink' %}
+{%     else %}
+  description {{ interface.role | title }} interface
+{%     endif %}
+{%     if interface.role == 'uplink' %}
   no switchport
   mtu {{ interface.mtu }}
   ip unnumbered loopback0
   ip ospf network point-to-point
   ip router ospf {{ ospf.process_id }} area {{ ospf.area }}
   no shutdown
-{% elif interface.vlans %}
-{% if interface.vlans|length == 1 %}
+{%     elif interface.vlans %}
+{%         if interface.vlans | length == 1 %}
   switchport access vlan {{ interface.vlans[0] }}
-{% else %}
-  switchport trunk allowed vlan {{ interface.vlans|join(',') }}
-{% endif %}
-{% endif %}
+{%         else %}
+  switchport trunk allowed vlan {{ interface.vlans | join(',') }}
+{%         endif %}
+{%     endif %}
 {% endfor %}
 
 {#- Management Interfaces -#}
 {% for interface in interfaces.management %}
 interface {{ interface.name }}
-{% if interface.description %}
+{%     if interface.description %}
   description {{ interface.description }}
-{% else %}
+{%     else %}
   description Management interface
-{% endif %}
+{%     endif %}
   vrf member management
 {% endfor %}
 
 {#- Console Interfaces -#}
 {% for interface in interfaces.console %}
 interface {{ interface.name }}
-{% if interface.description %}
+{%     if interface.description %}
   description {{ interface.description }}
-{% else %}
+{%     else %}
   description Console interface
-{% endif %}
+{%     endif %}
 {% endfor %}
 
 {#- OSPF Configuration -#}

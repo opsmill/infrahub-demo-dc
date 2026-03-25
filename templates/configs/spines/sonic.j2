@@ -1,3 +1,6 @@
+{% set default_ospf_area = '0.0.0.0' %}
+{% set default_ospf_process_id = 'Underlay' %}
+{% set default_router_id = loopbacks.loopback0 %}
 nv overlay evpn
 feature ospf
 feature bgp
@@ -12,17 +15,17 @@ vrf context management
 {#- All Downlink Interfaces (sorted) -#}
 {% for interface in interface_roles.all_downlink %}
 interface {{ interface.name }}
-{% if interface.description %}
+{%     if interface.description %}
   description {{ interface.description }}
-{% else %}
+{%     else %}
   description Link to Leaf
-{% endif %}
+{%     endif %}
   no switchport
   mtu {{ interface.mtu or 9216 }}
   medium p2p
   ip unnumbered loopback0
   ip ospf network point-to-point
-  ip router ospf {{ ospf.process_id or 'Underlay' }} area {{ ospf.area or '0.0.0.0' }}
+  ip router ospf {{ ospf.process_id or default_ospf_process_id }} area {{ ospf.area or default_ospf_area }}
   ip pim sparse-mode
   no shutdown
 
@@ -34,26 +37,26 @@ interface mgmt0
 {#- Loopback interfaces -#}
 {% for interface in interface_roles.loopback %}
 interface {{ interface.name }}
-{% if interface.name == 'loopback0' %}
+{%     if interface.name == 'loopback0' %}
   description Underlay Routing Loopback
-{% elif interface.name == 'loopback1' %}
+{%     elif interface.name == 'loopback1' %}
   description VTEP Loopback Interface
-{% elif interface.description %}
+{%     elif interface.description %}
   description {{ interface.description }}
-{% else %}
+{%     else %}
   description Routing Loopback
-{% endif %}
-{% if interface.ip_address %}
+{%     endif %}
+{%     if interface.ip_address %}
   ip address {{ interface.ip_address | replace('/24', '/32') }}
-{% endif %}
-{% if interface.name == 'loopback0' %}
-  ip router ospf {{ ospf.process_id or 'Underlay' }} area {{ ospf.area or '0.0.0.0' }}
+{%     endif %}
+{%     if interface.name == 'loopback0' %}
+  ip router ospf {{ ospf.process_id or default_ospf_process_id }} area {{ ospf.area or default_ospf_area }}
   ip pim sparse-mode
-{% elif interface.name != 'loopback1' %}
+{%     elif interface.name != 'loopback1' %}
 {#- loopback1 is NOT in OSPF, used only for iBGP EVPN overlay -#}
-  ip router ospf {{ ospf.process_id or 'Underlay' }} area {{ ospf.area or '0.0.0.0' }}
+  ip router ospf {{ ospf.process_id or default_ospf_process_id }} area {{ ospf.area or default_ospf_area }}
   ip pim sparse-mode
-{% endif %}
+{%     endif %}
 {% endfor %}
 
 icam monitor scale
@@ -62,11 +65,11 @@ cli alias name wr copy r s
 line console
 line vty
 
-router ospf {{ ospf.process_id or 'Underlay' }}
-  router-id {{ ospf.router_id or loopbacks.loopback0 }}
+router ospf {{ ospf.process_id or default_ospf_process_id }}
+  router-id {{ ospf.router_id or default_router_id}}
 
 router bgp {{ bgp.local_as }}
-  router-id {{ bgp.router_id or loopbacks.loopback0 }}
+  router-id {{ bgp.router_id or default_router_id }}
 {% for neighbor in bgp.neighbors %}
   neighbor {{ neighbor.remote_ip.split('/')[0] }}
     remote-as {{ neighbor.remote_as }}

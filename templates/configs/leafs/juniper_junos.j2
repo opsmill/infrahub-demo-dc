@@ -40,41 +40,41 @@ chassis {
 interfaces {
 {%- for interface in interface_list %}
     {{ interface.name }} {
-{%- if interface.description %}
+{%-     if interface.description %}
         description "{{ interface.description }}";
-{%- endif %}
-{%- if interface.status == 'active' %}
+{%-     endif %}
+{%-     if interface.status == 'active' %}
         ## Interface is active
-{%- else %}
+{%-     else %}
         disable;
-{%- endif %}
-{%- if interface.mtu %}
+{%-     endif %}
+{%-     if interface.mtu %}
         mtu {{ interface.mtu }};
-{%- endif %}
+{%-     endif %}
         unit 0 {
-{%- if interface.vlans %}
-{%- if interface.vlans|length == 1 %}
+{%-     if interface.vlans %}
+{%-         if interface.vlans | length == 1 %}
             family ethernet-switching {
                 interface-mode access;
                 vlan {
                     members {{ interface.vlans[0] }};
                 }
             }
-{%- else %}
+{%-         else %}
             family ethernet-switching {
                 interface-mode trunk;
                 vlan {
-                    members [ {{ interface.vlans|join(' ') }} ];
+                    members [ {{ interface.vlans | join(' ') }} ];
                 }
             }
-{%- endif %}
-{%- elif interface.ip_addresses %}
+{%-         endif %}
+{%-     elif interface.ip_addresses %}
             family inet {
-{%- for ip in interface.ip_addresses %}
+{%-         for ip in interface.ip_addresses %}
                 address {{ ip.address }};
-{%- endfor %}
+{%-         endfor %}
             }
-{%- endif %}
+{%-     endif %}
         }
     }
 {%- endfor %}
@@ -82,35 +82,35 @@ interfaces {
 {%- if vlans %}
     ## Integrated Routing and Bridging (IRB) for L3 VLANs
     irb {
-{%- for vlan in vlans %}
+{%-     for vlan in vlans %}
         unit {{ vlan.vlan_id }} {
             description "{{ vlan.name }} Gateway";
             family inet {
                 address 192.168.{{ vlan.vlan_id }}.1/24;
             }
         }
-{%- endfor %}
+{%-     endfor %}
     }
 {%- endif %}
 }
 
 {%- if ospf_configs %}
-{%- for ospf_config in ospf_configs %}
+{%-     for ospf_config in ospf_configs %}
 
 protocols {
     ospf {
         reference-bandwidth {{ ospf_config.reference_bandwidth or 10000 }}m;
-{%- if ospf_config.area %}
+{%-         if ospf_config.area %}
         area {{ ospf_config.area }} {
-{%- for interface in interface_list %}
-{%- if interface.get('ospf') and interface.ospf.area == ospf_config.area %}
+{%-             for interface in interface_list %}
+{%-                 if interface.get('ospf') and interface.ospf.area == ospf_config.area %}
             interface {{ interface.name }}.0 {
                 interface-type p2p;
             }
-{%- endif %}
-{%- endfor %}
+{%-                 endif %}
+{%-             endfor %}
         }
-{%- endif %}
+{%-         endif %}
     }
 
     lldp {
@@ -119,72 +119,72 @@ protocols {
 
     rstp;
 }
-{%- endfor %}
+{%-     endfor %}
 {%- endif %}
 
 {%- if bgp_profiles %}
-{%- for bgp_config in bgp_profiles %}
+{%-     for bgp_config in bgp_profiles %}
 
 routing-options {
-{%- if bgp_config.router_id and bgp_config.router_id.address %}
+{%-         if bgp_config.router_id and bgp_config.router_id.address %}
     router-id {{ bgp_config.router_id.address.split('/')[0] }};
-{%- endif %}
+{%-         endif %}
     autonomous-system {{ bgp_config.local_as.asn }};
 }
 
 protocols {
     bgp {
-{%- if bgp_config.graceful_restart %}
+{%-         if bgp_config.graceful_restart %}
         graceful-restart;
-{%- endif %}
+{%-         endif %}
 
         ## BGP Peer Group: {{ bgp_config.profile }}
         group {{ bgp_config.profile }} {
             type {{ 'internal' if bgp_config.session_type == 'INTERNAL' else 'external' }};
-{%- if bgp_config.local_ip and bgp_config.local_ip.address %}
+{%-         if bgp_config.local_ip and bgp_config.local_ip.address %}
             local-address {{ bgp_config.local_ip.address.split('/')[0] }};
-{%- endif %}
+{%-         endif %}
             family inet {
                 unicast {
-{%- if bgp_config.multipath %}
+{%-         if bgp_config.multipath %}
                     multipath;
-{%- endif %}
+{%-         endif %}
                 }
             }
             family evpn {
                 signaling;
             }
-{%- if bgp_config.send_community_extended %}
+{%-         if bgp_config.send_community_extended %}
             send-community extended;
-{%- endif %}
+{%-         endif %}
 
-{%- for session in bgp_config.sessions %}
+{%-         for session in bgp_config.sessions %}
             neighbor {{ session.remote_ip.address.split('/')[0] }} {
-{%- if session.name %}
+{%-             if session.name %}
                 description "{{ session.name }}";
-{%- endif %}
-{%- if bgp_config.session_type == 'INTERNAL' %}
+{%-             endif %}
+{%-             if bgp_config.session_type == 'INTERNAL' %}
                 peer-as {{ bgp_config.local_as.asn }};
-{%- else %}
+{%-             else %}
                 peer-as {{ session.remote_as.asn }};
-{%- endif %}
+{%-             endif %}
             }
-{%- endfor %}
+{%-         endfor %}
         }
     }
 }
-{%- endfor %}
+{%-     endfor %}
 {%- endif %}
 
 {%- if vlans %}
 
 vlans {
-{%- for vlan in vlans %}
+{%-     for vlan in vlans %}
     {{ vlan.name }} {
         vlan-id {{ vlan.vlan_id }};
         l3-interface irb.{{ vlan.vlan_id }};
     }
-{%- endfor %}
+{%-     endfor %}
 }
 {%- endif %}
 

@@ -31,6 +31,7 @@ dev = [
     "types-pyyaml>=6.0.12",
     "types-requests>=2.32.0",
     "yamllint>=1.37.1",
+    "j2lint>=1.2.0",
 ]
 
 [tool.setuptools]

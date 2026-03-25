@@ -42,20 +42,20 @@ interfaces {
 {%- for interface in interface_roles.loopback %}
     ## Loopback Interface: {{ interface.name }}
     {{ interface.name.replace('loopback', 'lo') }} {
-{%- if interface.name == 'loopback0' %}
+{%-     if interface.name == 'loopback0' %}
         description "Underlay Routing Loopback";
-{%- elif interface.name == 'loopback1' %}
+{%-     elif interface.name == 'loopback1' %}
         description "VTEP Loopback Interface";
-{%- elif interface.description %}
+{%-     elif interface.description %}
         description "{{ interface.description }}";
-{%- else %}
+{%-     else %}
         description "Routing Loopback";
-{%- endif %}
+{%-     endif %}
         unit 0 {
             family inet {
-{%- if interface.ip_address %}
+{%-     if interface.ip_address %}
                 address {{ interface.ip_address | replace('/24', '/32') }};
-{%- endif %}
+{%-     endif %}
             }
         }
     }
@@ -64,16 +64,16 @@ interfaces {
 {%- for interface in interface_roles.all_downlink %}
     ## Downlink to Leaf
     {{ interface.name }} {
-{%- if interface.description %}
+{%-     if interface.description %}
         description "{{ interface.description }}";
-{%- else %}
+{%-     else %}
         description "Link to Leaf";
-{%- endif %}
-{%- if interface.mtu %}
+{%-     endif %}
+{%-     if interface.mtu %}
         mtu {{ interface.mtu }};
-{%- else %}
+{%-     else %}
         mtu 9214;
-{%- endif %}
+{%-     endif %}
         unit 0 {
             family inet {
                 unnumbered-address lo0.0;
@@ -85,17 +85,17 @@ interfaces {
 {%- for interface in interface_roles.management %}
     ## Management Interface
     {{ interface.name }} {
-{%- if interface.description %}
+{%-     if interface.description %}
         description "{{ interface.description }}";
-{%- else %}
+{%-     else %}
         description "Management interface";
-{%- endif %}
+{%-     endif %}
         unit 0 {
-{%- if interface.ip_address %}
+{%-     if interface.ip_address %}
             family inet {
                 address {{ interface.ip_address }};
             }
-{%- endif %}
+{%-     endif %}
         }
     }
 {%- endfor %}
@@ -106,22 +106,22 @@ interfaces {
 protocols {
     ospf {
         reference-bandwidth {{ ospf.reference_bandwidth or 10000 }}m;
-{%- if ospf.area %}
+{%-     if ospf.area %}
         area {{ ospf.area }} {
-{%- for interface in interface_roles.loopback %}
-{%- if interface.name != 'loopback1' %}
+{%-         for interface in interface_roles.loopback %}
+{%-             if interface.name != 'loopback1' %}
             interface {{ interface.name.replace('loopback', 'lo') }}.0 {
                 passive;
             }
-{%- endif %}
-{%- endfor %}
-{%- for interface in interface_roles.all_downlink %}
+{%-             endif %}
+{%-         endfor %}
+{%-         for interface in interface_roles.all_downlink %}
             interface {{ interface.name }}.0 {
                 interface-type p2p;
             }
-{%- endfor %}
+{%-         endfor %}
         }
-{%- endif %}
+{%-     endif %}
     }
 
     lldp {
@@ -135,11 +135,11 @@ protocols {
 {%- if bgp %}
 
 routing-options {
-{%- if bgp.router_id %}
+{%-     if bgp.router_id %}
     router-id {{ bgp.router_id }};
-{%- elif loopbacks.loopback0 %}
+{%-     elif loopbacks.loopback0 %}
     router-id {{ loopbacks.loopback0.split('/')[0] }};
-{%- endif %}
+{%-     endif %}
     autonomous-system {{ bgp.local_as }};
 }
 
@@ -158,15 +158,15 @@ protocols {
             }
             cluster {{ bgp.router_id or loopbacks.loopback0.split('/')[0] }};
 
-{%- for neighbor in bgp.neighbors %}
+{%-     for neighbor in bgp.neighbors %}
             neighbor {{ neighbor.remote_ip.split('/')[0] }} {
-{%- if neighbor.name %}
+{%-         if neighbor.name %}
                 description "{{ neighbor.name }} (Route Reflector Client)";
-{%- else %}
+{%-         else %}
                 description "BGP Neighbor (Route Reflector Client)";
-{%- endif %}
+{%-         endif %}
             }
-{%- endfor %}
+{%-     endfor %}
         }
     }
 }
