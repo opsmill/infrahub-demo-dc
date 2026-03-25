@@ -149,6 +149,8 @@ def execute_segment_creation_step(client: InfrahubClient) -> None:
 
             with st.status("Creating network segment...", expanded=True) as status:
                 st.write(f"Creating segment: {customer_name} in {deployment_name}")
+                st.write(f"Deployment ID: {segment_data['deployment']}")
+                st.write(f"Owner ID: {segment_data['owner']}")
                 segment = client.create_network_segment(branch_name, segment_data)
                 st.write(f"Segment created: {segment['name']['value']}")
                 status.update(label="Network segment created!", state="complete")

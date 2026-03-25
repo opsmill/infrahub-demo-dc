@@ -1302,41 +1302,56 @@ class InfrahubClient:
             InfrahubAPIError: If API error occurs
         """
         try:
-            mutation = """
+            prefix = data.get("prefix")
+
+            # Build mutation dynamically to exclude prefix when not provided,
+            # since passing prefix: { id: null } causes server errors
+            prefix_var = ""
+            prefix_field = ""
+            if prefix:
+                prefix_var = "$prefix: String,"
+                prefix_field = "prefix: { id: $prefix }"
+
+            mutation = f"""
             mutation CreateNetworkSegment(
                 $customer_name: String!,
                 $environment: String!,
                 $segment_type: String!,
                 $tenant_isolation: String!,
-                $vlan_id: Int!,
+                $vlan_id: BigInt!,
                 $deployment: String!,
                 $owner: String!,
+                $group_id: String!,
                 $external_routing: Boolean,
-                $prefix: String
-            ) {
+                {prefix_var}
+            ) {{
                 ServiceNetworkSegmentCreate(
-                    data: {
-                        customer_name: { value: $customer_name }
-                        environment: { value: $environment }
-                        segment_type: { value: $segment_type }
-                        tenant_isolation: { value: $tenant_isolation }
-                        vlan_id: { value: $vlan_id }
-                        deployment: { id: $deployment }
-                        owner: { id: $owner }
-                        external_routing: { value: $external_routing }
-                        prefix: { id: $prefix }
-                    }
-                ) {
+                    data: {{
+                        customer_name: {{ value: $customer_name }}
+                        environment: {{ value: $environment }}
+                        segment_type: {{ value: $segment_type }}
+                        tenant_isolation: {{ value: $tenant_isolation }}
+                        vlan_id: {{ value: $vlan_id }}
+                        deployment: {{ id: $deployment }}
+                        owner: {{ id: $owner }}
+                        member_of_groups: [{{ id: $group_id }}]
+                        external_routing: {{ value: $external_routing }}
+                        {prefix_field}
+                    }}
+                ) {{
                     ok
-                    object {
+                    object {{
                         id
-                        name { value }
-                    }
-                }
-            }
+                        name {{ value }}
+                    }}
+                }}
+            }}
             """
 
-            variables = {
+            # Look up the network_segments group ID
+            group_id = self._get_group_id("network_segments", branch)
+
+            variables: Dict[str, Any] = {
                 "customer_name": data["customer_name"],
                 "environment": data["environment"],
                 "segment_type": data["segment_type"],
@@ -1344,9 +1359,12 @@ class InfrahubClient:
                 "vlan_id": data["vlan_id"],
                 "deployment": data["deployment"],
                 "owner": data["owner"],
+                "group_id": group_id,
                 "external_routing": data.get("external_routing", False),
-                "prefix": data.get("prefix"),
             }
+
+            if prefix:
+                variables["prefix"] = prefix
 
             result = self.execute_graphql(mutation, variables, branch)
 
@@ -1358,6 +1376,36 @@ class InfrahubClient:
 
         except Exception as e:
             raise InfrahubAPIError(f"Failed to create network segment: {str(e)}")
+
+    def _get_group_id(self, group_name: str, branch: str) -> str:
+        """Look up a CoreStandardGroup ID by name.
+
+        Args:
+            group_name: Name of the CoreStandardGroup.
+            branch: Branch to query.
+
+        Returns:
+            The group ID.
+
+        Raises:
+            InfrahubAPIError: If the group is not found.
+        """
+        query = """
+        query GetGroup($name: String!) {
+            CoreStandardGroup(name__value: $name) {
+                edges {
+                    node {
+                        id
+                    }
+                }
+            }
+        }
+        """
+        result = self.execute_graphql(query, {"name": group_name}, branch)
+        edges = result.get("CoreStandardGroup", {}).get("edges", [])
+        if not edges:
+            raise InfrahubAPIError(f"Group '{group_name}' not found")
+        return edges[0]["node"]["id"]
 
     def get_network_segments_by_deployment(self, deployment_id: str, branch: str = "main") -> List[Dict[str, Any]]:
         """Fetch ServiceNetworkSegment objects for a specific deployment.
