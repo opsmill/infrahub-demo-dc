@@ -58,6 +58,27 @@ exclude = ["scripts/debug/"]
 module = ["untyped_package.*"]
 follow_untyped_imports = true
 
+[tool.rumdl]
+extend = true
+MD013 = false
+MD029 = false
+MD033 = false
+MD041 = false
+exclude = [
+    ".claude/",
+    ".git/",
+    ".kiro/",
+    ".mypy_cache/",
+    ".ruff_cache/",
+    ".venv/",
+    "docs/.docusaurus/",
+    "docs/build/",
+    "docs/node_modules/",
+    "docs/README.md",
+    "node_modules/",
+]
+respect_gitignore = true
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
