@@ -53,6 +53,10 @@ pretty = true
 ignore_missing_imports = true
 disallow_untyped_defs = true
 exclude = ["scripts/debug/"]
+# The Infrahub SDK returns union types for dynamically-resolved node attributes
+# (e.g. node.attr returns Attribute | RelationshipManager | RelatedNode).
+# At runtime the correct type is always resolved, but mypy cannot verify this.
+disable_error_code = ["union-attr", "type-abstract"]
 
 [[tool.mypy.overrides]]
 module = ["untyped_package.*"]

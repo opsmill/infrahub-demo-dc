@@ -412,7 +412,7 @@ class TopologyCreator:
 
         # Get the building we just created
         building = self.client.store.get(
-            key=site_name,
+            key=site_name,  # type: ignore[arg-type]
             kind="LocationBuilding",
             branch=self.branch,
         )
@@ -1148,14 +1148,14 @@ class TopologyCreator:
             # this and treat it as "no existing cable".
             existing_cable_id = None
             try:
-                if source_endpoint.connector.peer:
-                    existing_cable_id = source_endpoint.connector.peer.id
+                if source_endpoint.connector.peer:  # type: ignore[attr-defined]
+                    existing_cable_id = source_endpoint.connector.peer.id  # type: ignore[attr-defined]
             except ValueError:
                 pass  # No existing cable or peer doesn't have an ID
             if not existing_cable_id:
                 try:
-                    if target_endpoint.connector.peer:
-                        existing_cable_id = target_endpoint.connector.peer.id
+                    if target_endpoint.connector.peer:  # type: ignore[attr-defined]
+                        existing_cable_id = target_endpoint.connector.peer.id  # type: ignore[attr-defined]
                 except ValueError:
                     pass  # No existing cable or peer doesn't have an ID
 
@@ -1179,8 +1179,8 @@ class TopologyCreator:
             # Set the connector relationship on both interfaces
             # After save(), cable.id is guaranteed to be set
             if cable.id is not None:
-                source_endpoint.connector = cable.id
-                target_endpoint.connector = cable.id
+                source_endpoint.connector = cable.id  # type: ignore[attr-defined]
+                target_endpoint.connector = cable.id  # type: ignore[attr-defined]
 
             batch.add(task=source_endpoint.save, allow_upsert=True, node=source_endpoint)
             batch.add(task=target_endpoint.save, allow_upsert=True, node=target_endpoint)

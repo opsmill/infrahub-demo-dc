@@ -204,8 +204,8 @@ class DCTopologyCreator(TopologyCreator):
             # This allows queries to traverse: interface → connector → cable → connected_endpoints
             # After save(), cable.id is guaranteed to be set
             if cable.id is not None:
-                source_endpoint.connector = cable.id
-                target_endpoint.connector = cable.id
+                source_endpoint.connector = cable.id  # type: ignore[assignment]
+                target_endpoint.connector = cable.id  # type: ignore[assignment]
 
             # Queue interface saves for batch
             batch.add(task=source_endpoint.save, allow_upsert=True, node=source_endpoint)
