@@ -566,11 +566,25 @@ def run_tests(context: Context) -> None:
     console.print("[green]✓[/green] Tests completed")
 
 
+@task(name="format")
+def format_code(context: Context) -> None:
+    """Run ruff to format all Python files."""
+    console.print()
+    console.print(Panel("[bold green]Formatting Code[/bold green]", border_style="green", box=box.SIMPLE))
+    exec_cmds = ["ruff format .", "ruff check . --fix"]
+    with context.cd(MAIN_DIRECTORY_PATH):
+        for cmd in exec_cmds:
+            console.print(f"\n[green]→[/green] Running {cmd}...")
+            context.run(cmd)
+    console.print("\n[green]✓[/green] Formatting completed!")
+    console.print()
+
+
 @task(name="_lint-markdown")
 def lint_markdown(context: Context) -> None:
     """Run Linter to check all Markdown files."""
     print(" - Check code with rumdl")
-    exec_cmd = "rumdl check --config .rumdl.toml ."
+    exec_cmd = "rumdl check ."
     with context.cd(MAIN_DIRECTORY_PATH):
         context.run(exec_cmd)
 

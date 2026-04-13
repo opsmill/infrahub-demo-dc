@@ -161,7 +161,7 @@ class NetworkSegmentGenerator(InfrahubGenerator):
             )
 
             for interface in interfaces:
-                interface_ids.append(interface.id)
+                interface_ids.append(interface.id)  # type: ignore[arg-type]
                 self.logger.info(f"  Adding interface {interface.name.value} on {device_name} to segment")
 
         if interface_ids:
