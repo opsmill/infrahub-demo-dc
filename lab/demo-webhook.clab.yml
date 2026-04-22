@@ -1,0 +1,18 @@
+name: cwdemo-webhook-demo
+
+mgmt:
+  network: cwdemo-webhook-demo-mgmt
+  ipv4-subnet: 172.20.20.0/24
+
+topology:
+  kinds:
+    vyosnetworks_vyos:
+      image: vyos:1.5-stream
+
+  nodes:
+    fw1:
+      kind: vyosnetworks_vyos
+      mgmt-ipv4: 172.20.20.11
+      startup-config: startup/fw1.boot
+      ports:
+        - 2221:22

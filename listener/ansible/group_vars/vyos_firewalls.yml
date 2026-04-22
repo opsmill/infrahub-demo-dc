@@ -1,0 +1,5 @@
+---
+ansible_network_os: vyos.vyos.vyos
+ansible_connection: ansible.netcommon.network_cli
+ansible_become: false
+ansible_python_interpreter: auto_silent

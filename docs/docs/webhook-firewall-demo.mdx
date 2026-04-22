@@ -1,0 +1,121 @@
+---
+title: Webhook Firewall Demo
+---
+
+# Webhook Firewall Demo
+
+This demo shows Infrahub driving a real firewall end-to-end: a change to a
+`SecurityPolicy` in Infrahub flows through a `CoreProposedChange` merge →
+artifact re-render → `CoreCustomWebhook` → a FastAPI listener → ansible deploy,
+landing as a committed config change on a containerlab-hosted VyOS firewall.
+
+## Prerequisites
+
+- Docker Engine 24+
+- `containerlab` ≥ 0.56 on `PATH` with a passwordless-sudo rule
+  (see `lab/README.md`)
+- `uv`, `infrahubctl` available (covered by `uv sync` + bundle-dc's standard
+  setup)
+- ~2 GB free disk for the built VyOS image
+
+## One-time setup (~10 minutes)
+
+```bash
+uv sync
+make -C lab/image image   # builds vyos:1.5-stream, ~5-10 min
+```
+
+## Bring up the demo
+
+The webhook demo requires `INFRAHUB_GIT_LOCAL=true` so Infrahub registers this
+repo's working tree (which carries the webhook-demo transforms in
+`.infrahub.yml`) via the `/upstream` mount already in
+`docker-compose.override.yml`. If Infrahub is already running without that
+flag, destroy and restart:
+
+```bash
+export INFRAHUB_GIT_LOCAL=true
+uv run invoke destroy
+uv run invoke start
+uv run invoke bootstrap
+uv run invoke demo-webhook-up
+```
+
+`demo-webhook-up` orchestrates:
+
+1. `demo-webhook-lab-up` — deploys the single-VyOS containerlab topology.
+2. `demo-webhook-listener-up` — starts the webhook listener container under
+   compose profile `webhook-demo`; primes its known_hosts with fw1's key.
+3. `demo-webhook-seed` — creates zones, services, the `fw1` `SecurityFirewall`,
+   the `demo-allow-web` `SecurityPolicy` with 3 base rules, registers the
+   `CoreCustomWebhook`, and runs a proposed-change merge that adds 17 more
+   rules (triggering the full pipeline).
+
+## Run the demo (~3 minutes live)
+
+Open three windows:
+
+- **A — Infrahub UI** at `http://localhost:8000`, navigate to Security →
+  Policies → `demo-allow-web` → Rules.
+- **B — Listener log stream**:
+
+  ```bash
+  docker logs -f webhook-listener
+  ```
+
+- **C — SSH to fw1**:
+
+  ```bash
+  ssh admin@172.20.20.11   # password: demo-vyos-password (or $VYOS_SSH_PASS)
+  # stage, don't run yet:
+  show configuration commands | match firewall
+  ```
+
+Flow:
+
+1. In C, run the staged command. Audience sees the current 20-rule config.
+2. In A, flip a rule's `action` (permit/deny) on a new branch, merge it via
+   a proposed change.
+3. In B, within ~20–30 s: `webhook received` → `fetch play start` →
+   `fetch play complete` → `deploy play start` → `deploy play complete`.
+4. In C, re-run the staged command. The change is visible.
+
+## Per-externality lifecycle
+
+Each piece cycles independently:
+
+```bash
+uv run invoke demo-webhook-listener-down && uv run invoke demo-webhook-listener-up
+uv run invoke demo-webhook-lab-down      && uv run invoke demo-webhook-lab-up
+uv run invoke demo-webhook-sync     # re-apply current main after a lab restart
+```
+
+## Teardown
+
+```bash
+uv run invoke demo-webhook-destroy
+uv run invoke destroy
+```
+
+## Overrides
+
+All tunables are environment variables (see `.env.example`):
+
+| Env var | Default | Purpose |
+|---|---|---|
+| `WEBHOOK_LISTENER_SHARED_KEY` | `demo-shared-key` | Webhook auth secret |
+| `WEBHOOK_LISTENER_PORT` | `8001` | Host port for the listener |
+| `VYOS_SSH_USER` / `VYOS_SSH_PASS` | `admin` / `demo-vyos-password` | fw1 login |
+| `INFRAHUB_GIT_LOCAL` | `false` | **Must be `true` for this demo** |
+
+## Troubleshooting
+
+- **`demo-webhook-up` complains `INFRAHUB_GIT_LOCAL is not set to true`**:
+  set it, then re-run `invoke destroy && invoke start && invoke bootstrap`
+  before `demo-webhook-up` so the task-worker picks up the local mount.
+- **Listener log shows `host key mismatch`**: `demo-webhook-listener-down &&
+  demo-webhook-listener-up` — container filesystem is ephemeral, so
+  reprovisioning the known_hosts is automatic.
+- **Artifact stays unchanged after a PC merge**: run
+  `uv run invoke demo-webhook-sync` to force the deploy against the current
+  main artifact.

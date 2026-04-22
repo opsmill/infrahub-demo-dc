@@ -1,0 +1,22 @@
+set system host-name 'fw1'
+set system login user admin authentication plaintext-password 'demo-vyos-password'
+set service ssh port '22'
+set service ssh listen-address '0.0.0.0'
+set interfaces ethernet eth0 address '172.20.20.11/24'
+set interfaces ethernet eth0 description 'mgmt'
+
+set firewall ipv4 name ALLOW-WEB default-action 'drop'
+set firewall ipv4 name ALLOW-WEB rule 10 action 'accept'
+set firewall ipv4 name ALLOW-WEB rule 10 description 'rule-id-10 corp -> dmz'
+set firewall ipv4 name ALLOW-WEB rule 10 protocol 'tcp'
+set firewall ipv4 name ALLOW-WEB rule 10 destination port '443'
+
+set firewall ipv4 name ALLOW-WEB rule 20 action 'accept'
+set firewall ipv4 name ALLOW-WEB rule 20 description 'rule-id-20 corp -> dmz'
+set firewall ipv4 name ALLOW-WEB rule 20 protocol 'tcp'
+set firewall ipv4 name ALLOW-WEB rule 20 destination port '80'
+
+set firewall ipv4 name ALLOW-WEB rule 30 action 'accept'
+set firewall ipv4 name ALLOW-WEB rule 30 description 'rule-id-30 ops -> mgmt'
+set firewall ipv4 name ALLOW-WEB rule 30 protocol 'tcp'
+set firewall ipv4 name ALLOW-WEB rule 30 destination port '22'
