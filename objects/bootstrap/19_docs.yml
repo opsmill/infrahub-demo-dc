@@ -4,8 +4,8 @@ kind: Object
 spec:
   kind: DocsDocs
   data:
-    - name: Bundle-DC Example Docs
-      link: https://docs.infrahub.app/bundle-dc/
+    - name: Demo-DC Example Docs
+      link: https://docs.infrahub.app/demo-dc/
     - name: Infrahub Docs
       link: https://docs.infrahub.app
     - name: Discord Community

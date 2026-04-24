@@ -26,10 +26,10 @@ jobs:
 
       - name: Sync folders
         run: |
-          rm -rf target-repo/docs/docs-bundle-dc/*
-          rm -f target-repo/docs/sidebars-bundle-dc.ts
-          cp -r source-repo/docs/docs/* target-repo/docs/docs-bundle-dc/
-          cp source-repo/docs/sidebars.ts target-repo/docs/sidebars-bundle-dc.ts
+          rm -rf target-repo/docs/docs-demo-dc/*
+          rm -f target-repo/docs/sidebars-demo-dc.ts
+          cp -r source-repo/docs/docs/* target-repo/docs/docs-demo-dc/
+          cp source-repo/docs/sidebars.ts target-repo/docs/sidebars-demo-dc.ts
           cd target-repo
           git config user.name github-actions
           git config user.email github-actions@github.com

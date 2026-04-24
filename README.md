@@ -19,7 +19,7 @@ This repository is demoing the key Infrahub features for an example data center 
 
 ## Running the demo
 
-Documentation for loading and using this demo is available on the Infrahub docs site [docs.infrahub.app/bundle-dc/](https://docs.infrahub.app/bundle-dc)
+Documentation for loading and using this demo is available on the Infrahub docs site [docs.infrahub.app/demo-dc/](https://docs.infrahub.app/demo-dc)
 
 ## Service Catalog
 
@@ -50,7 +50,7 @@ docker-compose up
 
 ### Documentation
 
-For detailed setup instructions, configuration options, and usage guide, see the [bundle-dc docs](https://docs.infrahub.app/bundle-dc).
+For detailed setup instructions, configuration options, and usage guide, see the [demo-dc docs](https://docs.infrahub.app/demo-dc).
 
 ## License
 

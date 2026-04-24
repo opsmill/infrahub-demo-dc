@@ -3,7 +3,7 @@
 Bootstrap Infrahub with schemas, data, and configurations.
 
 This script automates the complete setup of an Infrahub instance with all necessary
-data for the bundle-dc demonstration environment. It performs a sequential bootstrap
+data for the demo-dc demonstration environment. It performs a sequential bootstrap
 process with visual feedback and error handling.
 
 Bootstrap Process (7 steps):
@@ -14,7 +14,7 @@ Bootstrap Process (7 steps):
                          manufacturers, device types, ASNs, IP prefixes, pools, designs)
 4. Load Security Data - Create security zones, policies, and rules
 5. Create Users & Roles - Set up user accounts (emma, otto) with permissions
-6. Add Repository - Register bundle-dc Git repository (local or GitHub)
+6. Add Repository - Register demo-dc Git repository (local or GitHub)
 7. Load Event Actions - Configure automation triggers (optional, may need repository sync)
 
 Features:
@@ -305,7 +305,7 @@ def main(branch: str = "main") -> int:
 
     This is the primary orchestrator function that coordinates all bootstrap steps
     in the correct sequence. It provides a complete, automated setup of Infrahub
-    with all necessary schemas, data, and configurations for the bundle-dc demo.
+    with all necessary schemas, data, and configurations for the demo-dc demo.
 
     Bootstrap Sequence:
     ===================
@@ -316,7 +316,7 @@ def main(branch: str = "main") -> int:
     5. Load bootstrap data (locations, platforms, roles, devices, etc.)
     6. Load security data (zones, policies, rules)
     7. Create user accounts and roles (emma, otto)
-    8. Add bundle-dc Git repository (local or GitHub)
+    8. Add demo-dc Git repository (local or GitHub)
     9. Wait for repository sync (120 seconds)
     10. Load event actions (optional - may fail if repo not synced)
     11. Display success message with next steps
@@ -367,14 +367,14 @@ def main(branch: str = "main") -> int:
     console.print()
     console.print(
         Panel(
-            f"[bold bright_blue]🚀 Infrahub bundle-dc Bootstrap[/bold bright_blue]\n"
+            f"[bold bright_blue]🚀 Infrahub demo-dc Bootstrap[/bold bright_blue]\n"
             f"[bright_cyan]Branch:[/bright_cyan] [bold yellow]{branch}[/bold yellow]\n\n"
             "[dim]This will load:[/dim]\n"
             "  [blue]•[/blue] Schemas\n"
             "  [magenta]•[/magenta] Menu definitions\n"
             "  [yellow]•[/yellow] Bootstrap data\n"
             "  [green]•[/green] Security data\n"
-            "  [bright_magenta]•[/bright_magenta] bundle-dc repository",
+            "  [bright_magenta]•[/bright_magenta] demo-dc repository",
             border_style="bright_blue",
             box=box.SIMPLE,
             title="[bold bright_blue]Bootstrap Process[/bold bright_blue]",
@@ -453,12 +453,12 @@ def main(branch: str = "main") -> int:
     # ========================================================================
     # Step 6: Add Git Repository
     # ========================================================================
-    # This step adds the bundle-dc Git repository to Infrahub, which contains
+    # This step adds the demo-dc Git repository to Infrahub, which contains
     # Python generators and transforms needed for topology creation and
     # configuration generation. This step may fail gracefully if the repository
     # already exists from a previous bootstrap run.
     msg = "\n[bold bright_magenta on black][6/7][/bold bright_magenta on black] "
-    msg += "📚 [bold white]Adding bundle-dc repository[/bold white]"
+    msg += "📚 [bold white]Adding demo-dc repository[/bold white]"
     console.print(msg)
 
     # Choose repository source based on INFRAHUB_GIT_LOCAL environment variable

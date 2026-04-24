@@ -1,5 +1,5 @@
 ---
-# Override file for bundle-dc project
+# Override file for demo-dc project
 # Port configuration via environment variables for running multiple instances:
 #   INFRAHUB_PORT (default: 8000) - Infrahub server
 #   PREFECT_PORT (default: 4200) - Prefect task manager UI
