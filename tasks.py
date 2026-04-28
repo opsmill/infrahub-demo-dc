@@ -698,6 +698,245 @@ def demo_conflict(context: Context, branch: str = "conflict-demo", device: str =
     context.run(f"uv run python scripts/create_conflict.py --branch {branch} --device {device}", pty=True)
 
 
+# ===========================================================================
+# Webhook Firewall Demo (profile: webhook-demo)
+# ---------------------------------------------------------------------------
+# The demo adds a custom-webhook-driven pipeline: rule changes in Infrahub's
+# SecurityPolicy trigger a rendered VyOS config artifact, which fires a
+# CoreCustomWebhook, which the listener container receives and applies to a
+# containerlab-hosted VyOS firewall (fw1) via ansible. All webhook-demo
+# services live on compose profile `webhook-demo` so non-demo invoke tasks
+# are unaffected. See docs/docs/webhook-firewall-demo.mdx for the presenter
+# quickstart.
+# ===========================================================================
+
+WEBHOOK_DEMO_PROFILE = "webhook-demo"
+WEBHOOK_LAB_TOPOLOGY = "lab/demo-webhook.clab.yml"
+WEBHOOK_LAB_MGMT_IP = "172.20.20.11"
+WEBHOOK_LISTENER_CONTAINER = "webhook-listener"
+WEBHOOK_LAB_CONTAINER = "clab-cwdemo-webhook-demo-fw1"
+
+
+def _webhook_compose_cmd() -> str:
+    """Compose command with the webhook-demo profile enabled."""
+    return f"{COMPOSE_COMMAND} --profile {WEBHOOK_DEMO_PROFILE}"
+
+
+def _wait_for_http_ok(context: Context, url: str, timeout_s: int = 60) -> bool:
+    """Poll `url` until it returns HTTP 200 or timeout; return success bool."""
+    import httpx  # lazy import; keeps top-level import surface unchanged
+
+    deadline = time.monotonic() + timeout_s
+    while time.monotonic() < deadline:
+        try:
+            r = httpx.get(url, timeout=2)
+            if r.status_code == 200:
+                return True
+        except httpx.HTTPError:
+            pass
+        time.sleep(2)
+    return False
+
+
+@task(name="demo-webhook-lab-up")
+def demo_webhook_lab_up(context: Context) -> None:
+    """Deploy the VyOS containerlab topology for the webhook demo (fw1)."""
+    console.print()
+    console.print(
+        Panel(
+            f"[bold cyan]Webhook demo — lab up[/bold cyan]\n"
+            f"[dim]Topology:[/dim] {WEBHOOK_LAB_TOPOLOGY}\n"
+            f"[dim]fw1 mgmt:[/dim] {WEBHOOK_LAB_MGMT_IP}",
+            border_style="cyan",
+            box=box.SIMPLE,
+        )
+    )
+    # Strip any stale host key for fw1 — containerlab generates a fresh SSH
+    # host key on every deploy; paramiko inside the listener container honors
+    # known_hosts regardless of ANSIBLE_HOST_KEY_CHECKING (FR-012).
+    context.run(f"ssh-keygen -R {WEBHOOK_LAB_MGMT_IP} 2>/dev/null || true", warn=True)
+    context.run(f"sudo -n $(command -v containerlab) deploy -t {WEBHOOK_LAB_TOPOLOGY}")
+    console.print(f"[green]✓[/green] fw1 up at {WEBHOOK_LAB_MGMT_IP}")
+
+
+@task(name="demo-webhook-lab-down")
+def demo_webhook_lab_down(context: Context) -> None:
+    """Tear down the VyOS containerlab topology for the webhook demo."""
+    console.print()
+    console.print(
+        Panel(
+            "[bold yellow]Webhook demo — lab down[/bold yellow]",
+            border_style="yellow",
+            box=box.SIMPLE,
+        )
+    )
+    context.run(
+        f"sudo -n $(command -v containerlab) destroy -t {WEBHOOK_LAB_TOPOLOGY} --cleanup",
+        warn=True,
+    )
+    context.run(f"ssh-keygen -R {WEBHOOK_LAB_MGMT_IP} 2>/dev/null || true", warn=True)
+    console.print("[green]✓[/green] fw1 destroyed")
+
+
+@task(name="demo-webhook-listener-up")
+def demo_webhook_listener_up(context: Context) -> None:
+    """Start the webhook listener container (requires lab up first)."""
+    console.print()
+    console.print(
+        Panel(
+            "[bold cyan]Webhook demo — listener up[/bold cyan]",
+            border_style="cyan",
+            box=box.SIMPLE,
+        )
+    )
+    context.run(f"{_webhook_compose_cmd()} up -d {WEBHOOK_LISTENER_CONTAINER}")
+    # Prime the container's known_hosts with fw1's current key so paramiko
+    # doesn't hit a mismatch on the first ansible run (FR-012).
+    console.print("\n[cyan]→[/cyan] Priming listener known_hosts with fw1 key")
+    context.run(
+        f"docker exec {WEBHOOK_LISTENER_CONTAINER} bash -c "
+        f"'mkdir -p /root/.ssh && ssh-keyscan -t ed25519,rsa {WEBHOOK_LAB_MGMT_IP} "
+        f">> /root/.ssh/known_hosts 2>/dev/null || true'",
+        warn=True,
+    )
+    # Wait for /healthz.
+    listener_port = os.getenv("WEBHOOK_LISTENER_PORT", "8001")
+    health_url = f"http://127.0.0.1:{listener_port}/healthz"
+    if _wait_for_http_ok(context, health_url, timeout_s=60):
+        console.print(f"[green]✓[/green] Listener healthy at {health_url}")
+    else:
+        console.print(f"[red]✗[/red] Listener did not become healthy at {health_url}")
+        sys.exit(1)
+
+
+@task(name="demo-webhook-listener-down")
+def demo_webhook_listener_down(context: Context) -> None:
+    """Stop the webhook listener container."""
+    console.print()
+    console.print(
+        Panel(
+            "[bold yellow]Webhook demo — listener down[/bold yellow]",
+            border_style="yellow",
+            box=box.SIMPLE,
+        )
+    )
+    context.run(f"{_webhook_compose_cmd()} stop {WEBHOOK_LISTENER_CONTAINER}")
+    context.run(f"{_webhook_compose_cmd()} rm -f {WEBHOOK_LISTENER_CONTAINER}", warn=True)
+    console.print("[green]✓[/green] Listener stopped")
+
+
+@task(name="demo-webhook-sync")
+def demo_webhook_sync(context: Context) -> None:
+    """Re-apply the current main vyos-firewall-config artifact to fw1."""
+    console.print()
+    console.print(
+        Panel(
+            "[bold cyan]Webhook demo — sync fw1 with main[/bold cyan]",
+            border_style="cyan",
+            box=box.SIMPLE,
+        )
+    )
+    context.run("uv run python scripts/webhook_demo/sync_firewall.py", pty=True, warn=True)
+
+
+@task(name="demo-webhook-seed")
+def demo_webhook_seed(context: Context) -> None:
+    """Seed fw1 + SecurityPolicy + 3 base rules, then add 17 more via PC merge."""
+    console.print()
+    console.print(
+        Panel(
+            "[bold cyan]Webhook demo — seed + bootstrap PC[/bold cyan]\n"
+            "[dim]Seeds 3 base rules on main, then adds 17 more via a proposed-change merge.[/dim]",
+            border_style="cyan",
+            box=box.SIMPLE,
+        )
+    )
+    console.print("\n[cyan]→[/cyan] Seeding base data + 3 rules")
+    context.run("uv run python scripts/webhook_demo/seed_webhook_demo.py", pty=True)
+    console.print("\n[cyan]→[/cyan] Registering CoreCustomWebhook")
+    context.run("uv run python scripts/webhook_demo/register_webhook.py", pty=True)
+    console.print("\n[cyan]→[/cyan] Creating branch + 17 rules + PC + merge")
+    context.run("uv run python scripts/webhook_demo/bootstrap_pc_rules.py", pty=True)
+    console.print("\n[green]✓[/green] Demo seeded — 20 rules on main, fw1 deployed")
+
+
+@task(name="demo-webhook-up")
+def demo_webhook_up(context: Context) -> None:
+    """Bring up the full webhook firewall demo (lab + listener + seed data).
+
+    Assumes `invoke start` and `invoke bootstrap` have already run. The webhook
+    demo requires INFRAHUB_GIT_LOCAL=true so the task-worker sees this repo's
+    working tree (with the webhook-demo transforms in .infrahub.yml) via the
+    already-configured /upstream mount.
+    """
+    console.print()
+    console.print(
+        Panel(
+            "[bold bright_cyan]Webhook Firewall Demo — up[/bold bright_cyan]\n"
+            "[dim]Lab → Listener → Seed data (requires Infrahub already running)[/dim]",
+            border_style="bright_cyan",
+            box=box.SIMPLE,
+        )
+    )
+    if not INFRAHUB_GIT_LOCAL:
+        console.print(
+            "[yellow]⚠[/yellow] INFRAHUB_GIT_LOCAL is not set to true. The webhook demo "
+            "requires the /upstream mount so Infrahub can read this repo's local "
+            ".infrahub.yml. Run:\n"
+            "    export INFRAHUB_GIT_LOCAL=true && invoke destroy && invoke start && invoke bootstrap\n"
+            "then re-run demo-webhook-up."
+        )
+        sys.exit(1)
+    demo_webhook_lab_up(context)
+    demo_webhook_listener_up(context)
+    demo_webhook_seed(context)
+    console.print()
+    console.print(
+        Panel(
+            "[bold green]✓ Webhook demo ready[/bold green]\n\n"
+            "[cyan]Infrahub UI:[/cyan] http://localhost:8000\n"
+            "[cyan]Listener:[/cyan]   http://localhost:8001/healthz\n"
+            "[cyan]fw1:[/cyan]        ssh admin@172.20.20.11",
+            border_style="green",
+            box=box.SIMPLE,
+        )
+    )
+
+
+@task(name="demo-webhook-down")
+def demo_webhook_down(context: Context) -> None:
+    """Stop the webhook demo (preserves Infrahub data)."""
+    console.print()
+    console.print(
+        Panel(
+            "[bold yellow]Webhook Firewall Demo — down[/bold yellow]",
+            border_style="yellow",
+            box=box.SIMPLE,
+        )
+    )
+    demo_webhook_listener_down(context)
+    demo_webhook_lab_down(context)
+    console.print("\n[green]✓[/green] Webhook demo stopped (Infrahub data preserved)")
+
+
+@task(name="demo-webhook-destroy")
+def demo_webhook_destroy(context: Context) -> None:
+    """Destroy the webhook demo — stop containers and remove any webhook-demo volumes."""
+    console.print()
+    console.print(
+        Panel(
+            "[bold red]Webhook Firewall Demo — destroy[/bold red]",
+            border_style="red",
+            box=box.SIMPLE,
+        )
+    )
+    demo_webhook_down(context)
+    # The listener has no persistent volume today, but if any future
+    # webhook-demo service adds one this ensures it's wiped.
+    context.run(f"{_webhook_compose_cmd()} down -v", warn=True)
+    console.print("[green]✓[/green] Webhook demo destroyed")
+
+
 @task(name="docs")
 def docs_build(context: Context) -> None:
     """Build documentation website."""

@@ -54,3 +54,53 @@ services:
       - service-catalog
     networks:
       - default
+
+  # ===========================================================================
+  # Webhook Firewall Demo (profile: webhook-demo)
+  # ---------------------------------------------------------------------------
+  # The listener here is absent from the default stack; it comes up only when
+  # the `webhook-demo` compose profile is activated (normally via
+  # `invoke demo-webhook-up` or `demo-webhook-listener-up`). Infrahub
+  # registers the bundle-dc repo itself via its existing bootstrap flow — we
+  # rely on `INFRAHUB_GIT_LOCAL=true` so the task-worker sees this repo's
+  # working tree (with the webhook-demo transforms added to .infrahub.yml)
+  # via the `./:/upstream` mount already configured above. No separate git
+  # server is required.
+  # See docs/docs/webhook-firewall-demo.mdx for the presenter quickstart.
+  # ===========================================================================
+
+  # FastAPI webhook listener + ansible runner for fw1 deploys.
+  webhook-listener:
+    build:
+      context: ./listener
+      dockerfile: Dockerfile
+    container_name: webhook-listener
+    profiles:
+      - webhook-demo
+    environment:
+      # Talks to Infrahub over the compose default network.
+      INFRAHUB_ADDRESS: http://infrahub-server:8000
+      INFRAHUB_API_TOKEN: ${INFRAHUB_API_TOKEN:-06438eb2-8019-4776-878c-0941b1f1d1ec}
+      # Webhook config.
+      WEBHOOK_LISTENER_SHARED_KEY: ${WEBHOOK_LISTENER_SHARED_KEY:-demo-shared-key}
+      WEBHOOK_LISTENER_ARTIFACT_BASE_URL: http://infrahub-server:8000
+      # VyOS deploy target.
+      VYOS_MGMT_HOST: 172.20.20.11
+      VYOS_SSH_USER: ${VYOS_SSH_USER:-admin}
+      VYOS_SSH_PASS: ${VYOS_SSH_PASS:-demo-vyos-password}
+      ANSIBLE_HOST_KEY_CHECKING: "False"
+    ports:
+      - "${WEBHOOK_LISTENER_PORT:-8001}:8001"
+    networks:
+      # default = compose network (reaches infrahub-server).
+      # webhook-demo-mgmt = containerlab mgmt network (reaches fw1).
+      - default
+      - webhook-demo-mgmt
+
+networks:
+  # Attached externally — created by `containerlab deploy` when
+  # `invoke demo-webhook-lab-up` runs. `demo-webhook-listener-up` must run
+  # after `demo-webhook-lab-up` so this network exists at attach time.
+  webhook-demo-mgmt:
+    external: true
+    name: cwdemo-webhook-demo-mgmt

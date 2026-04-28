@@ -21,6 +21,10 @@ This repository is demoing the key Infrahub features for an example data center 
 
 Documentation for loading and using this demo is available on the Infrahub docs site [docs.infrahub.app/demo-dc/](https://docs.infrahub.app/demo-dc)
 
+### Additional demos
+
+- **Webhook Firewall Demo** — Infrahub drives a VyOS firewall end-to-end via a `CoreCustomWebhook` → FastAPI listener → ansible deploy. See [docs/docs/webhook-firewall-demo.mdx](docs/docs/webhook-firewall-demo.mdx). Runnable via `invoke demo-webhook-up` (requires `INFRAHUB_GIT_LOCAL=true`).
+
 ## Service Catalog
 
 This repository includes an optional Streamlit-based Service Catalog that provides a user-friendly web interface for viewing and creating data center infrastructure in Infrahub.
