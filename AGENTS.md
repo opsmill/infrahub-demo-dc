@@ -5,7 +5,7 @@
 
 ## Project Overview
 
-**bundle-dc** is a comprehensive demonstration of design-driven network automation using [Infrahub](https://docs.infrahub.app). It showcases:
+**demo-dc** is a comprehensive demonstration of design-driven network automation using [Infrahub](https://docs.infrahub.app). It showcases:
 
 - Composable data center and POP topology generation
 - Configuration management with Jinja2 templates

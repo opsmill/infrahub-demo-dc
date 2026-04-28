@@ -5,7 +5,7 @@
 
 ## Overview
 
-This directory contains the test suite for bundle-dc, using pytest as the test framework. Tests are organized into unit tests (fast, isolated) and integration tests (require running Infrahub instance).
+This directory contains the test suite for demo-dc, using pytest as the test framework. Tests are organized into unit tests (fast, isolated) and integration tests (require running Infrahub instance).
 
 ## Test Commands
 

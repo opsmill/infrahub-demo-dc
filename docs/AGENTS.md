@@ -5,7 +5,7 @@
 
 ## Overview
 
-This is a [Docusaurus](https://docusaurus.io/) documentation site for the bundle-dc project. It uses a different tech stack than the main Python project.
+This is a [Docusaurus](https://docusaurus.io/) documentation site for the demo-dc project. It uses a different tech stack than the main Python project.
 
 ## Tech Stack
 

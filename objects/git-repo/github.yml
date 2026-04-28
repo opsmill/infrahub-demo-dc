@@ -4,6 +4,6 @@ kind: Object
 spec:
   kind: CoreReadOnlyRepository
   data:
-    - name: bundle-dc
+    - name: demo-dc
       location: "https://github.com/opsmill/infrahub-demo-dc.git"
       ref: "main"

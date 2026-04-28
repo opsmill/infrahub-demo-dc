@@ -4,6 +4,6 @@ kind: Object
 spec:
   kind: CoreRepository
   data:
-    - name: bundle-dc
+    - name: demo-dc
       location: "/upstream"
       default_branch: "main"

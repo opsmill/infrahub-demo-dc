@@ -62,12 +62,8 @@ disable_error_code = ["union-attr", "type-abstract"]
 module = ["untyped_package.*"]
 follow_untyped_imports = true
 
-[tool.rumdl]
-extend = true
-MD013 = false
-MD029 = false
-MD033 = false
-MD041 = false
+[tool.rumdl.global]
+disable = ["MD013", "MD029", "MD033", "MD041"]
 exclude = [
     ".claude/",
     ".git/",
@@ -81,7 +77,7 @@ exclude = [
     "docs/README.md",
     "node_modules/",
 ]
-respect_gitignore = true
+respect-gitignore = true
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

@@ -67,7 +67,7 @@ const config: Config = {
       items: [
         {
           type: "docSidebar",
-          sidebarId: "BundleDcSidebar",
+          sidebarId: "DemoDcSidebar",
           position: "left",
           label: "DC Bundle (Extensive PoC)",
         },
