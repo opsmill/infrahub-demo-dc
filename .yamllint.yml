@@ -8,6 +8,9 @@ ignore: |
   /docs/node_modules
   /docs/pnpm-lock.yaml
   /.venv
+  /.specify
+  /.agents
+  /.claude
 
 rules:
   new-lines: disable

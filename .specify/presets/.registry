@@ -1,0 +1,19 @@
+{
+  "schema_version": "1.0",
+  "presets": {
+    "infrahub": {
+      "version": "1.0.0",
+      "source": "local",
+      "manifest_hash": "",
+      "enabled": true,
+      "priority": 10,
+      "registered_commands": {
+        "claude": [
+          "speckit.specify"
+        ]
+      },
+      "registered_skills": [],
+      "installed_at": "2026-03-25T00:00:00Z"
+    }
+  }
+}

@@ -1,0 +1,25 @@
+schema_version: "1.0"
+preset:
+  id: "infrahub"
+  name: "Infrahub Workflow Routing"
+  version: "1.0.0"
+  description: "Routes speckit commands to Infrahub-specific templates when .infrahub.yml is detected. Includes connectivity gating via infrahubctl info and multi-artifact dependency ordering."
+  author: "opsmill"
+  repository: "https://github.com/opsmill/infrahub-template"
+  license: "Apache-2.0"
+requires:
+  speckit_version: ">=0.4.1"
+  extensions:
+    - "infrahub"
+provides:
+  templates:
+    - type: "command"
+      name: "speckit.specify"
+      file: "commands/speckit.specify.md"
+      description: "Specification command with Infrahub artifact routing"
+      replaces: "speckit.specify"
+tags:
+  - "infrahub"
+  - "infrastructure"
+  - "routing"
+  - "opsmill"
