@@ -65,11 +65,13 @@ follow_untyped_imports = true
 [tool.rumdl.global]
 disable = ["MD013", "MD029", "MD033", "MD041"]
 exclude = [
+    ".agents/",
     ".claude/",
     ".git/",
     ".kiro/",
     ".mypy_cache/",
     ".ruff_cache/",
+    ".specify/",
     ".venv/",
     "docs/.docusaurus/",
     "docs/build/",

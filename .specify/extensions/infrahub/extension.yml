@@ -1,0 +1,39 @@
+schema_version: "1.0"
+extension:
+  id: "infrahub"
+  name: "Infrahub Development Workflows"
+  version: "1.0.0"
+  description: "Infrahub-specific spec templates, constitution, and lifecycle hooks for infrastructure-as-code development"
+  author: "opsmill"
+  repository: "https://github.com/opsmill/infrahub-template"
+  license: "Apache-2.0"
+requires:
+  speckit_version: ">=0.4.1"
+provides:
+  templates:
+    - name: "spec-schema-template"
+      file: "templates/spec-schema-template.md"
+      description: "Schema design specification template"
+    - name: "spec-objects-template"
+      file: "templates/spec-objects-template.md"
+      description: "Object population specification template"
+    - name: "spec-check-template"
+      file: "templates/spec-check-template.md"
+      description: "Validation check specification template"
+    - name: "spec-generator-template"
+      file: "templates/spec-generator-template.md"
+      description: "Design-driven generator specification template"
+    - name: "spec-transform-template"
+      file: "templates/spec-transform-template.md"
+      description: "Data transform specification template"
+    - name: "spec-menu-template"
+      file: "templates/spec-menu-template.md"
+      description: "UI menu customization specification template"
+  commands: []
+  config: []
+hooks: {}
+tags:
+  - "infrahub"
+  - "infrastructure"
+  - "schema"
+  - "opsmill"

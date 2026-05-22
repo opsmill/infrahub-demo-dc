@@ -1,0 +1,59 @@
+{
+  "version": 1,
+  "skills": {
+    "infrahub-analyzing-data": {
+      "source": "opsmill/infrahub-skills",
+      "sourceType": "github",
+      "skillPath": "skills/infrahub-analyzing-data/SKILL.md",
+      "computedHash": "660f0f3640b24699a24e8aca2a12a07e88428a5135aa4d405e20a26aee0eec5f"
+    },
+    "infrahub-auditing-repo": {
+      "source": "opsmill/infrahub-skills",
+      "sourceType": "github",
+      "skillPath": "skills/infrahub-auditing-repo/SKILL.md",
+      "computedHash": "6e41b42a85fe2b2a2a952fd622d3eb47ef369e48698a215e045d8b2c4e5a687f"
+    },
+    "infrahub-common": {
+      "source": "opsmill/infrahub-skills",
+      "sourceType": "github",
+      "skillPath": "skills/infrahub-common/SKILL.md",
+      "computedHash": "8eeb857dfa79b25c3799d7f70530f9c1eb784c135604fb0d7f5eaf62d7fdf23c"
+    },
+    "infrahub-managing-checks": {
+      "source": "opsmill/infrahub-skills",
+      "sourceType": "github",
+      "skillPath": "skills/infrahub-managing-checks/SKILL.md",
+      "computedHash": "0a86057b8244dc3fedcb8959ddd8f28062aee9fb0cdcd547af693402476449e4"
+    },
+    "infrahub-managing-generators": {
+      "source": "opsmill/infrahub-skills",
+      "sourceType": "github",
+      "skillPath": "skills/infrahub-managing-generators/SKILL.md",
+      "computedHash": "7fbd0d7511ad8f03b2da19b745703b9f2dec0b5842d85c0d57b51db45a26a27f"
+    },
+    "infrahub-managing-menus": {
+      "source": "opsmill/infrahub-skills",
+      "sourceType": "github",
+      "skillPath": "skills/infrahub-managing-menus/SKILL.md",
+      "computedHash": "1f5d7ffb4d5813413706577658869ac131422c728990289aae878c180be09d09"
+    },
+    "infrahub-managing-objects": {
+      "source": "opsmill/infrahub-skills",
+      "sourceType": "github",
+      "skillPath": "skills/infrahub-managing-objects/SKILL.md",
+      "computedHash": "9f810f655f1f860f38766e7b17e4786dd3d7548ef4e7f2299d33690fd6a061d0"
+    },
+    "infrahub-managing-schemas": {
+      "source": "opsmill/infrahub-skills",
+      "sourceType": "github",
+      "skillPath": "skills/infrahub-managing-schemas/SKILL.md",
+      "computedHash": "fafd55d1dd627883c922e44b949ea911fc7143922daf3da6555aee3e095c8878"
+    },
+    "infrahub-managing-transforms": {
+      "source": "opsmill/infrahub-skills",
+      "sourceType": "github",
+      "skillPath": "skills/infrahub-managing-transforms/SKILL.md",
+      "computedHash": "4e3a3f5d401885ffa6bb34015557570c08b2a1533b50d7562e217fb888b74a67"
+    }
+  }
+}
