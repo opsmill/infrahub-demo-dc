@@ -1,0 +1,57 @@
+query vyos_firewall_config($device: String!) {
+  SecurityFirewall(name__value: $device) {
+    edges {
+      node {
+        id
+        name { value }
+        policies {
+          edges {
+            node {
+              name { value }
+              rules {
+                edges {
+                  node {
+                    index { value }
+                    name { value }
+                    action { value }
+                    log { value }
+                    source_zone {
+                      node {
+                        name { value }
+                      }
+                    }
+                    destination_zone {
+                      node {
+                        name { value }
+                      }
+                    }
+                    services {
+                      edges {
+                        node {
+                          ... on SecurityServiceGroup {
+                            name { value }
+                            services {
+                              edges {
+                                node {
+                                  ... on SecurityService {
+                                    name { value }
+                                    port { value }
+                                    protocol { value }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

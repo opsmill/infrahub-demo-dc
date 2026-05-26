@@ -1,0 +1,97 @@
+---
+# Deploy the VyOS config artifact to the target firewall.
+#
+# Invoked by the webhook listener with:
+#   -e device_key=<inventory-selector>      (dash-joined hfid)
+#   -e device_hfid=["part1","part2",...]    (full HFID list from Infrahub, JSON-encoded)
+#   -e artifact_url=<https_url>
+#   -e artifact_checksum=<md5_hex>
+#   -e request_id=<uuid>
+#
+# See specs/001-custom-webhook-demo/contracts/playbook_interface.md.
+
+- name: fetch artifact
+  hosts: localhost
+  gather_facts: false
+  vars:
+    local_artifact_path: "/tmp/webhook-listener/artifacts/{{ request_id }}.boot"
+  tasks:
+    - name: log stage start
+      ansible.builtin.debug:
+        msg: "fetch play start request_id={{ request_id }} hfid={{ device_key }} hfid_parts={{ device_hfid }}"
+
+    - name: ensure artifact cache directory exists
+      ansible.builtin.file:
+        path: "{{ local_artifact_path | dirname }}"
+        state: directory
+        mode: "0750"
+
+    - name: download artifact (with retries, defensive buffer against FR-019 race)
+      ansible.builtin.get_url:
+        url: "{{ artifact_url }}"
+        dest: "{{ local_artifact_path }}"
+        mode: "0600"
+      register: fetch_result
+      retries: "{{ lookup('env', 'ARTIFACT_FETCH_RETRIES') | default(5, true) | int }}"
+      delay: "{{ lookup('env', 'ARTIFACT_FETCH_DELAY_SECONDS') | default(5, true) | int }}"
+      until: fetch_result is succeeded
+
+    - name: compute checksum of fetched artifact
+      ansible.builtin.stat:
+        path: "{{ local_artifact_path }}"
+        checksum_algorithm: md5
+      register: stat_result
+
+    - name: fail if checksum mismatch
+      ansible.builtin.fail:
+        msg: >-
+          artifact checksum mismatch for request_id={{ request_id }}:
+          expected {{ artifact_checksum }} got {{ stat_result.stat.checksum }}
+      when: stat_result.stat.checksum != artifact_checksum
+
+    - name: log stage complete
+      ansible.builtin.debug:
+        msg: "fetch play complete request_id={{ request_id }} hfid={{ device_key }} hfid_parts={{ device_hfid }} path={{ local_artifact_path }}"
+
+    - name: stash path for deploy play
+      ansible.builtin.set_fact:
+        shared_artifact_path: "{{ local_artifact_path }}"
+
+- name: deploy config to device
+  hosts: "{{ device_key }}"
+  gather_facts: false
+  connection: ansible.netcommon.network_cli
+  tasks:
+    - name: log stage start
+      ansible.builtin.debug:
+        msg: "deploy play start request_id={{ hostvars['localhost']['request_id'] }} hfid={{ inventory_hostname }}"
+
+    - name: push config.boot to device /tmp
+      ansible.netcommon.net_put:
+        src: "{{ hostvars['localhost']['shared_artifact_path'] }}"
+        dest: "/tmp/new.boot"
+
+    # vyos.vyos.vyos_command / vyos_config call `show version` to detect
+    # network_os_version. VyOS 1.5-Stream's `show version` errors on mokutil
+    # under containerlab and breaks that detection. Skip the collection and
+    # drive the vbash commit flow over paramiko directly.
+    - name: apply config via vbash (configure; load; commit; save)
+      delegate_to: localhost
+      ansible.builtin.command:
+        argv:
+          - python3
+          - "{{ playbook_dir }}/scripts/vbash_load_commit.py"
+          - "{{ hostvars[inventory_hostname]['ansible_host'] }}"
+          - "{{ hostvars[inventory_hostname]['ansible_user'] }}"
+          - /tmp/new.boot
+      environment:
+        VYOS_SSH_PASS: "{{ hostvars[inventory_hostname]['ansible_password'] }}"
+      register: vbash_result
+
+    - name: show vbash output
+      ansible.builtin.debug:
+        var: vbash_result.stdout_lines
+
+    - name: log stage complete
+      ansible.builtin.debug:
+        msg: "deploy play complete request_id={{ hostvars['localhost']['request_id'] }} hfid={{ inventory_hostname }}"

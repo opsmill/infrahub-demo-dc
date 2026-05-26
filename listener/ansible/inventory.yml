@@ -1,0 +1,11 @@
+---
+all:
+  children:
+    vyos_firewalls:
+      hosts:
+        fw1:
+          ansible_host: "{{ lookup('env', 'VYOS_MGMT_HOST') | default('172.20.20.11', true) }}"
+          ansible_user: "{{ lookup('env', 'VYOS_SSH_USER') | default('admin', true) }}"
+          ansible_password: "{{ lookup('env', 'VYOS_SSH_PASS') | mandatory }}"
+          ansible_network_os: vyos.vyos.vyos
+          ansible_connection: ansible.netcommon.network_cli

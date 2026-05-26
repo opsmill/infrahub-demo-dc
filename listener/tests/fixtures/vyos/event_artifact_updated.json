@@ -1,0 +1,17 @@
+{
+  "id": "01HXYZABC1234567890",
+  "event": "infrahub.artifact.updated",
+  "occurred_at": "2026-04-16T14:30:22.581Z",
+  "branch": "main",
+  "data": {
+    "node_id": "0190a8f1-9999-7777-aaaa-111122223333",
+    "node_kind": "CoreArtifact",
+    "target_id": "0190a8f1-1111-7777-aaaa-333344445555",
+    "target_kind": "DcimFirewall",
+    "artifact_definition_id": "0190a8f1-2222-7777-aaaa-555566667777",
+    "artifact_definition_name": "VyOSFirewallConfig",
+    "storage_id": "0190a8f1-3333-7777-aaaa-777788889999",
+    "checksum": "sha256:3b1c4f00112233445566778899aabbccddeeff00112233445566778899aabb",
+    "checksum_previous": "sha256:0a9d1e00112233445566778899aabbccddeeff00112233445566778899aabb"
+  }
+}
