@@ -218,11 +218,31 @@ def demo_dc_arista(context: Context, branch: str = "add-dc3") -> None:
 
     console.print(f"\n[green]✓[/green] DC Arista topology loaded to branch '[bold green]{branch}[/bold green]'")
 
-    console.print(
-        "\n[yellow]→[/yellow] Running generator [bold]create_dc[/bold] for topology [bold]dc-arista[/bold]..."
-    )
-    context.run(f"uv run infrahubctl generator create_dc name=dc-arista --branch {branch}", pty=True)
-    console.print("[green]✓[/green] Generator complete")
+    # Wait for generator to finish creating the data
+    console.print("\n[yellow]→[/yellow] Waiting for generator to complete data creation...")
+    wait_seconds = 60  # Wait 60 seconds for generator to process
+
+    with Progress(
+        SpinnerColumn(spinner_name="dots12", style="bold bright_yellow"),
+        TextColumn("[progress.description]{task.description}", style="bold white"),
+        BarColumn(
+            bar_width=40,
+            style="yellow",
+            complete_style="bright_green",
+            finished_style="bold bright_green",
+            pulse_style="bright_yellow",
+        ),
+        TextColumn("[bold bright_cyan]{task.percentage:>3.0f}%"),
+        TextColumn("•", style="dim"),
+        TimeElapsedColumn(),
+        console=console,
+    ) as progress:
+        task = progress.add_task("⏳ Generator processing", total=wait_seconds)
+        for _ in range(wait_seconds):
+            time.sleep(1)
+            progress.update(task, advance=1)
+
+    console.print("[green]✓[/green] Generator processing complete")
 
     # Create proposed change
     console.print(
@@ -253,11 +273,31 @@ def demo_dc_juniper(context: Context, branch: str = "add-dc5") -> None:
 
     console.print(f"\n[green]✓[/green] DC Juniper topology loaded to branch '[bold green]{branch}[/bold green]'")
 
-    console.print(
-        "\n[yellow]→[/yellow] Running generator [bold]create_dc[/bold] for topology [bold]dc-juniper[/bold]..."
-    )
-    context.run(f"uv run infrahubctl generator create_dc name=dc-juniper --branch {branch}", pty=True)
-    console.print("[green]✓[/green] Generator complete")
+    # Wait for generator to finish creating the data
+    console.print("\n[yellow]→[/yellow] Waiting for generator to complete data creation...")
+    wait_seconds = 60  # Wait 60 seconds for generator to process
+
+    with Progress(
+        SpinnerColumn(spinner_name="dots12", style="bold bright_yellow"),
+        TextColumn("[progress.description]{task.description}", style="bold white"),
+        BarColumn(
+            bar_width=40,
+            style="yellow",
+            complete_style="bright_green",
+            finished_style="bold bright_green",
+            pulse_style="bright_yellow",
+        ),
+        TextColumn("[bold bright_cyan]{task.percentage:>3.0f}%"),
+        TextColumn("•", style="dim"),
+        TimeElapsedColumn(),
+        console=console,
+    ) as progress:
+        task = progress.add_task("⏳ Generator processing", total=wait_seconds)
+        for _ in range(wait_seconds):
+            time.sleep(1)
+            progress.update(task, advance=1)
+
+    console.print("[green]✓[/green] Generator processing complete")
 
     # Create proposed change
     console.print(
@@ -288,11 +328,31 @@ def demo_dc_cisco(context: Context, branch: str = "add-dc2") -> None:
 
     console.print(f"\n[green]✓[/green] DC Cisco topology loaded to branch '[bold green]{branch}[/bold green]'")
 
-    console.print(
-        "\n[yellow]→[/yellow] Running generator [bold]create_dc[/bold] for topology [bold]dc-cisco[/bold]..."
-    )
-    context.run(f"uv run infrahubctl generator create_dc name=dc-cisco --branch {branch}", pty=True)
-    console.print("[green]✓[/green] Generator complete")
+    # Wait for generator to finish creating the data
+    console.print("\n[yellow]→[/yellow] Waiting for generator to complete data creation...")
+    wait_seconds = 60  # Wait 60 seconds for generator to process
+
+    with Progress(
+        SpinnerColumn(spinner_name="dots12", style="bold bright_yellow"),
+        TextColumn("[progress.description]{task.description}", style="bold white"),
+        BarColumn(
+            bar_width=40,
+            style="yellow",
+            complete_style="bright_green",
+            finished_style="bold bright_green",
+            pulse_style="bright_yellow",
+        ),
+        TextColumn("[bold bright_cyan]{task.percentage:>3.0f}%"),
+        TextColumn("•", style="dim"),
+        TimeElapsedColumn(),
+        console=console,
+    ) as progress:
+        task = progress.add_task("⏳ Generator processing", total=wait_seconds)
+        for _ in range(wait_seconds):
+            time.sleep(1)
+            progress.update(task, advance=1)
+
+    console.print("[green]✓[/green] Generator processing complete")
 
     # Create proposed change
     console.print(
