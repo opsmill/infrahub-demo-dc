@@ -153,6 +153,8 @@ generator_definitions:
     class_name: DCTopologyGenerator
     parameters:
       name: name__value
+    execute_in_proposed_change: false
+    execute_after_merge: false
   - name: create_pop
     file_path: generators/generate_pop.py
     targets: topologies_pop
