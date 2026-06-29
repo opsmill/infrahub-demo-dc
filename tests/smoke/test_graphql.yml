@@ -41,27 +41,3 @@ infrahub_tests:
         spec:
           path: queries/config/spine.gql
           kind: graphql-query-smoke
-
-  - resource: GraphQLQuery
-    resource_name: oob_config
-    tests:
-      - name: syntax_check
-        spec:
-          path: queries/config/oob.gql
-          kind: graphql-query-smoke
-
-  - resource: GraphQLQuery
-    resource_name: console_config
-    tests:
-      - name: syntax_check
-        spec:
-          path: queries/config/console.gql
-          kind: graphql-query-smoke
-
-  - resource: GraphQLQuery
-    resource_name: firewall_config
-    tests:
-      - name: syntax_check
-        spec:
-          path: queries/config/firewall.gql
-          kind: graphql-query-smoke

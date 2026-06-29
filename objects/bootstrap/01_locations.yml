@@ -1,6 +1,5 @@
 ---
 apiVersion: infrahub.app/v1
-version: "1.0"
 kind: Object
 spec:
   kind: LocationRegion
