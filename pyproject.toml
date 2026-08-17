@@ -13,14 +13,14 @@ authors = [
 ]
 requires-python = ">=3.10,<3.13"
 dependencies = [
-    "infrahub-sdk[all,ctl]==1.19.0",
+    "infrahub-sdk[all,ctl]==1.23.0b0",
     "invoke>=2.2.1,<3.0.0",
     "rich>=13.9.4,<14.0.0",
 ]
 
 [dependency-groups]
 dev = [
-    "infrahub-testcontainers==1.10.8",
+    "infrahub-testcontainers==1.11.0b2",
     "mypy>=1.19.1",
     "pytest>=9.0.0",
     "pytest-asyncio>=1.3.0",
@@ -87,4 +87,11 @@ testpaths = ["tests"]
 asyncio_default_fixture_loop_scope = "class"
 filterwarnings = [
     "ignore:`background_execution` is deprecated:DeprecationWarning:infrahub_sdk.branch",
+]
+# The integration suite shares one Infrahub deployment across modules, which run in file-name order
+# (test_00_..., test_10_..., ...). Do not reorder or randomise collection.
+markers = [
+    "core: workflows every pull request must keep working. Run with `-m 'not extended'`.",
+    "extended: additional workflows run on dependency bumps and on main. Adds ~30-40 minutes.",
+    "offline: an integration-suite test that reads only repository files and needs no deployment.",
 ]

@@ -62,6 +62,7 @@ rebase
 repos
 reusability
 ruff
+SDK's
 SDN
 ssl
 Streamlit
@@ -70,8 +71,11 @@ subnets
 sudo
 testcontainer
 tomek
+traceback
 untrust
 uv
+validator
+validators
 VIPs
 VLAN
 VLANs

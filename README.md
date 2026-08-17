@@ -52,6 +52,41 @@ docker-compose up
 
 For detailed setup instructions, configuration options, and usage guide, see the [demo-dc docs](https://docs.infrahub.app/demo-dc).
 
+## Testing
+
+```bash
+# Unit and specification tests: seconds, no containers
+uv run pytest tests/unit tests/smoke
+
+# The integration tier every pull request runs
+uv run pytest -m "not extended"
+
+# Everything, including the extended workflows
+uv run pytest
+```
+
+The integration suite starts its own throwaway Infrahub deployment with
+[infrahub-testcontainers](https://pypi.org/project/infrahub-testcontainers/), bootstraps it from this
+repository and drives complete workflows against it: building a data center from a design, generating
+device configurations, reviewing and merging a proposed change, adding a POP and a network segment,
+day-two operations, and conflict detection. It needs Docker; it does not use `invoke start`.
+
+The whole suite shares one deployment, so modules run in file-name order and build on what earlier
+ones merged. They are split into two tiers:
+
+- **`core`** runs on every pull request.
+- **`extended`** adds the second vendor data center, the POP and segment services, day-two operations
+  and the conflict workflow. It runs when a pull request is labelled `full-integration`.
+
+The extended tier is opt-in because it cannot currently pass: Infrahub intermittently fails to
+resolve a member of its own internal generator group, which fails whichever generator is running at
+the time. Run it deliberately with the label when changing a version or a generator, and read a
+failure there against that known fault before assuming the demo is broken. To test a specific
+Infrahub version, set `INFRAHUB_TESTING_IMAGE_VER`.
+
+See the [developer guide](https://docs.infrahub.app/demo-dc/developer-guide) for details, and
+[tests/AGENTS.md](tests/AGENTS.md) for the conventions the suite follows.
+
 ## License
 
 This project is licensed under the MIT License. See [LICENSE.txt](LICENSE.txt) for details.

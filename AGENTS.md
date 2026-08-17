@@ -31,21 +31,28 @@ uv run invoke init
 ## Build and Test Commands
 
 ```bash
-# Run all tests
+# Everything, including the integration suite (starts a real Infrahub deployment via Docker)
 uv run pytest
 
-# Run tests with verbose output
-uv run pytest -vv
+# No Docker needed - seconds, not minutes
+uv run pytest tests/unit tests/smoke
 
-# Run specific test categories
-uv run pytest tests/unit/
-uv run pytest tests/integration/
+# The integration tier every pull request runs
+uv run pytest -m "not extended"
 
 # Lint and type check
-uv run invoke lint         # Full suite: ruff, mypy, markdown, yaml
+uv run invoke lint         # Full suite: rumdl, yamllint, ruff, mypy
 uv run ruff check . --fix  # Format and lint
 uv run mypy .              # Type checking only
 ```
+
+The integration suite starts its own throwaway Infrahub deployment with `infrahub-testcontainers`;
+it does not use `invoke start`. It is split into two tiers by marker: `core` runs on every pull
+request, and `extended` adds the second vendor data center, the POP and segment services, day-two
+operations and the conflict workflow when a pull request is labelled `full-integration`. The extended
+tier is opt-in because an upstream Infrahub fault stops it passing reliably — see
+[tests/AGENTS.md](./tests/AGENTS.md), which records the signature and what to check before blaming
+the demo.
 
 ## Code Style Guidelines
 
@@ -157,7 +164,11 @@ INFRAHUB_GIT_LOCAL="true"  # Use local repo instead of GitHub
 3. **Jinja2 autoescape** - Set `autoescape=False` for device configs
 4. **HTML entities** - Use `get_interface_roles()` which handles HTML decoding
 5. **Missing `.infrahub.yml` entries** - Register all generators/transforms/checks
-6. **Wrong box style in Rich** - Use `box.SIMPLE` for terminal compatibility
+6. **Missing `watch` entries** - A transform or generator that imports a helper module
+   (`transforms/common.py`) or picks a template from device data (`f"{platform}.j2"`) must declare
+   those paths under `watch.files`, or its artifacts go stale when they change. Not supported on
+   `check_definitions`, whose model forbids unknown keys
+7. **Wrong box style in Rich** - Use `box.SIMPLE` for terminal compatibility
 
 ## Sub-Project Guidelines
 

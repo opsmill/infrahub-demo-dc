@@ -10,7 +10,7 @@ on:
         required: true
         default: "1.8.1"
       run:
-        description: "Whether to run integration tests"
+        description: "Label the PR for the full integration suite (a dependency bump already triggers it)"
         required: false
         type: boolean
         default: true
@@ -77,11 +77,25 @@ jobs:
           email: github-bot@opsmill.com
           rebase: ${{ env.BRANCH_EXISTS == 1 }}
 
+      # The `full-integration` label applied below is what runs the whole integration suite against
+      # the new version -- every data center, POP, segment, day-two and proposed-change workflow, not
+      # just the core tier. It is the only trigger for that tier, so without the label a version bump
+      # is validated against the core workflows alone. See the `scope` step in ci.yml for why the tier
+      # is opt-in and what to change to make a dependency bump select it automatically again.
       - name: Create a pull request
         run: |
           echo ${{ secrets.GH_UPDATE_PACKAGE_OTTO }} | gh auth login --with-token
           gh pr create \
             --title "update test-containers to version ${{ env.INFRAHUB_VERSION }} against ${{ matrix.branch-name}}" \
-            --body "This PR updates test-containers to version ${{ env.INFRAHUB_VERSION }}." \
+            --body "This PR updates test-containers to version ${{ env.INFRAHUB_VERSION }}.
+
+          The full-integration label requests the whole integration suite for this change." \
             --base ${{ matrix.branch-name}} \
             --head ${{ env.BRANCH_NAME }}
+
+      - name: Request the full integration suite
+        if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.run == 'true' }}
+        continue-on-error: true
+        run: |
+          echo ${{ secrets.GH_UPDATE_PACKAGE_OTTO }} | gh auth login --with-token
+          gh pr edit ${{ env.BRANCH_NAME }} --add-label full-integration

@@ -5,188 +5,256 @@
 
 ## Overview
 
-This directory contains the test suite for demo-dc, using pytest as the test framework. Tests are organized into unit tests (fast, isolated) and integration tests (require running Infrahub instance).
+Three suites, distinguished by what they need to run:
+
+| Suite | Needs | Runtime |
+| ----- | ----- | ------- |
+| `tests/unit/` | Nothing. Files on disk and mocks. | Under a second |
+| `tests/smoke/` | Nothing. Infrahub SDK pytest plugin specs. | Under a second |
+| `tests/integration/` | Docker. Starts a real Infrahub deployment. | 30 min (core) to 2 h (full) |
+
+The integration suite does **not** use `invoke start`. It starts its own throwaway deployment through
+`infrahub-testcontainers`, so it never touches a local development instance.
 
 ## Test Commands
 
 ```bash
-# Run all tests
+# Everything (starts a real Infrahub deployment)
 uv run pytest
 
-# Run with verbose output
-uv run pytest -vv
+# No container needed
+uv run pytest tests/unit tests/smoke
 
-# Run specific test categories
-uv run pytest tests/unit/
-uv run pytest tests/integration/
+# The tier every pull request runs
+uv run pytest -m "not extended"
 
-# Run specific test file
-uv run pytest tests/unit/test_cloud_security_mock.py
-
-# Run with coverage
-uv run pytest --cov=.
+# One integration module
+uv run pytest tests/integration/test_10_dc_workflow.py -vv --log-cli-level=INFO
 ```
 
 ## Directory Structure
 
 ```text
 tests/
-├── conftest.py       # Root pytest fixtures (session-scoped)
-├── unit/             # Fast, isolated unit tests
-│   ├── test_*.py     # Unit test files
-│   └── simulators/   # Mock data and simulators
-├── integration/      # Tests requiring running Infrahub
-│   ├── conftest.py   # Integration-specific fixtures
-│   ├── data/         # Test data files
-│   └── test_*.py     # Integration test files
-└── smoke/            # Quick smoke tests
+├── conftest.py                    # Path fixtures only; no container
+├── unit/                          # Fast, isolated
+│   ├── test_*.py
+│   ├── test_j2_transforms.yml     # SDK plugin: Jinja2 transform specs
+│   └── simulators/                # Mock data
+├── smoke/
+│   └── test_graphql.yml           # SDK plugin: syntax check per .infrahub.yml query
+└── integration/
+    ├── conftest.py                # Session-scoped deployment + bootstrap
+    ├── constants.py               # Timeouts, object paths, expectations
+    ├── helpers.py                 # Workflow helpers (load, generate, review, merge)
+    ├── repo_source.py             # Pruned repo copy for Infrahub to clone
+    └── test_<NN>_<workflow>.py    # One module per workflow, run in file-name order
 ```
 
-## Writing Tests
+## The integration suite
 
-### Unit Tests
+### One deployment, shared
 
-Unit tests should be fast and isolated. Mock all external dependencies:
+`integration/conftest.py` declares the deployment at **session** scope, so the whole suite starts one
+Infrahub stack and bootstraps it once. That is deliberate: `TestInfrahubDocker` from
+`infrahub-testcontainers` scopes its fixtures per class, which would mean a fresh stack and a fresh
+schema load for every workflow and would put most of this coverage out of reach of the CI timeout.
+
+The trade-off is that modules are **not independent**. They run in file-name order and share state:
+
+```text
+test_00_bootstrap        schema, menu, objects, repository, event actions
+test_10_dc_workflow      Arista DC -> generator -> proposed change -> merge to main
+test_20_artifacts        artifacts over the merged fabric
+test_30_graphql          every registered query, executed against the live schema
+test_40_dc_vendors       second DC (Cisco, with border leafs) on its own branch
+test_50_pop              POP topology, virtual devices
+test_60_segment          network segment service over the merged Arista fabric
+test_70_day2             device edit, then scale the fabric out
+test_80_proposed_change  conflict detection, closing a proposed change
+```
+
+Consequences to respect when editing:
+
+- **Do not randomise or reorder collection.** No `pytest-randomly`, no `-p no:cacheprovider` tricks.
+- **Give each module its own branch.** Never do exploratory writes to `main` except in
+  `test_80_proposed_change.py`, which runs last for that reason.
+- **Declare cross-module dependencies.** A module that needs the merged fabric marks it:
+  `pytest.mark.dependency(depends=["dc_merged"], scope="session")`, or calls
+  `pytest_dependency.depends(request, ["dc_merged"], scope="session")` when it also has an
+  intra-module dependency.
+- **Mark a file-only test `offline`.** The autouse `bootstrapped_deployment` fixture pulls the whole
+  deployment into scope for every integration test, so a check that only reads files from the
+  repository needs `pytest.mark.offline` to stay runnable without Docker.
+
+### Tiers
+
+Modules are marked `core` or `extended`:
+
+- `core` runs on every pull request.
+- `extended` runs when a pull request is labelled `full-integration`.
+  `.github/workflows/ci.yml` picks the tier.
+
+The extended tier is deliberately opt-in rather than automatic, and that is a **temporary
+concession**, not the design. It was written to run on dependency bumps and on pushes to `main`,
+because a version bump is the change most likely to break a workflow and the least likely to be
+caught by reading the diff. It cannot do that while the upstream fault below stands: running it
+automatically would leave `main` permanently red, which trains everyone to ignore it. The comment on
+the `scope` step in `ci.yml` says how to restore the automatic triggers, and
+`.github/file-filters.yml` still computes `dependencies_all` for that purpose.
+
+Until then, apply the label deliberately when changing a version, a generator or a transform, and
+read any failure against the known fault before concluding the demo is broken.
+
+Keep `core` self-sufficient. It must pass with `-m "not extended"`, so it may not depend on anything
+an extended module produces.
+
+### Writing an integration test
+
+Use the helpers rather than raw GraphQL. They already carry the polling and the failure messages:
 
 ```python
-from unittest.mock import MagicMock, patch
+from . import constants as c
+from . import helpers as h
 
-def test_my_function():
-    """Test description explaining what is being tested."""
-    with patch("module.external_dependency") as mock_dep:
-        mock_dep.return_value = {"key": "value"}
-        result = my_function()
-        assert result == expected_value
+pytestmark = pytest.mark.extended
+
+
+@pytest.mark.dependency(name="my_thing_loaded")
+async def test_01_load(async_client_main, infrahub_address, infrahub_bootstrap) -> None:
+    """One sentence on the property under test."""
+    await h.ensure_branch(async_client_main, "my-branch")
+    h.load_objects("objects/dc/dc-juniper-s.yml", address=infrahub_address, branch="my-branch")
 ```
 
-### Integration Tests
+Conventions that matter here more than in the unit suite:
 
-Integration tests run against a live Infrahub instance:
+1. **Derive expectations from the data model, not from literals.** `h.expected_role_counts` reads a
+   design and returns what it calls for; `h.artifact_target_members` reads an artifact definition's
+   target group. A hard-coded `assert len(devices) == 12` breaks whenever
+   `objects/bootstrap/15_designs.yml` changes and asserts nothing about the generator.
+2. **Poll through `h.wait_for`.** Never `asyncio.sleep` a fixed duration and hope. The timeout message
+   includes the last state observed, which is usually the whole diagnosis. It also retries through
+   transient errors, so a single 503 from a busy deployment does not end the run.
+3. **Never treat "the first result appeared" as "the work finished".** This is the mistake this suite
+   is most prone to, and the expensive kind is the one that *passes*. Every asynchronous step here
+   produces results progressively:
 
-```python
-import pytest
+   | Step | What arrives first | What the whole set is |
+   | ---- | ------------------ | --------------------- |
+   | A topology generator | devices (phase 3 of 6) | + racking, cabling, loopbacks, routing |
+   | Artifact generation | one artifact | one per target-group member |
+   | Proposed-change review | the data validator | ~21 validators incl. artifacts, checks, repository |
 
-@pytest.mark.integration
-async def test_create_device(client):
-    """Test device creation in Infrahub."""
-    # Use fixtures from conftest.py
-    result = await client.create_device(...)
-    assert result.id is not None
-```
+   Waiting for "all of what exists is done" is satisfied immediately in every one of those cases. Use
+   `h.wait_for_quiescence` (counts must hold steady across `QUIESCENCE_ROUNDS` polls) for generators,
+   pass an `expected` count to `h.wait_for_artifacts`, and rely on `h.wait_for_validations` requiring
+   the validator count to settle. Getting this wrong once produced a green run that had checked 2 of
+   6 artifacts, and another that merged with 1 of 21 validators complete.
+4. **Say what failed in the assertion message.** These tests fail in CI, on a machine nobody can log
+   into, so `assert devices` is close to useless. Include the branch, the expectation and what was
+   found. `h.merge_proposed_change` shows the shape: it quotes the merge task's own logs and the
+   validators that did not conclude successfully.
+5. **Assert completion and conclusion separately.** A validator that never finishes is an Infrahub
+   problem; a validator that finishes and fails is a demo-data problem. Do not collapse the two.
+6. **Check structure, not just counts.** A generator can create the right number of devices and leave
+   them unaddressed. Assert the addressing, cabling and peering that make a fabric usable.
 
-### Test Requirements
+### Diagnosing a failure
 
-1. **Type hints required** - All test functions need parameter types
-2. **Docstrings required** - Explain what each test validates
-3. **Both paths** - Test success AND failure scenarios
-4. **Descriptive names** - `test_create_device_with_invalid_name_raises_error`
+Container logs for `infrahub-server` and `task-worker` are attached as a warning at the end of any
+run that had a failure, so the CI log already contains them. Locally, add `--log-cli-level=INFO` to
+see each step as it happens.
 
-## Fixtures
+Before concluding that a failure is a defect in the demo or in Infrahub, check how the deployment was
+resourced. The stack defaults to two API servers and two task workers; running it trimmed down, or
+alongside another Infrahub stack on the same host, produces load-shedding that looks like product
+failure — 503s from the load balancer, and schema-constraint checks concluding `failure` on a branch
+that is actually fine. Reproduce at default sizing before filing anything.
 
-### Root Fixtures (conftest.py)
+`Unable to find the class <Name>` in a check or transform failure is **not** an import error.
+Infrahub wraps any exception raised inside a check or transform in `CheckError`/`TransformError`
+carrying that message, so the class name in the message is a red herring. The real cause is the
+`AttributeError`, `KeyError` or `TypeError` in the traceback above it in the `task-worker` log.
 
-| Fixture        | Scope   | Description                  |
-| -------------- | ------- | ---------------------------- |
-| `root_dir`     | session | Project root directory path  |
-| `fixtures_dir` | session | Test fixtures directory      |
-| `schema_dir`   | session | Schema files directory       |
-| `data_dir`     | session | Data files directory         |
+### Defects this coverage found
 
-### Integration Fixtures (integration/conftest.py)
+Three demo defects surfaced the first time the extended tier ran, all of them latent because nothing
+exercised the path. They are fixed, and they are worth reading as a guide to what this suite is for:
 
-| Fixture         | Scope   | Description            |
-| --------------- | ------- | ---------------------- |
-| `client`        | class   | Infrahub SDK client    |
-| `infrahub_port` | session | Running Infrahub port  |
+| Defect | Cause | Why nothing caught it |
+| ------ | ----- | --------------------- |
+| POP merge blocked: the `edge_config` artifact and `validate_edge` check both concluded `failure` | `queries/config/edge.gql` queried `DcimDevice`, but POP edges are `DcimVirtualDevice` and still join the `edges` group this artifact targets (`generators/common.py`: `group_name = f"{role}s"`). The query matched nothing, `get_data()` returned `[]`, and the caller called `.get()` on a list. | Only DC edges, which are physical, had ever been rendered |
+| Scaling a deployment out crashed the generator with `KeyError: 0` in `assign_devices_to_racks` | `middle_start` is `(total_racks // 2) - (middle_device_count // 2)`, which goes negative when a design has more infrastructure devices than leaf racks. The Arista and Sonic "with border leafs" designs place 6 into 4, centering the range on the nonexistent rack 0. | Both broken designs were unused; the Cisco equivalents have 8 leaf racks and land inside the row |
+| `create_segment` never ran from its trigger rule | `objects/segments/segment-opsmill.yml` did not join the `network_segments` group that the generator definition targets, so Infrahub refused: `Target ... is not part of the group`. DC and POP objects declare their group; the segment did not. | The segment service had no test |
 
-## Mocking Guidelines
+Two of these produced *plausible* wreckage rather than an obvious error, which is the lesson. The
+generator crash happened in phase 3 of 6, so the device count still matched the design and only the
+loopbacks created in phase 5 were missing — the failure surfaced two assertions later as an
+addressing bug. `h.run_generator` now asserts the task concluded `COMPLETED` for that reason: check
+that the work succeeded before checking what it produced.
 
-### Infrahub SDK
+### The one failure that is not ours
+
+`test_60_segment::test_05_segment_merges_to_main` is marked `xfail`. Infrahub runs `create_dc` as a
+check on that proposed change, because the segment's diff touches the DC fabric, and the run fails on
+Infrahub's own bookkeeping: `CoreGeneratorGroupUpsert` reports `NODE_NOT_FOUND` for a
+`CoreGeneratorGroup` or `CoreGraphQLQueryGroup` node. The same fault appears as an HTTP 500 on
+`CoreGeneratorGroup(...).members`, and as a `KeyError` from `query_peers` in `core/manager.py`.
+
+Nothing in this repository creates or deletes those nodes, so there is nothing here to fix. Two
+things follow for anyone touching this:
+
+- The marker is **not** `strict`, so the test reports `XPASS` as soon as Infrahub resolves those nodes
+  correctly. That is the signal to delete the marker — check for it before assuming the bug is live.
+- Do not generalise the marker. It is on one test because one workflow reaches that code path. If a
+  second test starts failing the same way, confirm the signature in the `task-worker` log first; a
+  merge blocked by a *demo* data problem looks similar from the outside and must not be waved through.
+
+### Authentication
+
+Clients get their token from the `infrahub_api_token` fixture, which reads the token
+`infrahub-testcontainers` seeds the deployment with. Do not rely on `INFRAHUB_API_TOKEN` being set in
+the environment: `Config` will pick it up silently, which is how the suite used to authenticate in CI
+and nowhere else.
+
+## Unit tests
+
+Fast and isolated. Mock every external dependency:
 
 ```python
 from unittest.mock import AsyncMock, MagicMock
 
-# Mock the SDK client
-mock_client = MagicMock()
-mock_client.execute_graphql = AsyncMock(return_value={"data": {...}})
+def test_my_function() -> None:
+    """Test description explaining what is being tested."""
+    client = MagicMock()
+    client.execute_graphql = AsyncMock(return_value={"data": {}})
+    assert my_function(client) == expected
 ```
 
-### GraphQL Responses
+Store mock GraphQL responses in `tests/unit/simulators/`.
 
-Store mock responses in `tests/unit/simulators/`:
+## SDK plugin specs
 
-```python
-from pathlib import Path
+`test_*.yml` files with an `infrahub_tests` key are collected by the Infrahub SDK's pytest plugin,
+not by any code in this repository. `tests/smoke/test_graphql.yml` holds one `graphql-query-smoke`
+entry per query in `.infrahub.yml`; keep the two in step, since
+`tests/integration/test_30_graphql.py::test_every_declared_query_has_a_subject` fails when they drift.
 
-def load_mock_response(filename: str) -> dict:
-    """Load mock GraphQL response from file."""
-    with open(Path(__file__).parent / "simulators" / filename) as f:
-        return json.load(f)
-```
+## Test Requirements
 
-## Test Data
-
-- Store test fixtures in `tests/fixtures/` or `tests/integration/data/`
-- Use YAML files for test data that mirrors the `objects/` structure
-- Keep test data minimal - only what's needed for the test
-
-## Common Patterns
-
-### Async Tests
-
-```python
-import pytest
-
-@pytest.mark.asyncio
-async def test_async_function():
-    result = await some_async_operation()
-    assert result is not None
-```
-
-### Parametrized Tests
-
-```python
-import pytest
-
-@pytest.mark.parametrize("input,expected", [
-    ("arista", "eos"),
-    ("cisco", "nxos"),
-    ("juniper", "junos"),
-])
-def test_platform_mapping(input, expected):
-    assert get_platform(input) == expected
-```
-
-### Testing Transforms
-
-```python
-def test_leaf_transform(root_dir):
-    """Test leaf device configuration transform."""
-    # Load sample data
-    # Run transform
-    # Assert output matches expected
-```
+1. **Type hints required** on every test and fixture signature
+2. **Docstrings required**, Google-style, saying what property is asserted
+3. **Descriptive names** — `test_generator_rerun_is_idempotent`, not `test_generator_2`
+4. **Run the linters** — `uv run invoke lint` covers ruff, mypy, yamllint and rumdl
 
 ## Common Pitfalls
 
-1. **Missing async markers** - Add `@pytest.mark.asyncio` for async tests
-2. **Hardcoded paths** - Use fixtures like `root_dir` instead
-3. **Leaked state** - Each test should be independent
-4. **Missing mocks** - Unit tests should not call external services
-5. **Slow tests in unit/** - Move to integration/ if they need real Infrahub
-
-## Running Integration Tests
-
-Integration tests require a running Infrahub instance:
-
-```bash
-# Start Infrahub
-uv run invoke start
-
-# Wait for it to be ready
-# Then run integration tests
-uv run pytest tests/integration/
-
-# Or run the full workflow test
-uv run pytest tests/integration/test_workflow.py -vv
-```
+1. **Adding a class-scoped container fixture** — it would start a second Infrahub stack. Use the
+   session fixtures in `integration/conftest.py`.
+2. **Writing to `main` from an integration module** — it perturbs every module that runs after it.
+3. **Hard-coded sleeps** — use `h.wait_for`.
+4. **A new module without a `core`/`extended` marker** — it lands in the core tier by default and
+   slows down every pull request.
+5. **Hardcoded paths** — use the `root_dir` fixture.
+6. **Slow tests in `unit/`** — move them to `integration/` if they need a real Infrahub.

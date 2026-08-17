@@ -18,3 +18,8 @@ spec:
           prefix: 172.25.1.0/24
           status: active
           role: customer
+      # Required, not decorative: `create_segment` targets the `network_segments` group, and the
+      # segment-on-create trigger rule refuses to run a generator against a node that is not a
+      # member of its target group.
+      member_of_groups:
+        - network_segments

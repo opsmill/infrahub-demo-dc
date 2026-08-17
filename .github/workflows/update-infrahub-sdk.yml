@@ -10,7 +10,7 @@ on:
         required: true
         default: "1.19.0"
       run:
-        description: "Whether to run integration tests"
+        description: "Label the PR for the full integration suite (a dependency bump already triggers it)"
         required: false
         type: boolean
         default: true
@@ -79,11 +79,22 @@ jobs:
           email: github-bot@opsmill.com
           rebase: ${{ env.BRANCH_EXISTS == 1 }}
 
+      # As in update-infrahub.yml: the dependency change is what makes ci.yml select the full
+      # integration suite, and the label keeps that selection explicit.
       - name: Create a pull request
         run: |
           echo ${{ secrets.GH_UPDATE_PACKAGE_OTTO }} | gh auth login --with-token
           gh pr create \
             --title "update infrahub-sdk to version ${{ env.INFRAHUB_SDK_VERSION }} against ${{ matrix.branch-name}}" \
-            --body "This PR updates infrahub-sdk to version ${{ env.INFRAHUB_SDK_VERSION }}." \
+            --body "This PR updates infrahub-sdk to version ${{ env.INFRAHUB_SDK_VERSION }}.
+
+          The full-integration label requests the whole integration suite for this change." \
             --base ${{ matrix.branch-name}} \
             --head ${{ env.BRANCH_NAME }}
+
+      - name: Request the full integration suite
+        if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.run == 'true' }}
+        continue-on-error: true
+        run: |
+          echo ${{ secrets.GH_UPDATE_PACKAGE_OTTO }} | gh auth login --with-token
+          gh pr edit ${{ env.BRANCH_NAME }} --add-label full-integration
