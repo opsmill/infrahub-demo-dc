@@ -1,0 +1,25 @@
+pyproject.toml
+  s_8f3abfc058ae21::t_3bebb2532502d7 14
+  s_8f3abfc058ae21::t_f169bb16ae9c15 87
+tasks.py
+  s_8f3abfc058ae21::t_5546a34f251be4 560-592,595
+  s_8f3abfc058ae21::t_ee29b7dc998f9f 8
+uv.lock
+  s_8f3abfc058ae21::t_d88e04a3608153 3,5-6,44,86-104,208-239,331-349,358,759-805,848-891,940-958,1053-1082,1108-1109,1133-1142,1181,1201,1223-1234,1263-1290,1345-1382,1459,1541-1546,1574-1601,1611,1652-1707,1786-1843,1863,1896-1911,1996,2142-2174,2233-2243,2285-2312,2346-2393
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "e4205876b915d3a2b9ac5ff1ec44cfbe655d3ca6",
+  "prompts": {},
+  "sessions": {
+    "s_8f3abfc058ae21": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "887f0582-2dd1-4c08-b4aa-3432f8f94e1c",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Benoit Kohler <bkohler@bearchitek.com>"
+    }
+  }
+}
