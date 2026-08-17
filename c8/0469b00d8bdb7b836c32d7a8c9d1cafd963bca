@@ -1,0 +1,21 @@
+tests/conftest.py
+  s_8f3abfc058ae21::t_949069a92f5450 11,13
+  s_8f3abfc058ae21::t_903c8d4cc38778 37,39-41,43-49
+  s_8f3abfc058ae21::t_df0c785b41123d 18-36,38,42,50-53
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "c80469b00d8bdb7b836c32d7a8c9d1cafd963bca",
+  "prompts": {},
+  "sessions": {
+    "s_8f3abfc058ae21": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "887f0582-2dd1-4c08-b4aa-3432f8f94e1c",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Benoit Kohler <bkohler@bearchitek.com>"
+    }
+  }
+}
