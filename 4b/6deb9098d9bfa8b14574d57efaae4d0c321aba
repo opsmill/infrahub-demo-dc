@@ -1,0 +1,25 @@
+docs/superpowers/specs/2026-08-17-uniform-demo-repo-cicd-design.md
+  s_8f3abfc058ae21::t_2c1ff53e8c3da9 690-728
+  s_8f3abfc058ae21::t_b5a21f092436c2 1131-1133
+  s_8f3abfc058ae21::t_e028224df49818 1017-1056
+  s_8f3abfc058ae21::t_9384a84a3ee889 457,459-470
+  s_8f3abfc058ae21::t_56e58c96d0e88c 729
+docs/superpowers/plans/2026-08-17-uniform-cicd-demo-dc.md
+  s_8f3abfc058ae21::t_55f3a306b213fd 378
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "4b6deb9098d9bfa8b14574d57efaae4d0c321aba",
+  "prompts": {},
+  "sessions": {
+    "s_8f3abfc058ae21": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "887f0582-2dd1-4c08-b4aa-3432f8f94e1c",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Benoit Kohler <bkohler@bearchitek.com>"
+    }
+  }
+}
