@@ -1,0 +1,25 @@
+docs/superpowers/audits/audit-ai-dc.md
+  s_8f3abfc058ae21::t_a79d17c7225012 1-392
+docs/superpowers/audits/audit-demo-dc.md
+  s_8f3abfc058ae21::t_a79d17c7225012 1-264
+docs/superpowers/audits/audit-service-catalog.md
+  s_8f3abfc058ae21::t_a79d17c7225012 1-240
+docs/superpowers/audits/audit-demo-sp.md
+  s_8f3abfc058ae21::t_a79d17c7225012 1-266
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "67ce202ffd9642bd1f89aff07e6723d1cc70e45e",
+  "prompts": {},
+  "sessions": {
+    "s_8f3abfc058ae21": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "887f0582-2dd1-4c08-b4aa-3432f8f94e1c",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Benoit Kohler <bkohler@bearchitek.com>"
+    }
+  }
+}
