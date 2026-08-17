@@ -1,0 +1,19 @@
+.github/workflows/update-infrahub.yml
+  s_8f3abfc058ae21::t_a56f70e04fe183 119-126,129-135
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "7cefe1504a91ceea41fada6898c00f07f126ddf7",
+  "prompts": {},
+  "sessions": {
+    "s_8f3abfc058ae21": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "887f0582-2dd1-4c08-b4aa-3432f8f94e1c",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Benoit Kohler <bkohler@bearchitek.com>"
+    }
+  }
+}
