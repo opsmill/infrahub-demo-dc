@@ -1,0 +1,19 @@
+docs/superpowers/specs/2026-08-17-uniform-demo-repo-cicd-design.md
+  s_8f3abfc058ae21::t_406decb8176aa4 806,808-812,819-840
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "8f63637a79d293d0a87f9b0d61eede3f3801b688",
+  "prompts": {},
+  "sessions": {
+    "s_8f3abfc058ae21": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "887f0582-2dd1-4c08-b4aa-3432f8f94e1c",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Benoit Kohler <bkohler@bearchitek.com>"
+    }
+  }
+}
