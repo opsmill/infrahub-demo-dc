@@ -1,0 +1,20 @@
+dev/constitution.md
+  s_c61e7f2a6f8b30::t_65fffa997d2b13 1-26,30-106,110-119
+  s_c61e7f2a6f8b30::t_20343201c7502f 27-29,107-109
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "ee4d1a00bc0aaea33b338bd299695355bbf714e2",
+  "prompts": {},
+  "sessions": {
+    "s_c61e7f2a6f8b30": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f96e34cf-79d1-45f1-ade3-89a74eb5ed2e",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Benoit Kohler <bkohler@bearchitek.com>"
+    }
+  }
+}
