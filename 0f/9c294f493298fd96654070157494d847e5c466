@@ -1,0 +1,23 @@
+pyproject.toml
+  s_c61e7f2a6f8b30::t_7612c4408ac499 16-23,30-32
+specs/001-uniform-cicd-contract/tasks.md
+  s_c61e7f2a6f8b30::t_59414810f41144 40
+uv.lock
+  s_c61e7f2a6f8b30::t_db694697b8c742 551,558
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "0f9c294f493298fd96654070157494d847e5c466",
+  "prompts": {},
+  "sessions": {
+    "s_c61e7f2a6f8b30": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f96e34cf-79d1-45f1-ade3-89a74eb5ed2e",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Benoit Kohler <bkohler@bearchitek.com>"
+    }
+  }
+}
