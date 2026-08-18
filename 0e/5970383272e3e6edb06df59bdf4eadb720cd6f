@@ -1,0 +1,57 @@
+tasks.py
+  s_8f3abfc058ae21::t_8f8d31a63fdf60 617-621
+tests/integration/helpers.py
+  s_8f3abfc058ae21::t_0de3605cc42c40 152-160
+  s_8f3abfc058ae21::t_4c5c140edcbd60 682-690,692,697
+AGENTS.md
+  s_8f3abfc058ae21::t_f4edcf4c6abc01 122
+tests/integration/conftest.py
+  s_8f3abfc058ae21::t_7c7e9b0ca95035 269-285
+  s_8f3abfc058ae21::t_29da2d6c1dc1ad 261-266
+  s_8f3abfc058ae21::t_3596911d020eba 32
+docs/superpowers/specs/2026-08-17-uniform-demo-repo-cicd-design.md
+  s_8f3abfc058ae21::t_dcf012e4ca3d55 427-476
+  s_8f3abfc058ae21::t_4f2f14214092bd 215-217,235-237,357,362-366
+  s_8f3abfc058ae21::t_4a4704b4877210 1465-1505
+  s_8f3abfc058ae21::t_1fde0d39c143f4 1506
+tests/integration/test_00_bootstrap.py
+  s_8f3abfc058ae21::t_b20e0a725577a7 106-115
+.github/workflows/update-infrahub.yml
+  s_8f3abfc058ae21::t_97899a5532a200 47-55
+  s_8f3abfc058ae21::t_15fca24596dfdc 70-84
+  s_8f3abfc058ae21::t_e5f1df6cbe1eab 65
+  s_8f3abfc058ae21::t_fa7696841a11b5 28-35
+  s_8f3abfc058ae21::t_b0d68aeb4c885c 158-160
+  s_8f3abfc058ae21::t_a7d39042235fe1 93
+  s_8f3abfc058ae21::t_19a9682f2b9671 171-175
+  s_8f3abfc058ae21::t_43b0227bc2d25a 137-140
+.github/workflows/ci.yml
+  s_8f3abfc058ae21::t_df9330bf7225e1 6-11
+  s_8f3abfc058ae21::t_7639107f325fcc 143-146,149
+  s_8f3abfc058ae21::t_51a84dfbf4864a 121-123
+  s_8f3abfc058ae21::t_5827b807e43839 180-191
+  s_8f3abfc058ae21::t_13028f11d0541c 70,72,74,178
+  s_8f3abfc058ae21::t_9dabfe01a1d993 27-32
+  s_8f3abfc058ae21::t_8fcc7ece2f370b 234
+tests/integration/stack_config.py
+  s_8f3abfc058ae21::t_eea7214bacf196 153-162
+  s_8f3abfc058ae21::t_5cc6b4d2cc022e 145-146
+tests/integration/repo_source.py
+  s_8f3abfc058ae21::t_837920a03fd01a 38-45
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "0e5970383272e3e6edb06df59bdf4eadb720cd6f",
+  "prompts": {},
+  "sessions": {
+    "s_8f3abfc058ae21": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "887f0582-2dd1-4c08-b4aa-3432f8f94e1c",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Benoit Kohler <bkohler@bearchitek.com>"
+    }
+  }
+}
