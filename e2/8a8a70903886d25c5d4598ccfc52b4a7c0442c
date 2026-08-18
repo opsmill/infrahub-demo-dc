@@ -1,0 +1,19 @@
+uv.lock
+  s_e5e839ab98b6b6::t_cbd10a4603fbb8 596-597,609-610,984-1116
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "e28a8a70903886d25c5d4598ccfc52b4a7c0442c",
+  "prompts": {},
+  "sessions": {
+    "s_e5e839ab98b6b6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-achunk4-us2-ci-6e578e7167a1f99e",
+        "model": "unknown"
+      },
+      "human_author": "Benoit Kohler <bkohler@bearchitek.com>"
+    }
+  }
+}
