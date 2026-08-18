@@ -1,0 +1,54 @@
+.github/workflows/update-infrahub.yml
+  s_c61e7f2a6f8b30::t_2776d53745ebea 23
+  s_c61e7f2a6f8b30::t_0ad67ea52ce7a5 143-159
+  s_c61e7f2a6f8b30::t_f75aaedde92383 11-17
+  s_c61e7f2a6f8b30::t_1ba0ab85a39812 275-281,285-298
+  s_c61e7f2a6f8b30::t_0bd3092c45abbd 322-325
+  s_c61e7f2a6f8b30::t_f9cab1515a92cf 351-354
+  s_c61e7f2a6f8b30::t_6b21099131562e 251-256,261
+docs/superpowers/specs/2026-08-18-demo-dc-contract-closeout.md
+  s_c61e7f2a6f8b30::t_09ee659be022c5 10-11
+.github/workflows/ci.yml
+  s_c61e7f2a6f8b30::t_f1132322167e3c 267-270,273
+  s_c61e7f2a6f8b30::t_cdc134d606721a 165-170
+  s_c61e7f2a6f8b30::t_63ebace9a84f20 9-15
+  s_c61e7f2a6f8b30::t_845721a9ec0c91 180-183
+  s_c61e7f2a6f8b30::t_1fd116f0ce6abe 213-245,248,250-261
+  s_c61e7f2a6f8b30::t_2a7f05473bd4d1 203-207
+pyproject.toml
+  s_c61e7f2a6f8b30::t_0bc7456b53956e 132
+docs/contract/uniform-demo-repo-cicd-contract.md
+  s_c61e7f2a6f8b30::t_3c9f40ced86d72 242-243
+  s_c61e7f2a6f8b30::t_d2e1acdeb5bf1c 156-171
+  s_c61e7f2a6f8b30::t_97b2474ba8eafa 57-61
+  s_c61e7f2a6f8b30::t_ea9dd7922764d9 118-127
+  s_c61e7f2a6f8b30::t_8a24d1bd4ce540 147-152
+  s_c61e7f2a6f8b30::t_253e7da97f6266 188-193
+  s_c61e7f2a6f8b30::t_fbaf1fcfdfb267 79-82
+  s_c61e7f2a6f8b30::t_708da8ffd21c63 138-142
+  s_c61e7f2a6f8b30::t_a98641cb46dfba 111-113
+  s_c61e7f2a6f8b30::t_df0aba8d545c4c 35-43
+  s_c61e7f2a6f8b30::t_7963fa52ab38ad 70-73
+  s_c61e7f2a6f8b30::t_aa09b9caad9263 103
+tests/integration/conftest.py
+  s_c61e7f2a6f8b30::t_70cb1ec6bf87e2 385-389
+tasks.py
+  s_c61e7f2a6f8b30::t_a18afcaeaa043a 620-622
+  s_c61e7f2a6f8b30::t_ff9bec78d30e4e 584-585
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "797b839b0bd2ac2e5450277c4647b6770b8ce725",
+  "prompts": {},
+  "sessions": {
+    "s_c61e7f2a6f8b30": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f96e34cf-79d1-45f1-ade3-89a74eb5ed2e",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Benoit Kohler <bkohler@bearchitek.com>"
+    }
+  }
+}
