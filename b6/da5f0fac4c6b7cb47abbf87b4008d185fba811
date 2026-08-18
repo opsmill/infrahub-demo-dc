@@ -1,0 +1,25 @@
+tests/integration/test_01_stack_config.py
+  s_c61e7f2a6f8b30::t_0f436fa6802f65 133-144
+tests/integration/test_03_wait_for.py
+  s_c61e7f2a6f8b30::t_56a8fcb19891ff 65
+  s_c61e7f2a6f8b30::t_b2c9cffea6294a 1-54,56-64,66-70
+  s_c61e7f2a6f8b30::t_152dbaacac63ac 55
+tests/integration/test_02_repo_source.py
+  s_c61e7f2a6f8b30::t_cf3d245bdccc56 1-82
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "b6da5f0fac4c6b7cb47abbf87b4008d185fba811",
+  "prompts": {},
+  "sessions": {
+    "s_c61e7f2a6f8b30": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f96e34cf-79d1-45f1-ade3-89a74eb5ed2e",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Benoit Kohler <bkohler@bearchitek.com>"
+    }
+  }
+}
