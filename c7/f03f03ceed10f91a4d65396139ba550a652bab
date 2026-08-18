@@ -1,0 +1,26 @@
+specs/001-uniform-cicd-contract/tasks.md
+  s_c61e7f2a6f8b30::t_d702a16b6062de 128
+tests/integration/conftest.py
+  s_c61e7f2a6f8b30::t_9bf24da33d82c2 71
+  s_c61e7f2a6f8b30::t_cf17314c313bad 69-70
+  s_c61e7f2a6f8b30::t_bb2e5cf5b3f890 72-73
+  s_c61e7f2a6f8b30::t_99050f02ee0a3a 31-35
+  s_c61e7f2a6f8b30::t_3797109362e2a1 38-42
+  s_c61e7f2a6f8b30::t_d52963ffd5bbe9 27-30,36-37,43-68
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "c7f03f03ceed10f91a4d65396139ba550a652bab",
+  "prompts": {},
+  "sessions": {
+    "s_c61e7f2a6f8b30": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f96e34cf-79d1-45f1-ade3-89a74eb5ed2e",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Benoit Kohler <bkohler@bearchitek.com>"
+    }
+  }
+}
