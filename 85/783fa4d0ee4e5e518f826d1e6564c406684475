@@ -1,0 +1,29 @@
+specs/001-uniform-cicd-contract/tasks.md
+  s_c61e7f2a6f8b30::t_4b39baa73acead 93,99,102,105,109,112
+tests/AGENTS.md
+  s_c61e7f2a6f8b30::t_49e63ff4c5af1b 34,101-113
+README.md
+  s_c61e7f2a6f8b30::t_49e63ff4c5af1b 79-80,82-84
+.github/workflows/update-infrahub.yml
+  s_c61e7f2a6f8b30::t_49e63ff4c5af1b 284-286
+AGENTS.md
+  s_c61e7f2a6f8b30::t_49e63ff4c5af1b 52-55,138-139
+docs/docs/developer-guide.mdx
+  s_c61e7f2a6f8b30::t_49e63ff4c5af1b 551-553,555-557
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "85783fa4d0ee4e5e518f826d1e6564c406684475",
+  "prompts": {},
+  "sessions": {
+    "s_c61e7f2a6f8b30": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f96e34cf-79d1-45f1-ade3-89a74eb5ed2e",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Benoit Kohler <bkohler@bearchitek.com>"
+    }
+  }
+}
