@@ -1,0 +1,26 @@
+specs/001-uniform-cicd-contract/contracts/ci-gates.md
+  s_c61e7f2a6f8b30::t_28d2cae35225bf 43-51
+  s_c61e7f2a6f8b30::t_af9af83ff8d61a 22-23
+specs/001-uniform-cicd-contract/critiques/critique-2026-08-18.md
+  s_c61e7f2a6f8b30::t_cc5e3646777da5 1-110
+specs/001-uniform-cicd-contract/spec.md
+  s_c61e7f2a6f8b30::t_939d0f020c648d 175-178
+specs/001-uniform-cicd-contract/contracts/dispatch-contract.md
+  s_c61e7f2a6f8b30::t_8e32bd2772bd23 25-29
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "da661ba29cd8fbc02264c39d0546ecbcaef14a6a",
+  "prompts": {},
+  "sessions": {
+    "s_c61e7f2a6f8b30": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f96e34cf-79d1-45f1-ade3-89a74eb5ed2e",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Benoit Kohler <bkohler@bearchitek.com>"
+    }
+  }
+}
