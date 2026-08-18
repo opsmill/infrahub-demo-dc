@@ -1,0 +1,45 @@
+docs/superpowers/specs/2026-08-18-demo-dc-contract-closeout.md
+  s_4297b3c975ff72::t_197d935cff40f5 26-29,35,37-38,41,43,45-50
+  s_4297b3c975ff72::t_5404d2117f542f 1-25,30-34,36,39-40,42,44,51-57,82-268,272-280
+  s_4297b3c975ff72::t_bf5ce438c897e1 269-271
+  s_4297b3c975ff72::t_3f833238f04594 58-81
+docs/superpowers/plans/2026-08-18-demo-dc-contract-closeout.md
+  s_4297b3c975ff72::t_7a282a0c379c1f 939-954
+  s_4297b3c975ff72::t_5a4b27b8ff5c35 518,521-530
+  s_4297b3c975ff72::t_10200e3a91ebf4 784-791
+  s_4297b3c975ff72::t_df0693bc8fb4fa 295,299-308
+  s_4297b3c975ff72::t_7871f25aff684e 1036-1043
+  s_4297b3c975ff72::t_895c1f3b5e59d2 1-238,258-294,296-298,309-481,486-493,495,509-517,519-520,531-654,656-659,664-679,681-683,686-698,701,704-783,792-938,955-1035
+  s_4297b3c975ff72::t_57a924c5f3b78f 482-485
+  s_4297b3c975ff72::t_88a7a5b660f625 494,496-508
+  s_4297b3c975ff72::t_572f0f2d895fff 680,684-685
+  s_4297b3c975ff72::t_ab0f856d76e41b 699-700,702-703
+  s_4297b3c975ff72::t_e54df50df4414e 239-257
+  s_4297b3c975ff72::t_e527e70a7ac890 655,660-663
+specs/001-uniform-cicd-contract/tasks.md
+  s_c61e7f2a6f8b30::t_db57143ea7b573 24,27,29
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "186abc24e39bbb9ac55923994cfb232649673bde",
+  "prompts": {},
+  "sessions": {
+    "s_4297b3c975ff72": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fe1d0036-0261-4a8b-bf67-2e17229228c3",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Benoit Kohler <bkohler@bearchitek.com>"
+    },
+    "s_c61e7f2a6f8b30": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f96e34cf-79d1-45f1-ade3-89a74eb5ed2e",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Benoit Kohler <bkohler@bearchitek.com>"
+    }
+  }
+}
