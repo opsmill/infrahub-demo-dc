@@ -1,0 +1,31 @@
+docs/superpowers/specs/2026-08-17-uniform-demo-repo-cicd-design.md
+  s_c61e7f2a6f8b30::t_cbf0cd0fef3fc0 3-8
+AGENTS.md
+  s_c61e7f2a6f8b30::t_6b9cf7bbc3ae01 59-69,72-73
+  s_c61e7f2a6f8b30::t_62c2fa3b96c030 70-71
+specs/001-uniform-cicd-contract/tasks.md
+  s_c61e7f2a6f8b30::t_1358001ea443b9 138,145,147,151
+tests/AGENTS.md
+  s_c61e7f2a6f8b30::t_6b9cf7bbc3ae01 116-118
+  s_c61e7f2a6f8b30::t_62c2fa3b96c030 115
+docs/superpowers/plans/2026-08-18-demo-dc-contract-closeout.md
+  s_c61e7f2a6f8b30::t_cbf0cd0fef3fc0 3-8
+docs/superpowers/specs/2026-08-18-demo-dc-contract-closeout.md
+  s_c61e7f2a6f8b30::t_cbf0cd0fef3fc0 3-8
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "db76fdad3570dca3f89ae304ae45580cd9333b98",
+  "prompts": {},
+  "sessions": {
+    "s_c61e7f2a6f8b30": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f96e34cf-79d1-45f1-ade3-89a74eb5ed2e",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Benoit Kohler <bkohler@bearchitek.com>"
+    }
+  }
+}
