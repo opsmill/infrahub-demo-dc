@@ -1,0 +1,22 @@
+specs/001-uniform-cicd-contract/checklists/requirements.md
+  s_c61e7f2a6f8b30::t_2f3517a3be72d8 1-41
+specs/001-uniform-cicd-contract/spec.md
+  s_c61e7f2a6f8b30::t_e04c322115bb44 1,3,5,9-13,17,19-22,24-27,29-31,35-45,49,51-53,55-57,59-60,64-66,70,72-74,76-79,81-82,86-90,96-107,113-155,161-171,175-200
+  s_c61e7f2a6f8b30::t_bcde6455946ff5 2,4,6-8,14-16,18,23,28,32-34,46-48,50,54,58,61-63,67-69,71,75,80,83-85,91-95,108-112,156-160,172-174
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "0dd60c05da11373bc111eb4e7166cbaf5fcd508c",
+  "prompts": {},
+  "sessions": {
+    "s_c61e7f2a6f8b30": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f96e34cf-79d1-45f1-ade3-89a74eb5ed2e",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Benoit Kohler <bkohler@bearchitek.com>"
+    }
+  }
+}
