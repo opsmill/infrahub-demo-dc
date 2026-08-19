@@ -28,6 +28,13 @@ generics:
     namespace: Virtualization
     description: A generic unit that can host VM
     include_in_menu: false
+    human_friendly_id:
+      - name__value
+    attributes:
+      - name: name
+        kind: Text
+        unique: true
+        order_weight: 1000
     relationships:
       - name: virtual_machines
         label: Virtual Machines

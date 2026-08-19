@@ -41,7 +41,11 @@ class VirtualizationHostCablingGenerator(InfrahubGenerator):
         host = hosts[0]  # Generator runs per-host
         host_name = host.get("name", "unknown")
         host_id = host.get("id")
-        existing_interfaces = {interface["name"]: interface for interface in host.get("interfaces", [])}
+        # clean_data() collapses an empty relationship's {edges: []} to None
+        # rather than [] (it checks truthiness), so `or []` covers both a
+        # missing key and a present-but-None one - a brand new host with no
+        # interfaces yet hits this every time.
+        existing_interfaces = {interface["name"]: interface for interface in host.get("interfaces") or []}
 
         leafs = await self.client.filters(kind="DcimDevice", role__value="leaf", branch=self.branch)
         if not leafs:
