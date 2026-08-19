@@ -1,0 +1,33 @@
+.github/workflows/ci.yml
+  s_c61e7f2a6f8b30::t_de1a65285f9c7a 60,88,131-132,183,204
+pyproject.toml
+  s_c61e7f2a6f8b30::t_de1a65285f9c7a 41
+dev/constitution.md
+  s_c61e7f2a6f8b30::t_b2842b48c8554d 4-9,63,65,67-72,109
+tests/integration/conftest.py
+  s_c61e7f2a6f8b30::t_2b98591529665c 31-33
+tasks.py
+  s_c61e7f2a6f8b30::t_2b98591529665c 584-585
+.github/workflows/update-infrahub.yml
+  s_c61e7f2a6f8b30::t_de1a65285f9c7a 16,27,31,73,115,155,196,240,256
+docs/superpowers/specs/2026-08-18-demo-dc-contract-closeout.md
+  s_c61e7f2a6f8b30::t_96f5ab2b1b759a 4
+CLAUDE.md
+  s_c61e7f2a6f8b30::t_de1a65285f9c7a 5
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "1b60586a2825b7c89f28a8a4348ceea65be86238",
+  "prompts": {},
+  "sessions": {
+    "s_c61e7f2a6f8b30": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f96e34cf-79d1-45f1-ade3-89a74eb5ed2e",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Benoit Kohler <bkohler@bearchitek.com>"
+    }
+  }
+}
