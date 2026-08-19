@@ -84,3 +84,7 @@ service_catalog/.streamlit/
 *.clab.yml.bak
 *.tar.xz
 .superset/config.json
+
+# spec-kit runtime artifacts
+.specify/**/.cache/
+.specify/feature.json

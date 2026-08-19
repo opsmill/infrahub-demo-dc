@@ -11,23 +11,36 @@ authors = [
     {name = "Tomek Zajac", email = "tomek@mastuazi.com"},
     {name = "Pete Crocker", email = "pete@opsmill.com"},
 ]
-requires-python = ">=3.10,<3.13"
+requires-python = ">=3.11,<3.15"
 dependencies = [
-    "infrahub-sdk[all,ctl]==1.19.0",
+    # Floor, not a pin: uv.lock is committed and resolves exactly, so a run is reproducible either
+    # way, and the difference is only who moves the version -- and the bump pull request is the
+    # designated mover. No upper bound: a relock is the deliberate act, and a stale ceiling costs
+    # more than it buys.
+    #
+    # BETA FLOOR, temporary: a floor should name the last stable release. Move this to >=1.23.0 when
+    # 1.23.0 ships stable.
+    "infrahub-sdk[all,ctl]>=1.23.0b0",
     "invoke>=2.2.1,<3.0.0",
     "rich>=13.9.4,<14.0.0",
 ]
 
 [dependency-groups]
 dev = [
-    "infrahub-testcontainers==1.10.8",
-    "mypy>=1.19.1",
+    # BETA FLOOR, temporary: move to >=1.11.0 when 1.11.0 ships stable. See the infrahub-sdk entry
+    # for why this is a floor rather than a pin.
+    "infrahub-testcontainers>=1.11.0b2",
+    "mypy>=2.3.1",
     "pytest>=9.0.0",
     "pytest-asyncio>=1.3.0",
     "pytest-dependency>=0.6.0",
     "pytest-order>=1.3.0",
-    "ruff>=0.14.10",
-    "rumdl>=0.1.20",
+    # Capped below 0.16, which formats Python inside markdown (17 files here today, 15 vendored).
+    # ariadne-codegen already pins ruff>=0.15.0,<0.16.0 transitively; recording it locally keeps a
+    # relock from crossing the boundary as a side effect. demo-sp's override-dependencies route is
+    # the end state; lifting the cap must also fix tests/AGENTS.md's fenced Python first.
+    "ruff>=0.15.0,<0.16.0",
+    "rumdl>=0.2.55",
     "types-pyyaml>=6.0.12",
     "types-requests>=2.32.0",
     "yamllint>=1.37.1",
@@ -39,7 +52,15 @@ packages = []
 
 [tool.ruff]
 line-length = 120
-exclude = [".venv/", ".dev/"]
+# extend-exclude, not exclude: an explicit `exclude` silently replaces ruff's default exclusions
+# (build/, dist/, .git/ and friends would become lintable).
+extend-exclude = [
+    # Vendored or illustrative trees: ruff 0.16 formats Python inside markdown, and these carry
+    # fenced code this repository does not author or deliberately leaves partial.
+    ".agents/",
+    ".dev/",
+    "scratchpad/",
+]
 
 [tool.ruff.format]
 quote-style = "double"
@@ -78,13 +99,22 @@ exclude = [
     "docs/node_modules/",
     "docs/README.md",
     "node_modules/",
+    "scratchpad/",
 ]
 respect-gitignore = true
 
 [tool.pytest.ini_options]
+addopts = "--strict-markers"
 asyncio_mode = "auto"
 testpaths = ["tests"]
 asyncio_default_fixture_loop_scope = "class"
 filterwarnings = [
     "ignore:`background_execution` is deprecated:DeprecationWarning:infrahub_sdk.branch",
+]
+# The integration suite shares one Infrahub deployment across modules, which run in file-name order
+# (test_00_..., test_10_..., ...). Do not reorder or randomise collection.
+markers = [
+    "core: workflows every pull request must keep working. Run with `-m 'not extended'`.",
+    "extended: additional workflows run on Infrahub-version bump branches and on a tier=full manual dispatch, advisory (non-blocking) while the upstream group-member resolution fault is open. Adds ~30-40 minutes.",
+    "offline: an integration-suite test that reads only repository files and needs no deployment.",
 ]
