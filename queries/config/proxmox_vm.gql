@@ -28,8 +28,10 @@ query proxmox_vm_config($name: String!) {
         }
         host {
           node {
-            name {
-              value
+            ... on VirtualizationPhysicalHost {
+              name {
+                value
+              }
             }
           }
         }
