@@ -1,0 +1,65 @@
+pyproject.toml
+  s_c61e7f2a6f8b30::t_62aa0ab530ac6b 38-41
+  s_c61e7f2a6f8b30::t_cbfef8d363ecf5 56-57
+tests/integration/stack_config.py
+  s_c61e7f2a6f8b30::t_5354024b822a38 5,20,23,140
+  s_c61e7f2a6f8b30::t_734307e184975f 38-40
+tests/integration/constants.py
+  s_c61e7f2a6f8b30::t_b950cc26bffd06 93-94,98,103
+  s_c61e7f2a6f8b30::t_9a53055bcf52a5 16-20
+tests/integration/test_80_proposed_change.py
+  s_c61e7f2a6f8b30::t_1fe0c3c35e12b2 99,112,142,152,175,184,188
+tests/integration/helpers.py
+  s_c61e7f2a6f8b30::t_8981a0f3612c50 32-33
+  s_c61e7f2a6f8b30::t_61495bef09ed37 910
+  s_c61e7f2a6f8b30::t_09a856f5f4b620 886-909,911
+tests/integration/test_40_dc_vendors.py
+  s_c61e7f2a6f8b30::t_bd5d239547fc7a 30
+  s_c61e7f2a6f8b30::t_1fe0c3c35e12b2 38,51,60-62,68,73-74,77,80,87,94,113,129,137,162
+  s_c61e7f2a6f8b30::t_5e2019ccaa2914 106
+.github/workflows/update-infrahub.yml
+  s_c61e7f2a6f8b30::t_b1221a75a8dfe6 3-4,7-9,16-18,28-29,31-33,45-48,54-56,75,87,100,109-110,116-118,130-131,153,157-159,163,171-178,180-188,190-195,197-203,215,220-223,242-244,259,265-266,272-274,278
+tests/integration/test_50_pop.py
+  s_c61e7f2a6f8b30::t_1fe0c3c35e12b2 39,55,61,70,121,134-135
+  s_c61e7f2a6f8b30::t_bd5d239547fc7a 30
+README.md
+  s_c61e7f2a6f8b30::t_2f9a057d679a90 59,62,65
+tests/integration/test_30_graphql.py
+  s_c61e7f2a6f8b30::t_bd5d239547fc7a 61
+docs/docs/developer-guide.mdx
+  s_c61e7f2a6f8b30::t_2f9a057d679a90 497,500,503,568,662,766
+tests/integration/test_10_dc_workflow.py
+  s_c61e7f2a6f8b30::t_bd5d239547fc7a 40
+  s_c61e7f2a6f8b30::t_1fe0c3c35e12b2 58,65,71,86,92,96,159,172,183-184,200,209,215,219,223-224,229,237-238
+tests/integration/test_60_segment.py
+  s_c61e7f2a6f8b30::t_1fe0c3c35e12b2 61,82-84,90,98,116,123,149,164,176,182-184,200,216-217,219
+tests/integration/test_70_day2.py
+  s_c61e7f2a6f8b30::t_bd5d239547fc7a 36
+  s_c61e7f2a6f8b30::t_1fe0c3c35e12b2 48,64-65,75,83,95,97,102,109,113,115,117,120,130,139-140,146,166,180,199,210-211,217,225
+  s_c61e7f2a6f8b30::t_d93f5d9e808cb6 243
+tests/integration/conftest.py
+  s_c61e7f2a6f8b30::t_e6fd9eb94f72b6 31-46
+  s_c61e7f2a6f8b30::t_36b6011f0371c9 443
+  s_c61e7f2a6f8b30::t_d6c16160441d28 412
+  s_c61e7f2a6f8b30::t_da52eff86b91ae 77-88
+.github/file-filters.yml
+  s_c61e7f2a6f8b30::t_5354024b822a38 18-19
+.github/workflows/ci.yml
+  s_c61e7f2a6f8b30::t_155a767a99095e 4-9,15-17,49,61-65,70,73,76-79,90-91,98,116,131,133-134,148,155-156,165-167,171-173,181,184-186,190-191,198-201,205-212,216-219,240,269
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "4382ecd152eb6a12c3f1233b6ca29538515e4459",
+  "prompts": {},
+  "sessions": {
+    "s_c61e7f2a6f8b30": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f96e34cf-79d1-45f1-ade3-89a74eb5ed2e",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Benoit Kohler <bkohler@bearchitek.com>"
+    }
+  }
+}
