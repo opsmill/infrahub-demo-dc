@@ -1,0 +1,39 @@
+# yaml-language-server: $schema=https://schema.infrahub.app/infrahub/schema/latest.json
+---
+version: "1.0"
+
+generics:
+  - name: GenericUnit
+    namespace: Compute
+    description: A generic unit that can compute (e.g. server, vm ...).
+    include_in_menu: false
+    attributes:
+      - name: vcpus
+        label: vCPUs
+        kind: Number
+        optional: true
+        order_weight: 1500
+      - name: memory
+        label: Memory (GB)
+        kind: Number
+        optional: true
+        order_weight: 1600
+      - name: disk
+        label: Disk Size (GB)
+        kind: Number
+        optional: true
+        order_weight: 1700
+
+  - name: HostVirtualMachine
+    namespace: Virtualization
+    description: A generic unit that can host VM
+    include_in_menu: false
+    relationships:
+      - name: virtual_machines
+        label: Virtual Machines
+        description: Virtual machines hosted on this unit.
+        cardinality: many
+        peer: VirtualizationVirtualMachine
+        kind: Component
+        identifier: host__virtual_machines
+        optional: true

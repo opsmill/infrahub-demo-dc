@@ -22,3 +22,9 @@ spec:
       mutation_action: created
       action: segment
       branch_scope: other_branches
+    - name: virtualization-host-on-create
+      description: Trigger cabling on create of a Virtualization Physical Host
+      node_kind: VirtualizationPhysicalHost
+      mutation_action: created
+      action: virtualization_host_cabling
+      branch_scope: other_branches

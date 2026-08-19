@@ -13,3 +13,6 @@ spec:
     - name: segment
       description: Network Segment VxLAN VPN
       generator: create_segment
+    - name: virtualization_host_cabling
+      description: Cable a Virtualization Physical Host to leaf switches
+      generator: cable_virtualization_host

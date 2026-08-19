@@ -1,0 +1,33 @@
+query virtualization_host_cabling($name: String!) {
+  VirtualizationPhysicalHost(name__value: $name) {
+    edges {
+      node {
+        id
+        name {
+          value
+        }
+        interfaces {
+          edges {
+            node {
+              id
+              name {
+                value
+              }
+              role {
+                value
+              }
+              status {
+                value
+              }
+              connector {
+                node {
+                  id
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

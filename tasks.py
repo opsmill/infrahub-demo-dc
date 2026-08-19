@@ -195,6 +195,18 @@ def bootstrap_py(context: Context, branch: str = "main") -> None:
     context.run(f"uv run python scripts/bootstrap.py --branch {branch}", pty=True)
 
 
+def _load_virtualization_objects(context: Context, branch: str) -> None:
+    """Load virtualization objects (clusters, physical hosts, VMs) onto the given branch.
+
+    Shared by all demo-dc-* tasks. Standalone and design-independent, but
+    each host's own cable_virtualization_host generator only finds leaf
+    switches to cable to if they already exist - so this must run *after*
+    the DC topology's generator has finished creating them.
+    """
+    console.print(f"\n[cyan]→[/cyan] Loading virtualization objects to branch: [bold]{branch}[/bold]")
+    context.run(f"uv run infrahubctl object load objects/virtualization/ --branch {branch}")
+
+
 @task(optional=["branch"], name="demo-dc-arista")
 def demo_dc_arista(context: Context, branch: str = "add-dc3") -> None:
     """Create branch and load Arista DC demo topology."""
@@ -243,6 +255,8 @@ def demo_dc_arista(context: Context, branch: str = "add-dc3") -> None:
             progress.update(task, advance=1)
 
     console.print("[green]✓[/green] Generator processing complete")
+
+    _load_virtualization_objects(context, branch)
 
     # Create proposed change
     console.print(
@@ -299,6 +313,8 @@ def demo_dc_juniper(context: Context, branch: str = "add-dc5") -> None:
 
     console.print("[green]✓[/green] Generator processing complete")
 
+    _load_virtualization_objects(context, branch)
+
     # Create proposed change
     console.print(
         f"\n[bright_magenta]→[/bright_magenta] Creating proposed change for branch '[bold]{branch}[/bold]'..."
@@ -353,6 +369,8 @@ def demo_dc_cisco(context: Context, branch: str = "add-dc2") -> None:
             progress.update(task, advance=1)
 
     console.print("[green]✓[/green] Generator processing complete")
+
+    _load_virtualization_objects(context, branch)
 
     # Create proposed change
     console.print(

@@ -1,0 +1,20 @@
+# Virtualization Clusters - independent of any specific DC design
+---
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: VirtualizationCluster
+  data:
+    - name: "FRA1-PROXMOX-CLUSTER"
+      description: "Proxmox VE cluster in Frankfurt"
+      cluster_type: proxmox
+      hosts:
+        - fra1-pve-01
+        - fra1-pve-02
+
+    - name: "PAR1-KVM-CLUSTER"
+      description: "KVM cluster in Paris"
+      cluster_type: kvm
+      hosts:
+        - par1-kvm-01
+        - par1-kvm-02

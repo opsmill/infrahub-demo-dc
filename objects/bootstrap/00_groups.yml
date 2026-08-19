@@ -80,3 +80,7 @@ spec:
       description: Network Segments for VPN/VxLAN services
     - name: racks
       description: Racks
+    - name: proxmox_vms
+      description: Virtual machines hosted on a Proxmox VE cluster
+    - name: virtualization_hosts
+      description: Physical hosts that trigger the virtualization cabling generator

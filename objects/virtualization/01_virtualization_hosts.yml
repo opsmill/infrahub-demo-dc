@@ -1,0 +1,50 @@
+# Virtualization Physical Hosts - independent of any specific DC design
+---
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: VirtualizationPhysicalHost
+  data:
+    - name: "fra1-pve-01"
+      description: "Proxmox VE host in Frankfurt"
+      location: "fra-1"
+      platform: [Generic, Linux]
+      status: active
+      vcpus: 64
+      memory: 512
+      disk: 4000
+      member_of_groups:
+        - virtualization_hosts
+
+    - name: "fra1-pve-02"
+      description: "Proxmox VE host in Frankfurt"
+      location: "fra-1"
+      platform: [Generic, Linux]
+      status: active
+      vcpus: 64
+      memory: 512
+      disk: 4000
+      member_of_groups:
+        - virtualization_hosts
+
+    - name: "par1-kvm-01"
+      description: "KVM host in Paris"
+      location: "par-1"
+      platform: [Generic, Linux]
+      status: active
+      vcpus: 32
+      memory: 256
+      disk: 2000
+      member_of_groups:
+        - virtualization_hosts
+
+    - name: "par1-kvm-02"
+      description: "KVM host in Paris"
+      location: "par-1"
+      platform: [Generic, Linux]
+      status: active
+      vcpus: 32
+      memory: 256
+      disk: 2000
+      member_of_groups:
+        - virtualization_hosts

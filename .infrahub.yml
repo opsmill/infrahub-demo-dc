@@ -5,6 +5,11 @@ jinja2_transforms:
     description: Template to generate a containerlab topology
     query: topology_simulator
     template_path: templates/clab_topology.j2
+  # Proxmox
+  - name: proxmox_vm_config
+    description: Template to generate a Proxmox VE VM provisioning script
+    query: proxmox_vm_config
+    template_path: templates/configs/proxmox_vm.j2
 
 artifact_definitions:
   # Cisco
@@ -89,6 +94,14 @@ artifact_definitions:
     transformation: rack_elevation
     parameters:
       name: name__value
+  # Proxmox
+  - name: proxmox_vm_config
+    artifact_name: proxmox-vm
+    content_type: text/plain
+    targets: proxmox_vms
+    transformation: proxmox_vm_config
+    parameters:
+      name: name__value
 
 check_definitions:
   - name: validate_spine
@@ -167,6 +180,13 @@ generator_definitions:
     class_name: NetworkSegmentGenerator
     parameters:
       name: name__value
+  - name: cable_virtualization_host
+    file_path: generators/generate_virtualization_cabling.py
+    targets: virtualization_hosts
+    query: virtualization_host_cabling
+    class_name: VirtualizationHostCablingGenerator
+    parameters:
+      name: name__value
 
 queries:
   - name: topology_dc
@@ -197,6 +217,10 @@ queries:
     file_path: queries/segment/segment.gql
   - name: rack_elevation_query
     file_path: queries/visualization/rack_elevation.gql
+  - name: virtualization_host_cabling
+    file_path: queries/virtualization/host_cabling.gql
+  - name: proxmox_vm_config
+    file_path: queries/config/proxmox_vm.gql
 schemas:
   - schemas/
 menus:

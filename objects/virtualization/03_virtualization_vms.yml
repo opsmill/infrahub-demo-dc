@@ -1,0 +1,84 @@
+# Virtualization Virtual Machines - independent of any specific DC design
+---
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: VirtualizationVirtualMachine
+  data:
+    - name: "fra1-vm-web01"
+      description: "Web server VM"
+      host: "fra1-pve-01"
+      cluster: "FRA1-PROXMOX-CLUSTER"
+      platform: [Generic, Linux]
+      os_version: "Ubuntu 22.04"
+      status: active
+      vcpus: 4
+      memory: 8
+      disk: 80
+      vmid: 100
+      member_of_groups:
+        - proxmox_vms
+
+    - name: "fra1-vm-db01"
+      description: "Database server VM"
+      host: "fra1-pve-01"
+      cluster: "FRA1-PROXMOX-CLUSTER"
+      platform: [Generic, Linux]
+      os_version: "Ubuntu 22.04"
+      status: active
+      vcpus: 8
+      memory: 32
+      disk: 500
+      vmid: 101
+      member_of_groups:
+        - proxmox_vms
+
+    - name: "fra1-vm-web02"
+      description: "Web server VM"
+      host: "fra1-pve-02"
+      cluster: "FRA1-PROXMOX-CLUSTER"
+      platform: [Generic, Linux]
+      os_version: "Ubuntu 22.04"
+      status: active
+      vcpus: 4
+      memory: 8
+      disk: 80
+      vmid: 102
+      member_of_groups:
+        - proxmox_vms
+
+    - name: "par1-vm-app01"
+      description: "Application server VM"
+      host: "par1-kvm-01"
+      cluster: "PAR1-KVM-CLUSTER"
+      platform: [Generic, Linux]
+      os_version: "Ubuntu 22.04"
+      status: active
+      vcpus: 4
+      memory: 16
+      disk: 100
+      vmid: 103
+
+    - name: "par1-vm-app02"
+      description: "Application server VM"
+      host: "par1-kvm-01"
+      cluster: "PAR1-KVM-CLUSTER"
+      platform: [Generic, Linux]
+      os_version: "Ubuntu 22.04"
+      status: active
+      vcpus: 4
+      memory: 16
+      disk: 100
+      vmid: 104
+
+    - name: "par1-vm-cache01"
+      description: "Cache server VM"
+      host: "par1-kvm-02"
+      cluster: "PAR1-KVM-CLUSTER"
+      platform: [Generic, Linux]
+      os_version: "Ubuntu 22.04"
+      status: provisioning
+      vcpus: 2
+      memory: 8
+      disk: 40
+      vmid: 105

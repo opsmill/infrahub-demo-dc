@@ -1,0 +1,118 @@
+# yaml-language-server: $schema=https://schema.infrahub.app/infrahub/schema/latest.json
+---
+version: "1.0"
+
+nodes:
+  # --------------------  Virtualization Cluster  --------------------
+  - name: Cluster
+    namespace: Virtualization
+    description: A group of hypervisor hosts on which virtual machines run.
+    label: Virtualization Cluster
+    icon: mdi:server-network
+    include_in_menu: false
+    human_friendly_id:
+      - name__value
+    order_by:
+      - name__value
+    display_label: "{{ name__value }}"
+    uniqueness_constraints:
+      - [name__value]
+    attributes:
+      - name: name
+        kind: Text
+        unique: true
+        order_weight: 1000
+      - name: description
+        kind: Text
+        optional: true
+        order_weight: 1100
+      - name: cluster_type
+        label: Cluster Type
+        kind: Dropdown
+        optional: true
+        order_weight: 1200
+        choices:
+          - name: vmware
+            label: VMware vSphere
+            description: VMware vSphere/ESXi cluster.
+            color: "#7fbfff"
+          - name: kvm
+            label: KVM
+            description: KVM/QEMU cluster.
+            color: "#ff9900"
+          - name: proxmox
+            label: Proxmox VE
+            description: Proxmox Virtual Environment cluster.
+            color: "#e57000"
+          - name: hyperv
+            label: Hyper-V
+            description: Microsoft Hyper-V cluster.
+            color: "#0078d4"
+          - name: other
+            label: Other
+            description: Other hypervisor cluster type.
+            color: "#808080"
+    relationships:
+      - name: hosts
+        peer: VirtualizationPhysicalHost
+        cardinality: many
+        kind: Attribute
+        optional: true
+        description: Hypervisor hosts that are members of this cluster.
+        order_weight: 2000
+
+  # --------------------  Physical Host  --------------------
+  - name: PhysicalHost
+    namespace: Virtualization
+    description: A physical server that hosts virtual machines via a hypervisor.
+    label: Physical Host
+    icon: mdi:server
+    include_in_menu: false
+    generate_template: true
+    inherit_from:
+      - CoreArtifactTarget
+      - DcimGenericDevice
+      - DcimPhysicalDevice
+      - ComputeGenericUnit
+      - VirtualizationHostVirtualMachine
+    uniqueness_constraints:
+      - [name__value]
+
+  # --------------------  Virtual Machine  --------------------
+  - name: VirtualMachine
+    namespace: Virtualization
+    description: A virtual machine hosted on a hypervisor.
+    label: Virtual Machine
+    icon: mdi:server
+    include_in_menu: false
+    generate_template: true
+    inherit_from:
+      - CoreArtifactTarget
+      - DcimGenericDevice
+      - ComputeGenericUnit
+    uniqueness_constraints:
+      - [name__value]
+      - [vmid__value]
+    attributes:
+      - name: vmid
+        label: VM ID
+        description: Numeric ID used by the hypervisor to identify this VM (e.g. Proxmox VMID).
+        kind: Number
+        optional: true
+        order_weight: 1050
+    relationships:
+      - name: host
+        peer: VirtualizationHostVirtualMachine
+        cardinality: one
+        kind: Parent
+        identifier: host__virtual_machines
+        optional: false
+        description: Physical host running this virtual machine.
+        order_weight: 1150
+      - name: cluster
+        peer: VirtualizationCluster
+        cardinality: one
+        kind: Attribute
+        optional: true
+        description: Virtualization cluster this virtual machine belongs to.
+        order_weight: 1200

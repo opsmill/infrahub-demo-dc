@@ -1,0 +1,72 @@
+query proxmox_vm_config($name: String!) {
+  VirtualizationVirtualMachine(name__value: $name) {
+    edges {
+      node {
+        name {
+          value
+        }
+        description {
+          value
+        }
+        status {
+          value
+        }
+        os_version {
+          value
+        }
+        vmid {
+          value
+        }
+        vcpus {
+          value
+        }
+        memory {
+          value
+        }
+        disk {
+          value
+        }
+        host {
+          node {
+            name {
+              value
+            }
+          }
+        }
+        cluster {
+          node {
+            name {
+              value
+            }
+            cluster_type {
+              value
+            }
+          }
+        }
+        platform {
+          node {
+            name {
+              value
+            }
+          }
+        }
+        primary_address {
+          node {
+            address {
+              value
+            }
+          }
+        }
+        tags {
+          edges {
+            node {
+              name {
+                value
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
