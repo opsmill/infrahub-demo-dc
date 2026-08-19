@@ -1,11 +1,28 @@
 ---
 name: CI
 # yamllint disable rule:truthy rule:line-length
+
+env:
+  UV_VERSION: "0.9.18"
+
 on:
   pull_request:
   push:
     branches:
       - main
+  # The tier input is the only guaranteed part of a dispatch. Path filters still evaluate
+  # (paths-filter diffs a non-pull-request event against the default branch), so the lint and unit
+  # jobs may or may not run depending on what the ref changed -- neither outcome is a bug.
+  workflow_dispatch:
+    inputs:
+      tier:
+        description: "Integration tier to run"
+        required: false
+        default: "core"
+        type: choice
+        options:
+          - core
+          - full
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -13,6 +30,7 @@ concurrency:
 
 permissions:
   contents: read
+  pull-requests: read
 
 jobs:
   files-changed:
@@ -24,36 +42,64 @@ jobs:
       python: ${{ steps.changes.outputs.python_all }}
       yaml: ${{ steps.changes.outputs.yaml_all }}
       markdown: ${{ steps.changes.outputs.markdown_all }}
+      dependencies: ${{ steps.changes.outputs.dependencies_all }}
+      integration_scope: ${{ steps.scope.outputs.scope }}
+      run_full: ${{ steps.scope.outputs.run_full }}
     steps:
       - name: "Check out repository code"
-        uses: "actions/checkout@v6"
+        uses: "actions/checkout@v7"
       - name: Check for file changes
         uses: opsmill/paths-filter@v3.0.2
         id: changes
         with:
           token: ${{ github.token }}
           filters: .github/file-filters.yml
+      - name: Decide how much of the integration suite to run
+        id: scope
+        # Full is bounded to an explicit dispatch and Infrahub-version bump branches; everything
+        # else, pushes to main included, stays core -- a runner-cost decision. The
+        # branch name is the signal because update-infrahub.yml encodes the component in it, and
+        # `update-infrahub-sdk-` is tested first: an SDK branch also starts with the broader
+        # Infrahub prefix, which would otherwise select `full` for every SDK bump.
+        env:
+          DISPATCH_TIER: ${{ github.event.inputs.tier }}
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          SCOPE="core"
+          if [ -n "${DISPATCH_TIER}" ]; then
+            SCOPE="${DISPATCH_TIER}"
+          elif [ "${HEAD_REF#update-infrahub-sdk-}" = "${HEAD_REF}" ] && [ "${HEAD_REF#update-infrahub-}" != "${HEAD_REF}" ]; then
+            SCOPE="full"
+          fi
+          {
+            echo "scope=${SCOPE}"
+            echo "run_full=$([ "${SCOPE}" = "full" ] && echo true || echo false)"
+          } >> "$GITHUB_OUTPUT"
+          echo "Integration scope selected -> ${SCOPE}"
 
   python-lint:
-    if: needs.files-changed.outputs.python == 'true'
+    if: needs.files-changed.outputs.python == 'true' || needs.files-changed.outputs.dependencies == 'true'
     needs: ["files-changed"]
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        # Both ends of `requires-python`, resolving real packages at each end;
+        # `mypy python_version` was rejected -- it inherits the numpy stub workarounds.
+        python-version: ["3.11", "3.14"]
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Install uv
         uses: astral-sh/setup-uv@v7
         with:
-          version: "0.9.18"
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ matrix.python-version }}
       - run: uv sync
-      - name: Check code formatting
-        run: |
-          uv run ruff format --check --diff
-          uv run ruff check --select I .
       - name: Run linters
-        run: uv run ruff check
+        run: uv run invoke lint-ruff
       - name: Run type checks
-        run: uv run mypy .
+        run: uv run invoke lint-mypy
 
   yaml-lint:
     if: needs.files-changed.outputs.yaml == 'true'
@@ -61,14 +107,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Install uv
         uses: astral-sh/setup-uv@v7
         with:
-          version: "0.9.18"
+          version: ${{ env.UV_VERSION }}
       - run: uv sync
       - name: Run yamllint
-        run: uv run yamllint -s .
+        run: uv run invoke lint-yaml
 
   markdown-lint:
     if: needs.files-changed.outputs.markdown == 'true'
@@ -76,48 +122,122 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v6
-      - name: Run rumdl
-        uses: rvben/rumdl@v0
+      - uses: actions/checkout@v7
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
         with:
-          report-type: annotations
+          version: ${{ env.UV_VERSION }}
+      - run: uv sync
+      # rumdl comes from uv.lock, so this gate runs the binary contributors run locally.
+      # No --fail-on: rumdl's default `any` severity applies in both places.
+      - name: Run rumdl
+        run: uv run invoke lint-markdown
+
+  unit-test:
+    if: needs.files-changed.outputs.python == 'true' || needs.files-changed.outputs.dependencies == 'true'
+    needs: ["files-changed"]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          version: ${{ env.UV_VERSION }}
+      - run: uv sync
+      - name: Run the tests that need no deployment
+        run: uv run invoke test-unit
 
   integration-test:
+    name: "integration-test (${{ needs.files-changed.outputs.integration_scope }})"
+    # files-changed must have succeeded so its outputs hold real values; an empty scope only skips
+    # the advisory step below. `always()` ignores whether the lint jobs ran, not whether they failed.
     if: |
       always() && !cancelled() &&
+      needs.files-changed.result == 'success' &&
       !contains(needs.*.result, 'failure') &&
       !contains(needs.*.result, 'cancelled')
-    needs: ["python-lint", "yaml-lint", "markdown-lint"]
+    needs: ["files-changed", "python-lint", "yaml-lint", "markdown-lint", "unit-test"]
     runs-on:
       group: "huge-runners"
-    timeout-minutes: 60
+    # 75 minutes covers the single run every scope but `full` performs; 180 covers the two
+    # sequential runs of a `full` scope (blocking core, then advisory full), each booting a stack.
+    timeout-minutes: ${{ needs.files-changed.outputs.run_full == 'true' && 180 || 75 }}
     env:
       INFRAHUB_DB_TYPE: neo4j
-      INFRAHUB_API_TOKEN: '06438eb2-8019-4776-878c-0941b1f1d1ec'
-      INFRAHUB_TIMEOUT: 600
       INFRAHUB_TESTING_LOG_LEVEL: INFO
+      # INFRAHUB_API_TOKEN and INFRAHUB_TIMEOUT deliberately unset: `Config` reads them from the
+      # environment, so exporting them here made CI behave differently from a laptop. The suite
+      # passes both explicitly (`infrahub_api_token` fixture, `constants.CLIENT_TIMEOUT`).
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Install tini
         run: "apt-get update && apt-get install -y tini"
       - name: Install uv
         uses: astral-sh/setup-uv@v7
         with:
-          version: "0.9.18"
+          version: ${{ env.UV_VERSION }}
       - run: uv sync
       - name: Set environment variables
+        # Through `env:`, never interpolated into the `run:` body -- a ${{ }} expression becomes
+        # script text before the shell sees it, and three sibling repositories copy this file.
+        env:
+          RUNNER_LABEL: ${{ runner.name }}
         run: |
-          RUNNER_NAME=$(echo "${{ runner.name }}" | grep -o 'ghrunner[0-9]\+' | sed 's/ghrunner\([0-9]\+\)/ghrunner_\1/')
-          echo "PYTEST_DEBUG_TEMPROOT=/var/lib/github/${RUNNER_NAME}/_temp" >> $GITHUB_ENV
-      - name: Run tests
-        run: exec tini -s -g -- uv run pytest tests/
+          # Fail by name rather than fall through: a runner without the ghrunnerN token would
+          # otherwise yield the silently wrong temp root /var/lib/github//_temp.
+          if ! RUNNER_NAME=$(echo "${RUNNER_LABEL}" | grep -o 'ghrunner[0-9]\+'); then
+            echo "::error::Runner name '${RUNNER_LABEL}' does not match ghrunner<N>; cannot derive PYTEST_DEBUG_TEMPROOT."
+            exit 1
+          fi
+          echo "PYTEST_DEBUG_TEMPROOT=/var/lib/github/${RUNNER_NAME/ghrunner/ghrunner_}/_temp" >> "$GITHUB_ENV"
+      - name: "Run the core integration tier (blocking)"
+        # The merge gate on every pull request, bumps included. Separate from the advisory run
+        # below because job-level `continue-on-error` -- this job's previous shape -- also swallowed
+        # core regressions and infrastructure failures on exactly the bump PRs whose only QA is
+        # this run.
+        run: exec tini -s -g -- uv run invoke test-integration --tier=core
+      - name: "Run the full integration tier (advisory)"
+        id: full
+        # Reports the whole suite without blocking: Infrahub intermittently returns HTTP 500 while
+        # resolving its own CoreGeneratorGroup / CoreGraphQLQueryGroup members -- intermittent, so
+        # not xfail-able. Delete this step's
+        # `continue-on-error` and collapse the two steps back into one blocking `--tier=full` run
+        # the day that fault is fixed. A `full` scope boots the stack twice; that is bounded to
+        # Infrahub bumps and explicit full-tier dispatches. No `always()`: a failed core run
+        # already blocks the merge, so the advisory hour of huge-runner time would buy nothing.
+        if: needs.files-changed.outputs.run_full == 'true'
+        continue-on-error: true
+        run: exec tini -s -g -- uv run invoke test-integration --tier=full
+      - name: "Report what the advisory full tier did"
+        # `continue-on-error` above keeps the job green, so the checks list stops carrying the
+        # advisory signal -- write it into the run summary instead. `skipped` is a real outcome
+        # (the core step failed first). Delete this step together with the advisory one.
+        if: always() && needs.files-changed.outputs.run_full == 'true'
+        env:
+          OUTCOME: ${{ steps.full.outcome }}
+        run: |
+          {
+            echo "### Integration tiers"
+            echo ""
+            echo "- **core** (blocking): this job's own conclusion is the merge gate."
+            echo "- **full** (advisory, non-blocking): \`${OUTCOME}\`"
+            if [ "${OUTCOME}" = "failure" ]; then
+              echo ""
+              echo "**The advisory full tier FAILED.** It does not block this merge -- see the"
+              echo "upstream CoreGeneratorGroup / CoreGraphQLQueryGroup resolution fault -- but read"
+              echo "the log before assuming that fault is what happened."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
 
   documentation:
     defaults:
       run:
         working-directory: ./docs
+    # Same downstream-of-files-changed clause as every other consumer of its outputs.
     if: |
       always() && !cancelled() &&
+      needs.files-changed.result == 'success' &&
       !contains(needs.*.result, 'failure') &&
       !contains(needs.*.result, 'cancelled') &&
       needs.files-changed.outputs.documentation == 'true'
@@ -125,14 +245,14 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           submodules: true
       - name: Install pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
         with:
           package_json_file: docs/package.json
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: 20
           cache: 'pnpm'
@@ -143,7 +263,7 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v7
         with:
-          version: "0.9.18"
+          version: ${{ env.UV_VERSION }}
       - run: uv sync
         working-directory: ./
       - name: Build docs website
@@ -153,6 +273,7 @@ jobs:
   validate-documentation-style:
     if: |
       always() && !cancelled() &&
+      needs.files-changed.result == 'success' &&
       !contains(needs.*.result, 'failure') &&
       !contains(needs.*.result, 'cancelled')
     needs: ["files-changed", "yaml-lint", "python-lint", "markdown-lint"]
@@ -161,7 +282,7 @@ jobs:
     env:
       VALE_VERSION: "3.13.0"
     steps:
-      - uses: "actions/checkout@v6"
+      - uses: "actions/checkout@v7"
         with:
           submodules: true
 
