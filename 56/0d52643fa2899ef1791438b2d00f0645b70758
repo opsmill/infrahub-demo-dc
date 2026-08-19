@@ -1,0 +1,27 @@
+pyproject.toml
+  s_c61e7f2a6f8b30::t_18b9cd3f3fdb8b 55-57
+docs/contract/uniform-demo-repo-cicd-contract.md
+  s_c61e7f2a6f8b30::t_4fe07ad6bb4af6 14-16,18,26
+  s_c61e7f2a6f8b30::t_d62744bdbc8b47 39-43
+  s_c61e7f2a6f8b30::t_d2a9df8b496770 74-76
+  s_c61e7f2a6f8b30::t_410d4fba65999c 181-188
+  s_c61e7f2a6f8b30::t_c7242eb109dd2b 246-248
+  s_c61e7f2a6f8b30::t_ac6c6def64b266 266-282
+  s_c61e7f2a6f8b30::t_a6afaaf14e7c4f 195-200
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "560d52643fa2899ef1791438b2d00f0645b70758",
+  "prompts": {},
+  "sessions": {
+    "s_c61e7f2a6f8b30": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f96e34cf-79d1-45f1-ade3-89a74eb5ed2e",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Benoit Kohler <bkohler@bearchitek.com>"
+    }
+  }
+}
