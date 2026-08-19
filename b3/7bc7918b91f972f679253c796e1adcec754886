@@ -1,0 +1,23 @@
+.github/workflows/update-infrahub.yml
+  s_9e8a2a4f9c0dae::t_f0845398681893 14-15
+pyproject.toml
+  s_9e8a2a4f9c0dae::t_eb88cbdd2d16ff 30
+uv.lock
+  s_9e8a2a4f9c0dae::t_3badb6adbafc0f 558
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "b37bc7918b91f972f679253c796e1adcec754886",
+  "prompts": {},
+  "sessions": {
+    "s_9e8a2a4f9c0dae": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-atrim-demo-sp-18dc09419c6ea04e",
+        "model": "unknown"
+      },
+      "human_author": "Benoit Kohler <bkohler@bearchitek.com>"
+    }
+  }
+}
