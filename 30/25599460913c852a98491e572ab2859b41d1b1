@@ -1,0 +1,32 @@
+uv.lock
+  s_9e8a2a4f9c0dae::t_3badb6adbafc0f 558
+  s_c61e7f2a6f8b30::t_e5e7f665c771af 619,629,631
+pyproject.toml
+  s_9e8a2a4f9c0dae::t_eb88cbdd2d16ff 30
+.github/workflows/update-infrahub.yml
+  s_9e8a2a4f9c0dae::t_f0845398681893 14-15
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "3025599460913c852a98491e572ab2859b41d1b1",
+  "prompts": {},
+  "sessions": {
+    "s_9e8a2a4f9c0dae": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-atrim-demo-sp-18dc09419c6ea04e",
+        "model": "unknown"
+      },
+      "human_author": "Benoit Kohler <bkohler@bearchitek.com>"
+    },
+    "s_c61e7f2a6f8b30": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f96e34cf-79d1-45f1-ade3-89a74eb5ed2e",
+        "model": "unknown"
+      },
+      "human_author": "Benoit Kohler <bkohler@bearchitek.com>"
+    }
+  }
+}
