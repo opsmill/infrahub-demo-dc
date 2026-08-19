@@ -55,16 +55,29 @@ class VirtualizationHostCablingGenerator(InfrahubGenerator):
         # Rank leafs by how many free "customer" ports each currently has,
         # most-available first, so hosts spread out across the fabric instead
         # of piling onto whichever leaf happens to be first.
+        #
+        # "Free" means no cable attached (connector unset), not status=free:
+        # this repo's DC generator marks every interface "active" at device
+        # creation time regardless of whether anything is actually plugged
+        # in, so status can't be used as an occupancy signal here.
         leaf_free_ports: dict[str, list[Any]] = {}
         for leaf in leafs:
             interfaces = await self.client.filters(
-                kind="DcimInterface",
+                kind="InterfacePhysical",
                 branch=self.branch,
                 device__name__value=leaf.name.value,
                 role__value="customer",
-                status__value="free",
+                prefetch_relationships=True,
             )
-            by_name = {interface.name.value: interface for interface in interfaces}
+            free_interfaces = []
+            for interface in interfaces:
+                try:
+                    already_cabled = bool(interface.connector.peer)
+                except ValueError:
+                    already_cabled = False
+                if not already_cabled:
+                    free_interfaces.append(interface)
+            by_name = {interface.name.value: interface for interface in free_interfaces}
             leaf_free_ports[leaf.name.value] = [by_name[name] for name in safe_sort_interface_list(list(by_name))]
 
         ranked_leafs = sorted(
