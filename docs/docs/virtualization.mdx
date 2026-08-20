@@ -51,11 +51,11 @@ The demo ships one virtualization environment in the Frankfurt metro:
 
 ## What the generators do
 
-Three generators react to the loaded data. You don't run any of them by hand.
+Four generators react to the loaded data. You don't run any of them by hand.
 
 ### Rack placement and fabric cabling
 
-The `cable_virtualization_host` generator runs whenever a physical host is created or updated. For each host, scoped to the host's own metro:
+The `cable_virtualization_host` generator runs whenever a physical host is created. For each host, scoped to the host's own metro:
 
 1. **Placement** - if racks exist in the metro (from whichever DC design was generated there), the host moves into the least-occupied one
 2. **Cabling** - the host's `eth0` and `eth1` interfaces are dual-homed to the two leaf switches with the most free `customer`-role ports, so cabling load-balances across leafs
@@ -175,7 +175,7 @@ OrganizationCustomer
 - **VirtualizationPhysicalHost** is a full DCIM device: it inherits the generic device and physical device models, so it has a rack position, interfaces, and can be an artifact target
 - **VirtualizationVirtualMachine** belongs to exactly one host (parent relationship) and one cluster, and optionally to a customer
 - Both hosts and VMs share the compute sizing attributes (`vcpus`, `memory`, `disk`) through the `ComputeGenericUnit` generic
-- VM IDs are unique per cluster, not globally: two clusters can both use VM ID 100
+- The Create VM form validates that a VM ID is unique within its cluster; the schema itself does not enforce it, so two clusters can both use VM ID 100
 
 ## Next steps
 

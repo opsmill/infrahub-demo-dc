@@ -110,7 +110,15 @@ CONFLICT_BRANCH = "conflict-dc-arista"
 
 # --- definitions the repository must publish -----------------------------------------------------
 
-GENERATOR_DEFINITIONS = ["create_dc", "create_pop", "create_segment"]
+GENERATOR_DEFINITIONS = [
+    "create_dc",
+    "create_pop",
+    "create_segment",
+    "cable_virtualization_host",
+    "secure_virtualization_vm",
+    "assign_vm_artifact_groups",
+    "attach_dc_firewall_policy",
+]
 """Every entry under ``generator_definitions`` in ``.infrahub.yml``."""
 
 TRANSFORM_DEFINITIONS = [
@@ -124,10 +132,21 @@ TRANSFORM_DEFINITIONS = [
     "equinix_pop",
     "juniper_firewall",
     "topology_clab",
+    "proxmox_vm_config",
+    "vm_userdata",
+    "kvm_vm_config",
+    "hyperv_vm_config",
+    "esxi_vm_config",
 ]
 """Every entry under ``python_transforms`` and ``jinja2_transforms`` in ``.infrahub.yml``."""
 
-CHECK_DEFINITIONS = ["validate_spine", "validate_leaf", "validate_edge", "validate_loadbalancer"]
+CHECK_DEFINITIONS = [
+    "validate_spine",
+    "validate_leaf",
+    "validate_edge",
+    "validate_loadbalancer",
+    "validate_virtualization_vm",
+]
 """Every entry under ``check_definitions`` in ``.infrahub.yml``."""
 
 # --- artifact states -----------------------------------------------------------------------------

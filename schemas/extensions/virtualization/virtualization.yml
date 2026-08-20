@@ -140,8 +140,8 @@ nodes:
         peer: VirtualizationCluster
         cardinality: one
         kind: Attribute
-        # Mandatory: the [cluster, vmid__value] uniqueness constraint requires
-        # it, and every VM runs on a host that belongs to exactly one cluster.
+        # Mandatory: every VM runs on a host that belongs to exactly one
+        # cluster.
         optional: false
         description: Virtualization cluster this virtual machine belongs to.
         order_weight: 1200

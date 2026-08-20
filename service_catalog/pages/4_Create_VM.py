@@ -235,6 +235,10 @@ def execute_vm_creation_step(client: InfrahubClient) -> None:
         elif step == 6:
             # Step 6: Complete - show success message
             state["active"] = False
+            # The VM was created successfully, so the cached used-vmid map is
+            # stale - drop it so the next form load refetches and offers the
+            # right "next free" suggestion / duplicate check.
+            st.session_state.pop("vm_used_vmids", None)
             st.markdown("---")
             display_success(f"Virtual Machine '{vm_name}' created successfully!")
 
@@ -251,9 +255,9 @@ def execute_vm_creation_step(client: InfrahubClient) -> None:
 
             for artifact in state.get("artifacts", []):
                 language = (
-                    "powershell"
-                    if form_data.get("cluster_type") == "hyperv"
-                    else ("yaml" if artifact["definition_name"] == "vm_userdata" else "bash")
+                    "yaml"
+                    if artifact["definition_name"] == "vm_userdata"
+                    else ("powershell" if form_data.get("cluster_type") == "hyperv" else "bash")
                 )
                 with st.expander(f"Artifact: {artifact['name']}", expanded=False):
                     st.code(artifact["content"], language=language)

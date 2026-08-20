@@ -1,6 +1,6 @@
 """Virtualization Host Cabling Generator.
 
-Triggered whenever a VirtualizationPhysicalHost is created or updated
+Triggered whenever a VirtualizationPhysicalHost is created
 (see the `virtualization_hosts` group in .infrahub.yml). Two things
 happen per host, both scoped to the host's own metro so that loading a
 second DC design in another city can never pull a host's rack or cables

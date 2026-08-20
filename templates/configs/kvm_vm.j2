@@ -48,7 +48,7 @@ virt-install \
   --network bridge=br0,model=virtio \
   --os-variant {{ "win2k22" if is_windows else "ubuntu22.04" }} \
   --import \
-  --noautoconsole{{ "" if vm.status.value == "active" else " \\\n  --autostart=off" }}
+  --noautoconsole
 
 {% if vm.status.value != "active" %}
 # Status is "{{ vm.status.value }}" - shut the VM down after first-boot import.

@@ -45,6 +45,12 @@ infrahub_tests:
           kind: "jinja2-transform-unit-render"
           directory: kvm_vm
           output: output.txt
+      - name: non_active_leaves_vm_shut_down
+        expect: PASS
+        spec:
+          kind: "jinja2-transform-unit-render"
+          directory: kvm_vm_provisioning
+          output: output.txt
 
   - resource: Jinja2Transform
     resource_name: hyperv_vm_config
