@@ -8,7 +8,7 @@ This tutorial shows how the demo models a virtualization layer on top of the dat
 
 The virtualization schema tracks:
 
-- **Hypervisor types** - one row per hypervisor family holding what follows from it: the OS its hosts run, the artifact group its VMs join, the transform that renders their provisioning script, and the template image prefix
+- **Hypervisor types** - one row per hypervisor family holding what follows from it: the OS its hosts run, the artifact group its VMs join, the transform that renders their provisioning script, the template image prefix, and the overcommit ratios its capacity is judged against
 - **Clusters** - groups of hypervisor hosts (VMware vSphere, KVM, Proxmox VE, Hyper-V, or other)
 - **Physical hosts** - rack-mounted servers that run a hypervisor and appear in the DCIM model like any other device, created from a sized object template that carries the server model, its capacity and its ports
 - **Virtual machines** - VMs with compute sizing (vCPUs, memory, disk), a hypervisor VM ID, and an optional customer link
@@ -211,6 +211,22 @@ Merge the proposed change to bring the VM into `main`.
 Two checks run automatically in every proposed change that touches this data.
 
 `validate_virtualization_vm` covers the VM: it names both its host and its cluster, and the host itself belongs to a cluster, so there are two paths to the same fact. The check fails when they disagree, for example a VM assigned to `FRA1-KVM-CLUSTER` while running on `fra1-pve-01`.
+
+`validate_virtualization_capacity` covers compute capacity: a VM's vCPUs, memory and disk are allocated on the VM, the hardware they come from is on the host, and nothing compares the sum of one against the other. The check does that at two levels and reports the numbers whether or not anything is wrong, so a proposed change shows current utilization:
+
+```text
+info  fra1-pve-01: 12/256 vCPU allocated (5% of the limit, 64 physical at 400%)
+info  FRA1-PROXMOX-CLUSTER: 16/512 vCPU allocated across 2 hosts (3%), 6% of the 256 available with the largest host lost
+error fra1-pve-01 is oversubscribed after fra1-vm-toobig: 412 vCPU allocated against a limit of 256 (64 physical at 400% overcommit)
+```
+
+Three things about how it judges:
+
+**Overcommit is expected, so the limit is not the raw hardware number.** Each hypervisor family carries the ratio it is run at, on its `VirtualizationHypervisorType` row, as a percentage because `Number` is integer-only: 400 is 4:1, 100 is no overcommit. The demo ships 4:1 vCPU for Proxmox and KVM, 3:1 for VMware, 2:1 for Hyper-V, 1:1 memory everywhere, and thin provisioning of 1.5:1 on disk (2:1 for VMware). A family with no value set is treated as 1:1.
+
+**A powered-off VM counts for disk but not for vCPU or memory.** A stopped VM still occupies its disk image, while its cores and memory are only claimed while it runs.
+
+**Only the host level fails the change.** A VM that does not fit its own host cannot start, so that is an error. The cluster level errors only if the allocation exceeds the cluster's total capacity, since nothing could place those VMs. Losing N+1 headroom, meaning the cluster no longer fits if its largest host is lost, is reported as information: it is a capacity-planning signal rather than a reason to block a change. A single-host cluster has no host to lose, so no N+1 figure is reported for it.
 
 `validate_virtualization_host` covers the host: a host names the hypervisor family it runs, and so does the cluster it joins. The check fails when a host joins a cluster of a different family, for example the Hyper-V host `fra1-hv-01` placed in `FRA1-PROXMOX-CLUSTER`, and when a host with the `compute` role, which runs its workload directly on the hardware, is made a cluster member at all.
 

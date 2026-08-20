@@ -1,0 +1,124 @@
+query virtualization_capacity($device: String!) {
+  VirtualizationVirtualMachine(name__value: $device) {
+    edges {
+      node {
+        name {
+          value
+        }
+        vcpus {
+          value
+        }
+        memory {
+          value
+        }
+        disk {
+          value
+        }
+        status {
+          value
+        }
+        host {
+          node {
+            ... on VirtualizationPhysicalHost {
+              name {
+                value
+              }
+              vcpus {
+                value
+              }
+              memory {
+                value
+              }
+              disk {
+                value
+              }
+              virtual_machines {
+                edges {
+                  node {
+                    name {
+                      value
+                    }
+                    vcpus {
+                      value
+                    }
+                    memory {
+                      value
+                    }
+                    disk {
+                      value
+                    }
+                    status {
+                      value
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+        cluster {
+          node {
+            name {
+              value
+            }
+            hypervisor_type {
+              node {
+                name {
+                  value
+                }
+                vcpu_overcommit_percent {
+                  value
+                }
+                memory_overcommit_percent {
+                  value
+                }
+                disk_overcommit_percent {
+                  value
+                }
+              }
+            }
+            hosts {
+              edges {
+                node {
+                  name {
+                    value
+                  }
+                  vcpus {
+                    value
+                  }
+                  memory {
+                    value
+                  }
+                  disk {
+                    value
+                  }
+                }
+              }
+            }
+            virtual_machines {
+              edges {
+                node {
+                  name {
+                    value
+                  }
+                  vcpus {
+                    value
+                  }
+                  memory {
+                    value
+                  }
+                  disk {
+                    value
+                  }
+                  status {
+                    value
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

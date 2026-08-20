@@ -36,6 +36,8 @@ hostname
 Hostname
 http
 https
+hypervisor
+hypervisors
 Infrahub
 Infrahub's
 Ipam
@@ -54,6 +56,8 @@ NICs
 npm
 NSGs
 OSPF
+overcommit
+oversubscribed
 Palo
 parallelization
 passwordless

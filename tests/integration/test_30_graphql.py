@@ -55,6 +55,7 @@ QUERY_SUBJECTS: dict[str, tuple[str, str, str | None]] = {
     "vm_config": ("name", "VirtualizationVirtualMachine", None),
     "virtualization_vm_validation": ("device", "VirtualizationVirtualMachine", None),
     "virtualization_host_validation": ("device", "VirtualizationPhysicalHost", None),
+    "virtualization_capacity": ("device", "VirtualizationVirtualMachine", None),
 }
 """How to supply each query's single variable. Keyed by the name used in ``.infrahub.yml``."""
 

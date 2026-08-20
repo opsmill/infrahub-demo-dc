@@ -207,6 +207,12 @@ check_definitions:
     targets: virtualization_hosts
     parameters:
       device: name__value
+  - name: validate_virtualization_capacity
+    class_name: CheckVirtualizationCapacity
+    file_path: checks/virtualization_capacity.py
+    targets: virtualization_vms
+    parameters:
+      device: name__value
 
 # `watch` lists the files a component depends on that Infrahub cannot detect by reading the entry
 # point: helper modules imported at runtime, and Jinja templates chosen from device data rather than
@@ -395,6 +401,8 @@ queries:
     file_path: queries/validation/virtualization_vm.gql
   - name: virtualization_host_validation
     file_path: queries/validation/virtualization_host.gql
+  - name: virtualization_capacity
+    file_path: queries/validation/virtualization_capacity.gql
   - name: vm_config
     file_path: queries/config/vm_config.gql
 schemas:

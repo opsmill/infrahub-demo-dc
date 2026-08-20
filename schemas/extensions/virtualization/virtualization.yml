@@ -59,6 +59,35 @@ nodes:
         kind: Text
         optional: true
         order_weight: 1400
+      # How far this family is allowed to allocate beyond physical capacity,
+      # as a percentage: 400 is 4:1, 100 is no overcommit. A percentage rather
+      # than a ratio because Number is integer-only, so 1.5:1 has no spelling
+      # as a ratio. validate_virtualization_capacity reads these, and treats a
+      # missing value as 100.
+      - name: vcpu_overcommit_percent
+        label: vCPU Overcommit (%)
+        description: Allocatable vCPUs as a percentage of physical cores. 400 means 4:1.
+        kind: Number
+        optional: true
+        order_weight: 1500
+        parameters:
+          min_value: 100
+      - name: memory_overcommit_percent
+        label: Memory Overcommit (%)
+        description: Allocatable memory as a percentage of installed memory. 100 means no overcommit.
+        kind: Number
+        optional: true
+        order_weight: 1600
+        parameters:
+          min_value: 100
+      - name: disk_overcommit_percent
+        label: Disk Overcommit (%)
+        description: Allocatable disk as a percentage of usable capacity. 150 means 1.5:1 thin provisioning.
+        kind: Number
+        optional: true
+        order_weight: 1700
+        parameters:
+          min_value: 100
     relationships:
       - name: platform
         peer: DcimPlatform
