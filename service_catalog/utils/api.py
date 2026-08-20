@@ -1377,6 +1377,191 @@ class InfrahubClient:
         except Exception as e:
             raise InfrahubAPIError(f"Failed to create network segment: {str(e)}")
 
+    def get_physical_hosts(self, branch: str = "main") -> List[Dict[str, Any]]:
+        """Fetch VirtualizationPhysicalHost objects, including their cluster.
+
+        VirtualizationCluster.hosts is a one-directional Attribute relationship
+        (declared only on the Cluster side), so VirtualizationPhysicalHost has
+        no queryable reverse field - clusters are fetched separately and the
+        host->cluster mapping is built here instead.
+
+        Args:
+            branch: Branch name to query (default: "main")
+
+        Returns:
+            List of host dictionaries with id, name, and cluster (id, name, cluster_type)
+
+        Raises:
+            InfrahubConnectionError: If connection fails
+            InfrahubAPIError: If API error occurs
+        """
+        try:
+            query = """
+            query GetPhysicalHostsAndClusters {
+                VirtualizationPhysicalHost {
+                    edges {
+                        node {
+                            id
+                            name { value }
+                        }
+                    }
+                }
+                VirtualizationCluster {
+                    edges {
+                        node {
+                            id
+                            name { value }
+                            cluster_type { value }
+                            hosts {
+                                edges {
+                                    node {
+                                        id
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            """
+
+            result = self.execute_graphql(query, branch=branch)
+
+            # Build a host ID -> cluster info map from the cluster side
+            host_to_cluster: Dict[str, Dict[str, Any]] = {}
+            for cluster_edge in result.get("VirtualizationCluster", {}).get("edges", []):
+                cluster_node = cluster_edge.get("node", {})
+                cluster_info = {
+                    "id": cluster_node.get("id"),
+                    "name": cluster_node.get("name", {}).get("value"),
+                    "cluster_type": cluster_node.get("cluster_type", {}).get("value"),
+                }
+                for host_edge in cluster_node.get("hosts", {}).get("edges", []):
+                    host_id = host_edge.get("node", {}).get("id")
+                    if host_id:
+                        host_to_cluster[host_id] = cluster_info
+
+            hosts = []
+            for host_edge in result.get("VirtualizationPhysicalHost", {}).get("edges", []):
+                node = host_edge.get("node", {})
+                host_id = node.get("id")
+                hosts.append(
+                    {
+                        "id": host_id,
+                        "name": {"value": node.get("name", {}).get("value")},
+                        "cluster": host_to_cluster.get(host_id),
+                    }
+                )
+
+            return hosts
+        except Exception as e:
+            raise InfrahubAPIError(f"Failed to fetch physical hosts: {str(e)}")
+
+    def create_virtual_machine(self, branch: str, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Create a VirtualizationVirtualMachine object.
+
+        Args:
+            branch: Branch to create the object in
+            data: Virtual machine data dictionary with structure:
+                - name: str
+                - host: str (ID, required)
+                - cluster: str (ID, optional - derived from host)
+                - description: str (optional)
+                - os_version: str (optional)
+                - status: str (active, provisioning, maintenance, drained)
+                - vcpus: int (optional)
+                - memory: int (optional, GB)
+                - disk: int (optional, GB)
+                - vmid: int (optional)
+                - group_names: List[str] (CoreStandardGroup names, e.g. ["virtualization_vms"])
+
+        Returns:
+            Created virtual machine dictionary
+
+        Raises:
+            InfrahubConnectionError: If connection fails
+            InfrahubAPIError: If API error occurs
+        """
+        try:
+            cluster = data.get("cluster")
+            vmid = data.get("vmid")
+
+            # Build mutation dynamically to exclude cluster/vmid when not
+            # provided, since passing e.g. cluster: { id: null } errors.
+            optional_vars = []
+            optional_fields = []
+            if cluster:
+                optional_vars.append("$cluster: String,")
+                optional_fields.append("cluster: { id: $cluster }")
+            if vmid is not None:
+                optional_vars.append("$vmid: BigInt,")
+                optional_fields.append("vmid: { value: $vmid }")
+
+            mutation = f"""
+            mutation CreateVirtualMachine(
+                $name: String!,
+                $description: String,
+                $host: String!,
+                $os_version: String,
+                $status: String!,
+                $vcpus: BigInt,
+                $memory: BigInt,
+                $disk: BigInt,
+                $groups: [RelatedNodeInput],
+                {" ".join(optional_vars)}
+            ) {{
+                VirtualizationVirtualMachineCreate(
+                    data: {{
+                        name: {{ value: $name }}
+                        description: {{ value: $description }}
+                        host: {{ id: $host }}
+                        os_version: {{ value: $os_version }}
+                        status: {{ value: $status }}
+                        vcpus: {{ value: $vcpus }}
+                        memory: {{ value: $memory }}
+                        disk: {{ value: $disk }}
+                        member_of_groups: $groups
+                        {" ".join(optional_fields)}
+                    }}
+                ) {{
+                    ok
+                    object {{
+                        id
+                        name {{ value }}
+                    }}
+                }}
+            }}
+            """
+
+            groups = [{"id": self._get_group_id(name, branch)} for name in data.get("group_names", [])]
+
+            variables: Dict[str, Any] = {
+                "name": data["name"],
+                "description": data.get("description", ""),
+                "host": data["host"],
+                "os_version": data.get("os_version", ""),
+                "status": data.get("status", "active"),
+                "vcpus": data.get("vcpus"),
+                "memory": data.get("memory"),
+                "disk": data.get("disk"),
+                "groups": groups,
+            }
+            if cluster:
+                variables["cluster"] = cluster
+            if vmid is not None:
+                variables["vmid"] = vmid
+
+            result = self.execute_graphql(mutation, variables, branch)
+
+            if result.get("VirtualizationVirtualMachineCreate", {}).get("ok"):
+                vm_obj = result["VirtualizationVirtualMachineCreate"]["object"]
+                return {"id": vm_obj["id"], "name": vm_obj["name"]}
+            else:
+                raise InfrahubAPIError(f"Failed to create virtual machine: {result}")
+
+        except Exception as e:
+            raise InfrahubAPIError(f"Failed to create virtual machine: {str(e)}")
+
     def _get_group_id(self, group_name: str, branch: str) -> str:
         """Look up a CoreStandardGroup ID by name.
 
