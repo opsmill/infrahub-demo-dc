@@ -1382,10 +1382,9 @@ class InfrahubClient:
     def get_physical_hosts(self, branch: str = "main") -> List[Dict[str, Any]]:
         """Fetch VirtualizationPhysicalHost objects, including their cluster.
 
-        VirtualizationCluster.hosts is a one-directional Attribute relationship
-        (declared only on the Cluster side), so VirtualizationPhysicalHost has
-        no queryable reverse field - clusters are fetched separately and the
-        host->cluster mapping is built here instead.
+        VirtualizationPhysicalHost declares the `cluster` side of the
+        cluster/hosts relationship, so the cluster is one hop from the host and
+        the whole shape comes back in a single traversal.
 
         Args:
             branch: Branch name to query (default: "main")
@@ -1405,20 +1404,11 @@ class InfrahubClient:
                         node {
                             id
                             name { value }
-                        }
-                    }
-                }
-                VirtualizationCluster {
-                    edges {
-                        node {
-                            id
-                            name { value }
-                            cluster_type { value }
-                            hosts {
-                                edges {
-                                    node {
-                                        id
-                                    }
+                            cluster {
+                                node {
+                                    id
+                                    name { value }
+                                    cluster_type { value }
                                 }
                             }
                         }
@@ -1429,29 +1419,24 @@ class InfrahubClient:
 
             result = self.execute_graphql(query, branch=branch)
 
-            # Build a host ID -> cluster info map from the cluster side
-            host_to_cluster: Dict[str, Dict[str, Any]] = {}
-            for cluster_edge in result.get("VirtualizationCluster", {}).get("edges", []):
-                cluster_node = cluster_edge.get("node", {})
-                cluster_info = {
-                    "id": cluster_node.get("id"),
-                    "name": cluster_node.get("name", {}).get("value"),
-                    "cluster_type": cluster_node.get("cluster_type", {}).get("value"),
-                }
-                for host_edge in cluster_node.get("hosts", {}).get("edges", []):
-                    host_id = host_edge.get("node", {}).get("id")
-                    if host_id:
-                        host_to_cluster[host_id] = cluster_info
-
             hosts = []
             for host_edge in result.get("VirtualizationPhysicalHost", {}).get("edges", []):
                 node = host_edge.get("node", {})
-                host_id = node.get("id")
+                cluster_node = (node.get("cluster") or {}).get("node")
+                cluster = (
+                    {
+                        "id": cluster_node.get("id"),
+                        "name": cluster_node.get("name", {}).get("value"),
+                        "cluster_type": cluster_node.get("cluster_type", {}).get("value"),
+                    }
+                    if cluster_node
+                    else None
+                )
                 hosts.append(
                     {
-                        "id": host_id,
+                        "id": node.get("id"),
                         "name": {"value": node.get("name", {}).get("value")},
-                        "cluster": host_to_cluster.get(host_id),
+                        "cluster": cluster,
                     }
                 )
 

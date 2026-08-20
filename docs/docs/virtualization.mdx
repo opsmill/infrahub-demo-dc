@@ -121,7 +121,7 @@ The SSH key comes from the VM's `ssh_public_key` attribute. No password is ever 
 
 ### Group membership
 
-The `assign_vm_artifact_groups` generator runs whenever a VM is created, the same trigger as the security generator. It reads the VM's `cluster.cluster_type` and adds the VM to the matching hypervisor group (`proxmox_vms`, `kvm_vms`, `hyperv_vms`, or `esxi_vms`) plus `vm_userdata_targets`. The demo data carries no static `member_of_groups` entry for the hypervisor groups - membership is derived from `cluster_type`, so it stays correct if a VM ever moves clusters.
+The `assign_vm_artifact_groups` generator runs whenever a VM is created, the same trigger as the security generator. It reads the VM's `cluster.cluster_type` and adds the VM to the matching hypervisor group (`proxmox_vms`, `kvm_vms`, `hyperv_vms`, or `esxi_vms`) plus `vm_userdata_targets`. The demo data carries no static `member_of_groups` entry for the hypervisor groups - membership is derived from `cluster_type` instead of hand-maintained per VM. The generator only adds, and only on create, so moving a VM to a cluster of a different type leaves the old group membership behind; correct that by editing the groups directly.
 
 ## Image prerequisites
 

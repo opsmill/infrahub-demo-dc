@@ -8,9 +8,10 @@ esxi_vms) plus the umbrella vm_userdata_targets group, so artifact
 definitions target the right VMs without static member_of_groups
 entries duplicating what cluster_type already encodes.
 
-Idempotent: membership is diffed before extending, so re-runs never
-add a VM to the same group twice. cluster_type values without a
-mapped group (e.g. "other") only join the umbrella group.
+Idempotent and concurrency-safe: membership is added through the
+RelationshipAdd mutation, which adds only the named peer and tolerates
+a peer that is already a member. cluster_type values without a mapped
+group (e.g. "other") only join the umbrella group.
 """
 
 from infrahub_sdk.generator import InfrahubGenerator  # type: ignore[import-not-found]
@@ -64,11 +65,11 @@ class VMArtifactGroupsGenerator(InfrahubGenerator):
                 branch=self.branch,
                 name__value=group_name,
             )
-            await group.members.fetch()
-            existing_ids = {peer.id for peer in group.members.peers}
-            if vm_id in existing_ids:
-                self.logger.info(f"- {vm_name} already in {group_name}, skipping")
-                continue
-            group.members.extend([vm_id])  # type: ignore[list-item]
-            await group.save(allow_upsert=True)
+            # add_relationships issues a RelationshipAdd mutation, which touches
+            # only the peers it names. `members.extend()` + `save()` writes back
+            # the whole member list as it was read moments earlier, and one of
+            # these generators runs per VM concurrently - so each run would
+            # clobber the members its siblings added in between, and a group like
+            # vm_userdata_targets would end up with a fraction of the VMs.
+            await group.add_relationships(relation_to_update="members", related_nodes=[vm_id])
             self.logger.info(f"- Added {vm_name} to {group_name}")
