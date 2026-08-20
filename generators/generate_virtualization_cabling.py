@@ -13,6 +13,7 @@ port is never handed out to more than one host.
 
 from typing import Any
 
+from infrahub_sdk.exceptions import GraphQLError  # type: ignore[import-not-found]
 from infrahub_sdk.generator import InfrahubGenerator  # type: ignore[import-not-found]
 
 from .common import clean_data, safe_sort_interface_list
@@ -95,11 +96,6 @@ class VirtualizationHostCablingGenerator(InfrahubGenerator):
                 self.logger.info(f"- {host_name}:{nic_name} already cabled, skipping")
                 continue
 
-            if not ranked_leafs:
-                self.logger.warning(f"No leaf switches with free ports left for {host_name}:{nic_name}")
-                break
-            leaf = ranked_leafs[index % len(ranked_leafs)]
-
             host_iface = await self.client.get(
                 kind="InterfacePhysical",
                 branch=self.branch,
@@ -115,30 +111,52 @@ class VirtualizationHostCablingGenerator(InfrahubGenerator):
                 )
                 await host_iface.save(allow_upsert=True)
 
-            pool = leaf_free_ports[leaf.name.value]
-            leaf_iface = pool.pop(0)
-            if not pool:
-                ranked_leafs = [item for item in ranked_leafs if item.name.value != leaf.name.value]
+            # A concurrent generator run for another host can grab the same
+            # port between our scan above and this write - Infrahub rejects
+            # the second cable with a "maximum of 1 peer" error. Retry with
+            # the next candidate port instead of failing the whole host.
+            cabled = False
+            while not cabled and ranked_leafs:
+                leaf = ranked_leafs[index % len(ranked_leafs)]
+                pool = leaf_free_ports[leaf.name.value]
+                if not pool:
+                    ranked_leafs = [item for item in ranked_leafs if item.name.value != leaf.name.value]
+                    continue
+                leaf_iface = pool.pop(0)
+                if not pool:
+                    ranked_leafs = [item for item in ranked_leafs if item.name.value != leaf.name.value]
 
-            host_iface.status.value = "active"
-            host_iface.description.value = f"Uplink to {leaf.name.value} {leaf_iface.name.value}"
-            leaf_iface.status.value = "active"
-            leaf_iface.description.value = f"Downlink to {host_name} {nic_name}"
+                host_iface.status.value = "active"
+                host_iface.description.value = f"Uplink to {leaf.name.value} {leaf_iface.name.value}"
+                leaf_iface.status.value = "active"
+                leaf_iface.description.value = f"Downlink to {host_name} {nic_name}"
 
-            cable = await self.client.create(
-                kind="DcimCable",
-                branch=self.branch,
-                data={
-                    "status": "connected",
-                    "cable_type": "cat6",
-                    "connected_endpoints": [host_iface.id, leaf_iface.id],
-                },
-            )
-            await cable.save(allow_upsert=True)
-            host_iface.connector = cable.id  # type: ignore[assignment]
-            leaf_iface.connector = cable.id  # type: ignore[assignment]
+                try:
+                    cable = await self.client.create(
+                        kind="DcimCable",
+                        branch=self.branch,
+                        data={
+                            "status": "connected",
+                            "cable_type": "cat6",
+                            "connected_endpoints": [host_iface.id, leaf_iface.id],
+                        },
+                    )
+                    await cable.save(allow_upsert=True)
+                except GraphQLError as exc:
+                    self.logger.warning(
+                        f"- {leaf.name.value}:{leaf_iface.name.value} was claimed by a concurrent "
+                        f"run ({exc}), trying another port for {host_name}:{nic_name}"
+                    )
+                    continue
 
-            await host_iface.save(allow_upsert=True)
-            await leaf_iface.save(allow_upsert=True)
+                host_iface.connector = cable.id  # type: ignore[assignment]
+                leaf_iface.connector = cable.id  # type: ignore[assignment]
 
-            self.logger.info(f"- Cabled {host_name}:{nic_name} -> {leaf.name.value}:{leaf_iface.name.value}")
+                await host_iface.save(allow_upsert=True)
+                await leaf_iface.save(allow_upsert=True)
+
+                self.logger.info(f"- Cabled {host_name}:{nic_name} -> {leaf.name.value}:{leaf_iface.name.value}")
+                cabled = True
+
+            if not cabled:
+                self.logger.warning(f"No leaf switches with free ports left for {host_name}:{nic_name}")
