@@ -31,6 +31,34 @@ spec:
             role: leaf
             status: active
 
+    - name: fra1-firewall
+      description: "Firewall protecting the Frankfurt virtualization VM subnet"
+      role: dc_firewall
+      device_type: [Juniper, SRX-1500]
+      platform: [Juniper, JunOS]
+      location: fra-1
+      status: active
+      member_of_groups:
+        - juniper_firewall
+      interfaces:
+        kind: InterfacePhysical
+        data:
+          - name: fxp0
+            role: management
+            status: active
+          - name: ge-0/0/0
+            role: leaf
+            status: active
+          - name: ge-0/0/1
+            role: leaf
+            status: active
+          - name: ge-0/0/2
+            role: leaf
+            status: active
+          - name: ge-0/0/3
+            role: leaf
+            status: active
+
 ---
 apiVersion: infrahub.app/v1
 kind: Object
