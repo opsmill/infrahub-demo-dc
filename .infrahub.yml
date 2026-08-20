@@ -19,6 +19,11 @@ jinja2_transforms:
     description: Template to generate a KVM/libvirt VM provisioning script
     query: vm_config
     template_path: templates/configs/kvm_vm.j2
+  # Hyper-V
+  - name: hyperv_vm_config
+    description: Template to generate a Microsoft Hyper-V VM provisioning script
+    query: vm_config
+    template_path: templates/configs/hyperv_vm.j2
 
 artifact_definitions:
   # Cisco
@@ -124,6 +129,14 @@ artifact_definitions:
     content_type: text/plain
     targets: kvm_vms
     transformation: kvm_vm_config
+    parameters:
+      name: name__value
+  # Hyper-V
+  - name: hyperv_vm_config
+    artifact_name: hyperv-vm
+    content_type: text/plain
+    targets: hyperv_vms
+    transformation: hyperv_vm_config
     parameters:
       name: name__value
 

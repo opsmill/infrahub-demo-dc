@@ -47,6 +47,19 @@ infrahub_tests:
           output: output.txt
 
   - resource: Jinja2Transform
+    resource_name: hyperv_vm_config
+    tests:
+      - name: syntax_check
+        spec:
+          kind: jinja2-transform-smoke
+      - name: renders_nocloud_iso_flow
+        expect: PASS
+        spec:
+          kind: "jinja2-transform-unit-render"
+          directory: hyperv_vm
+          output: output.txt
+
+  - resource: Jinja2Transform
     resource_name: vm_userdata
     tests:
       - name: syntax_check
