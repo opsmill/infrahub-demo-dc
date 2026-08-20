@@ -448,4 +448,14 @@ def _generate_rack_css() -> str:
         background-color: #38e7fb;
         border-color: #08b7cb;
     }
+
+    .device-role-hypervisor {
+        background-color: #7ec8a0;
+        border-color: #4e9870;
+    }
+
+    .device-role-compute {
+        background-color: #9fb8d4;
+        border-color: #6f88a4;
+    }
     """

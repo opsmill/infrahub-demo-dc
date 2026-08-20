@@ -6,6 +6,13 @@ query virtualization_host_cabling($name: String!) {
         name {
           value
         }
+        device_type {
+          node {
+            height {
+              value
+            }
+          }
+        }
         location {
           node {
             id

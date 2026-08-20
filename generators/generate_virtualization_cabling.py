@@ -9,16 +9,21 @@ across sites:
 1. Placement: if a LocationRack exists in the host's metro (from
    whichever DC design has been generated there, if any), the host is
    moved into the least-occupied one from its building-level default
-   location. A no-op if no racks exist yet.
+   location and given a free rack unit. A no-op if no racks exist yet.
+   The position matters beyond tidiness: the rack_elevation transform
+   skips any device without one, so a host placed in a rack but left
+   positionless never appears in the rack drawing.
 2. Cabling: dual-homes the host to two leaf switches in the same metro,
    picking whichever leafs currently have the most free "customer"-role
    interfaces available - so cabling naturally load-balances across
    leafs and adapts to whatever ports earlier hosts have already
    consumed.
 
-The host's eth0/eth1 NICs come from the VIRTUALIZATION_HOST object
-template (objects/bootstrap/10_physical_device_templates.yml), not from
-this generator.
+The host's eth0/eth1 NICs come from whichever sized
+VIRTUALIZATION_HOST_* object template it was created from
+(objects/bootstrap/10_physical_device_templates.yml), not from this
+generator. A larger template carries further NICs; only eth0/eth1 are
+cabled here.
 
 Idempotent: a host already placed in a rack is left alone, already-cabled
 host interfaces are left alone, and a leaf port is never handed out to
@@ -35,7 +40,6 @@ from .schema_protocols import (
     DcimCable,
     DcimDevice,
     InterfacePhysical,
-    LocationRack,
     VirtualizationPhysicalHost,
 )
 
@@ -59,6 +63,45 @@ query MetroRacks($metro_ids: [ID]) {
   }
 }
 """
+
+
+# Mirrors queries/visualization/rack_elevation.gql: position and device_type
+# sit on the relationship peer, only name/status need the generic fragment.
+RACK_OCCUPANCY_QUERY = """
+query RackOccupancy($rack_ids: [ID]) {
+  LocationRack(ids: $rack_ids) {
+    edges {
+      node {
+        id
+        name {
+          value
+        }
+        height {
+          value
+        }
+        devices {
+          edges {
+            node {
+              position {
+                value
+              }
+              device_type {
+                node {
+                  height {
+                    value
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+"""
+
+DEFAULT_RACK_HEIGHT = 42
 
 
 class VirtualizationHostCablingGenerator(InfrahubGenerator):
@@ -100,7 +143,8 @@ class VirtualizationHostCablingGenerator(InfrahubGenerator):
             )
             return
 
-        await self._assign_rack(host_name, host_id, current_location.get("typename"), rack_ids)
+        host_height = (host.get("device_type") or {}).get("height") or 1
+        await self._assign_rack(host_name, host_id, current_location.get("typename"), rack_ids, host_height)
 
         leafs = await self.client.filters(
             kind=DcimDevice,
@@ -158,12 +202,12 @@ class VirtualizationHostCablingGenerator(InfrahubGenerator):
         for index, nic_name in enumerate(HOST_INTERFACE_NAMES):
             existing = existing_interfaces.get(nic_name)
             if existing is None:
-                # NICs are cloned from the VIRTUALIZATION_HOST object template
-                # at host creation - a missing one means the host was created
-                # without the template.
+                # NICs are cloned from the host's sized object template at
+                # creation - a missing one means the host was created without
+                # a VIRTUALIZATION_HOST_* template.
                 self.logger.warning(
-                    f"- {host_name} has no {nic_name} interface (expected from the "
-                    f"VIRTUALIZATION_HOST object template), skipping"
+                    f"- {host_name} has no {nic_name} interface (expected from its "
+                    f"VIRTUALIZATION_HOST_* object template), skipping"
                 )
                 continue
             if existing.get("connector"):
@@ -265,35 +309,104 @@ class VirtualizationHostCablingGenerator(InfrahubGenerator):
         return rack_ids
 
     async def _assign_rack(
-        self, host_name: str, host_id: str, current_location_typename: str | None, rack_ids: list[str]
+        self,
+        host_name: str,
+        host_id: str,
+        current_location_typename: str | None,
+        rack_ids: list[str],
+        host_height: int,
     ) -> None:
-        """Move the host into the least-occupied rack of its own metro, if any exist.
+        """Move the host into the emptiest rack of its own metro, if any exist.
 
         Args:
             host_name: Host name, for logging
             host_id: Host ID
             current_location_typename: __typename of the host's current location
             rack_ids: IDs of the racks in the host's metro (never empty)
+            host_height: Height of the host in rack units, from its device type
         """
         if current_location_typename == "LocationRack":
             self.logger.info(f"- {host_name} already placed in a rack, skipping")
             return
 
-        racks = await self.client.filters(
-            kind=LocationRack,
-            ids=rack_ids,
-            branch=self.branch,
-            prefetch_relationships=True,
-        )
+        racks = await self._rack_occupancy(rack_ids)
+        if not racks:
+            self.logger.warning(f"- No rack occupancy returned for {host_name}, leaving it where it is")
+            return
 
-        # Unlike cabling above, there is no conflict-retry here: two
-        # concurrent host-creation runs can both read the same least-loaded
-        # rack and both write to it. The worst case is an unevenly filled
-        # rack rather than an error (a rack accepts any number of devices),
-        # so a guard is not worth the complexity.
-        least_loaded = min(racks, key=lambda rack: len(rack.devices.peers))
+        # Occupancy is measured in rack units rather than device count, so a
+        # rack holding one 24U chassis does not read as emptier than a rack
+        # holding three 1U switches. Ties break on name to keep placement
+        # deterministic across runs.
+        #
+        # There is no conflict-retry here: two concurrent host-creation runs can
+        # both read the same emptiest rack and pick the same free unit in it.
+        # The worst case is two devices drawn at one position rather than an
+        # error, so a guard is not worth the complexity.
+        target = min(racks, key=lambda rack: (rack["used_units"], rack["name"]))
+        if target["positions"]:
+            position = min(target["positions"]) - host_height
+        else:
+            position = target["rack_height"] - (host_height - 1)
+        if position < 1:
+            position = None
 
         host_node = await self.client.get(kind=VirtualizationPhysicalHost, branch=self.branch, id=host_id)
-        host_node.location = least_loaded.id  # type: ignore[assignment]
+        host_node.location = target["id"]  # type: ignore[assignment]
+        if position is None:
+            self.logger.warning(
+                f"- Placed {host_name} in rack {target['name']} without a position "
+                f"({host_height}U does not fit) - it will not show in the rack elevation"
+            )
+        else:
+            host_node.position = position  # type: ignore[assignment]
+            self.logger.info(f"- Placed {host_name} in rack {target['name']} at U{position}")
         await host_node.save(allow_upsert=True)
-        self.logger.info(f"- Placed {host_name} in rack {least_loaded.name.value}")
+
+    async def _rack_occupancy(self, rack_ids: list[str]) -> list[dict[str, Any]]:
+        """Summarise how full each candidate rack is, in one round trip.
+
+        A rack's devices are read through GraphQL rather than
+        `LocationRack.devices.peers`: `filters(prefetch_relationships=True)`
+        leaves a many-relationship empty, so a peer count is always zero and
+        every host would pile into whichever rack happened to be first.
+
+        Args:
+            rack_ids: IDs of the racks in the host's metro
+
+        Returns:
+            One dict per rack with its id, name, used_units, the positions its
+            devices already occupy, and its rack_height. The caller stacks
+            downward from the top of the rack, the convention the DC generator
+            uses in TopologyCreator.assign_devices_to_racks.
+        """
+        result = await self.client.execute_graphql(
+            query=RACK_OCCUPANCY_QUERY,
+            variables={"rack_ids": rack_ids},
+            branch_name=self.branch,
+        )
+
+        racks = []
+        for edge in result.get("LocationRack", {}).get("edges", []):
+            node = edge["node"]
+            rack_height = (node.get("height") or {}).get("value") or DEFAULT_RACK_HEIGHT
+            positions, used_units = [], 0
+            for device_edge in node.get("devices", {}).get("edges", []):
+                device = device_edge["node"]
+                device_height = (((device.get("device_type") or {}).get("node") or {}).get("height") or {}).get(
+                    "value"
+                ) or 1
+                used_units += device_height
+                position = (device.get("position") or {}).get("value")
+                if position is not None:
+                    positions.append(position)
+            racks.append(
+                {
+                    "id": node["id"],
+                    "name": node["name"]["value"],
+                    "used_units": used_units,
+                    "positions": positions,
+                    "rack_height": rack_height,
+                }
+            )
+        return racks

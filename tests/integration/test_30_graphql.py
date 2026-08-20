@@ -54,6 +54,7 @@ QUERY_SUBJECTS: dict[str, tuple[str, str, str | None]] = {
     "dc_firewall_policy": ("device", "SecurityFirewall", "dc_firewall"),
     "vm_config": ("name", "VirtualizationVirtualMachine", None),
     "virtualization_vm_validation": ("device", "VirtualizationVirtualMachine", None),
+    "virtualization_host_validation": ("device", "VirtualizationPhysicalHost", None),
 }
 """How to supply each query's single variable. Keyed by the name used in ``.infrahub.yml``."""
 

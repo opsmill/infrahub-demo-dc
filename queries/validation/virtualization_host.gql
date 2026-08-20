@@ -1,0 +1,37 @@
+query virtualization_host_validation($device: String!) {
+  VirtualizationPhysicalHost(name__value: $device) {
+    edges {
+      node {
+        name {
+          value
+        }
+        role {
+          value
+        }
+        hypervisor_type {
+          node {
+            id
+            name {
+              value
+            }
+          }
+        }
+        cluster {
+          node {
+            name {
+              value
+            }
+            hypervisor_type {
+              node {
+                id
+                name {
+                  value
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

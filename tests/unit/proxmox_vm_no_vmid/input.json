@@ -4,25 +4,77 @@
       "edges": [
         {
           "node": {
-            "name": { "value": "fra1-vm-cache01" },
-            "description": { "value": "Cache server VM" },
-            "status": { "value": "provisioning" },
-            "os_version": { "value": "Ubuntu 22.04" },
-            "vmid": { "value": null },
-            "vcpus": { "value": 2 },
-            "memory": { "value": 8 },
-            "disk": { "value": 40 },
-            "ssh_public_key": { "value": null },
-            "host": { "node": { "name": { "value": "fra1-kvm-02" } } },
-            "cluster": {
+            "name": {
+              "value": "fra1-vm-cache01"
+            },
+            "description": {
+              "value": "Cache server VM"
+            },
+            "status": {
+              "value": "provisioning"
+            },
+            "os_version": {
+              "value": "Ubuntu 22.04"
+            },
+            "vmid": {
+              "value": null
+            },
+            "vcpus": {
+              "value": 2
+            },
+            "memory": {
+              "value": 8
+            },
+            "disk": {
+              "value": 40
+            },
+            "ssh_public_key": {
+              "value": null
+            },
+            "host": {
               "node": {
-                "name": { "value": "FRA1-KVM-CLUSTER" },
-                "cluster_type": { "value": "kvm" }
+                "name": {
+                  "value": "fra1-kvm-02"
+                }
               }
             },
-            "platform": { "node": { "name": { "value": "Linux" }, "manufacturer": { "node": { "name": { "value": "Generic" } } } } },
-            "primary_address": { "node": null },
-            "tags": { "edges": [] }
+            "cluster": {
+              "node": {
+                "name": {
+                  "value": "FRA1-KVM-CLUSTER"
+                },
+                "cluster_type": {
+                  "value": "kvm"
+                },
+                "hypervisor_type": {
+                  "node": {
+                    "image_prefix": {
+                      "value": "tpl-"
+                    }
+                  }
+                }
+              }
+            },
+            "platform": {
+              "node": {
+                "name": {
+                  "value": "Linux"
+                },
+                "manufacturer": {
+                  "node": {
+                    "name": {
+                      "value": "Generic"
+                    }
+                  }
+                }
+              }
+            },
+            "primary_address": {
+              "node": null
+            },
+            "tags": {
+              "edges": []
+            }
           }
         }
       ]

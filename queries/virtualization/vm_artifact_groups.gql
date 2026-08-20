@@ -8,8 +8,19 @@ query vm_artifact_groups($name: String!) {
         }
         cluster {
           node {
-            cluster_type {
-              value
+            hypervisor_type {
+              node {
+                name {
+                  value
+                }
+                artifact_group {
+                  node {
+                    name {
+                      value
+                    }
+                  }
+                }
+              }
             }
           }
         }

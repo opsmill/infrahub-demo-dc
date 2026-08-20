@@ -4,25 +4,81 @@
       "edges": [
         {
           "node": {
-            "name": { "value": "fra1-vm-win01" },
-            "description": { "value": "Windows application server" },
-            "status": { "value": "active" },
-            "os_version": { "value": "Windows Server 2022" },
-            "vmid": { "value": null },
-            "vcpus": { "value": 4 },
-            "memory": { "value": 16 },
-            "disk": { "value": 120 },
-            "ssh_public_key": { "value": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA demo@opsmill" },
-            "host": { "node": { "name": { "value": "fra1-esx-01" } } },
-            "cluster": {
+            "name": {
+              "value": "fra1-vm-win01"
+            },
+            "description": {
+              "value": "Windows application server"
+            },
+            "status": {
+              "value": "active"
+            },
+            "os_version": {
+              "value": "Windows Server 2022"
+            },
+            "vmid": {
+              "value": null
+            },
+            "vcpus": {
+              "value": 4
+            },
+            "memory": {
+              "value": 16
+            },
+            "disk": {
+              "value": 120
+            },
+            "ssh_public_key": {
+              "value": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA demo@opsmill"
+            },
+            "host": {
               "node": {
-                "name": { "value": "FRA1-ESXI-CLUSTER" },
-                "cluster_type": { "value": "vmware" }
+                "name": {
+                  "value": "fra1-esx-01"
+                }
               }
             },
-            "platform": { "node": { "name": { "value": "Windows" }, "manufacturer": { "node": { "name": { "value": "Generic" } } } } },
-            "primary_address": { "node": { "address": { "value": "100.64.0.5/16" } } },
-            "tags": { "edges": [] }
+            "cluster": {
+              "node": {
+                "name": {
+                  "value": "FRA1-ESXI-CLUSTER"
+                },
+                "cluster_type": {
+                  "value": "vmware"
+                },
+                "hypervisor_type": {
+                  "node": {
+                    "image_prefix": {
+                      "value": "tpl-"
+                    }
+                  }
+                }
+              }
+            },
+            "platform": {
+              "node": {
+                "name": {
+                  "value": "Windows"
+                },
+                "manufacturer": {
+                  "node": {
+                    "name": {
+                      "value": "Generic"
+                    }
+                  }
+                }
+              }
+            },
+            "primary_address": {
+              "node": {
+                "address": {
+                  "value": "100.64.0.5/16"
+                }
+              }
+            },
+            "tags": {
+              "edges": []
+            }
           }
         }
       ]

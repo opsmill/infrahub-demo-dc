@@ -8,8 +8,9 @@ This tutorial shows how the demo models a virtualization layer on top of the dat
 
 The virtualization schema tracks:
 
+- **Hypervisor types** - one row per hypervisor family holding what follows from it: the OS its hosts run, the artifact group its VMs join, the transform that renders their provisioning script, and the template image prefix
 - **Clusters** - groups of hypervisor hosts (VMware vSphere, KVM, Proxmox VE, Hyper-V, or other)
-- **Physical hosts** - rack-mounted servers that run a hypervisor and appear in the DCIM model like any other device
+- **Physical hosts** - rack-mounted servers that run a hypervisor and appear in the DCIM model like any other device, created from a sized object template that carries the server model, its capacity and its ports
 - **Virtual machines** - VMs with compute sizing (vCPUs, memory, disk), a hypervisor VM ID, and an optional customer link
 
 Everything around a VM is automated. When you load a host, a generator places it in a rack and cables it to the fabric. When you load a VM, another generator assigns it a primary IP address and puts it behind an HTTPS-only firewall policy. A validation check keeps the data consistent in every proposed change.
@@ -49,6 +50,57 @@ The demo ships one virtualization environment in the Frankfurt metro:
 | Physical hosts | `fra1-pve-01`, `fra1-pve-02`, `fra1-kvm-01`, `fra1-kvm-02`, `fra1-esx-01`, `fra1-hv-01` |
 | Virtual machines | `fra1-vm-web01`, `fra1-vm-web02`, `fra1-vm-app01`, `fra1-vm-app02`, `fra1-vm-db01`, `fra1-vm-cache01` (VM IDs 100-105), plus the Windows VMs `fra1-vm-win01` (ESXi) and `fra1-vm-win02` (Hyper-V), which don't use a VM ID |
 
+### Physical host hardware
+
+Hosts are created from a sized object template, so a host record only names what
+is specific to it: its name, description, location, hypervisor type and groups.
+Everything about the hardware comes from the template it clones.
+
+| Template | Server | Height | vCPUs | Memory | Disk | NICs |
+| -------- | ------ | ------ | ----- | ------ | ---- | ---- |
+| `VIRTUALIZATION_HOST_SMALL` | Dell PowerEdge R650 | 1U | 32 | 256 GB | 2000 GB | `eth0`, `eth1`, `idrac` |
+| `VIRTUALIZATION_HOST_MEDIUM` | HPE ProLiant DL380 Gen11 | 2U | 48 | 384 GB | 3000 GB | `eth0`-`eth3`, `ilo` |
+| `VIRTUALIZATION_HOST_LARGE` | Dell PowerEdge R760 | 2U | 64 | 512 GB | 4000 GB | `eth0`-`eth3`, `idrac` |
+| `VIRTUALIZATION_HOST_XLARGE` | HPE ProLiant DL385 Gen11 | 2U | 96 | 768 GB | 8000 GB | `eth0`-`eth5`, `ilo` |
+
+Only `eth0` and `eth1` are cabled to the fabric. Further NICs are spare capacity
+and stay free, and the `idrac` / `ilo` port is out-of-band management, which
+nothing cables either. The demo uses LARGE for the Proxmox hosts, SMALL for KVM,
+and MEDIUM for the ESXi and Hyper-V hosts; XLARGE ships unused, as a size to
+pick from.
+
+Hosts carry a `role` of `hypervisor`. The vocabulary also offers `compute`, for a
+server that runs its workload directly on the hardware without a hypervisor, and
+a `compute` host is rejected as a cluster member by the validation below. This is
+a separate attribute from the network device roles (leaf, spine, dc_firewall and
+so on), which `DcimDevice` declares for itself: a switch cannot be a hypervisor,
+and a server cannot be a spine.
+
+Because each template names a real server model, and the model carries a height,
+hosts appear in rack elevations at the right size once the cabling generator has
+placed them. Look at the `rack_elevation` artifact on any `LocationRack`, or open
+**Rack Visualization** in the Service Catalog.
+
+## Adding a hypervisor
+
+Everything a hypervisor family implies lives in one row of
+`objects/bootstrap/07_hypervisor_types.yml`: the OS its hosts run, the artifact
+group its VMs join, the artifact definition that renders their provisioning
+script, the script language, and the template image prefix. Adding a fifth
+family is four steps:
+
+1. Add the row, pointing `platform` at a `DcimPlatform` and `artifact_group` at a
+   `CoreStandardGroup`.
+2. Add that group to `objects/bootstrap/00_groups.yml`.
+3. Write the provisioning template under `templates/configs/`, including the
+   shared `partials/vm_userdata.j2`.
+4. Register the transform and the artifact definition in `.infrahub.yml`.
+
+Nothing else changes. The generator that assigns artifact groups, the validation
+check, and the Service Catalog form all read the row rather than carrying their
+own copy of the mapping, and the cluster's `cluster_type` choice list is the only
+other place the family name appears.
+
 ## What the generators do
 
 Four generators react to the loaded data. You don't run any of them by hand.
@@ -57,10 +109,10 @@ Four generators react to the loaded data. You don't run any of them by hand.
 
 The `cable_virtualization_host` generator runs whenever a physical host is created. For each host, scoped to the host's own metro:
 
-1. **Placement** - if racks exist in the metro (from whichever DC design was generated there), the host moves into the least-occupied one
+1. **Placement** - if racks exist in the metro (from whichever DC design was generated there), the host moves into the emptiest one and takes a free rack unit, stacking downward from the top the same way the DC generator places switches. The rack unit matters beyond tidiness: the `rack_elevation` artifact skips any device without a position, so a host placed in a rack but left positionless never appears in the rack drawing. Occupancy is counted in rack units rather than devices, so a rack holding one tall chassis does not read as emptier than a rack of 1U switches
 2. **Cabling** - the host's `eth0` and `eth1` interfaces are dual-homed to the two leaf switches with the most free `customer`-role ports, so cabling load-balances across leafs
 
-The host's NICs come from the `VIRTUALIZATION_HOST` object template in the bootstrap data, not from the generator. The generator is idempotent: a placed host stays in its rack, cabled interfaces are left alone, and a leaf port is never handed out twice.
+The host's NICs come from the sized `VIRTUALIZATION_HOST_SMALL` / `_MEDIUM` / `_LARGE` / `_XLARGE` object templates in the bootstrap data, not from the generator. Each template also carries the server model, its capacity, and an out-of-band management NIC; only `eth0` and `eth1` are cabled to the fabric. The generator is idempotent: a placed host stays in its rack, cabled interfaces are left alone, and a leaf port is never handed out twice.
 
 ### Automatic addressing and HTTPS-only security
 
@@ -121,11 +173,11 @@ The SSH key comes from the VM's `ssh_public_key` attribute. No password is ever 
 
 ### Group membership
 
-The `assign_vm_artifact_groups` generator runs whenever a VM is created, the same trigger as the security generator. It reads the VM's `cluster.cluster_type` and adds the VM to the matching hypervisor group (`proxmox_vms`, `kvm_vms`, `hyperv_vms`, or `esxi_vms`) plus `vm_userdata_targets`. The demo data carries no static `member_of_groups` entry for the hypervisor groups - membership is derived from `cluster_type` instead of hand-maintained per VM. The generator only adds, and only on create, so moving a VM to a cluster of a different type leaves the old group membership behind; correct that by editing the groups directly.
+The `assign_vm_artifact_groups` generator runs whenever a VM is created, the same trigger as the security generator. It follows the VM's cluster to its hypervisor type and adds the VM to the artifact group that row names (`proxmox_vms`, `kvm_vms`, `hyperv_vms`, or `esxi_vms`) plus `vm_userdata_targets`. The demo data carries no static `member_of_groups` entry for the hypervisor groups, and the generator holds no hypervisor mapping of its own: which group a VM joins is data on `VirtualizationHypervisorType`, so a new hypervisor is a row in `objects/bootstrap/07_hypervisor_types.yml` rather than an edit to the generator. The generator only adds, and only on create, so moving a VM to a cluster of a different type leaves the old group membership behind; correct that by editing the groups directly.
 
 ## Image prerequisites
 
-Each provisioning script expects a template image already on the target hypervisor, named `tpl-<os_version slug>`: lowercase the VM's `os_version` and replace spaces with dashes. `Ubuntu 22.04` becomes `tpl-ubuntu-22.04`; `Windows Server 2022` becomes `tpl-windows-server-2022`.
+Each provisioning script expects a template image already on the target hypervisor, named `<image_prefix><os_version slug>`: lowercase the VM's `os_version` and replace spaces with dashes. The prefix comes from the cluster's hypervisor type (`tpl-` for every family the demo ships), so changing the convention is a data edit rather than a change to four templates. `Ubuntu 22.04` becomes `tpl-ubuntu-22.04`; `Windows Server 2022` becomes `tpl-windows-server-2022`.
 
 | Hypervisor | Where the template lives |
 | ---------- | ------------------------- |
@@ -156,7 +208,13 @@ Merge the proposed change to bring the VM into `main`.
 
 ## Validation
 
-A VM names both its host and its cluster, and the host itself belongs to a cluster - two paths to the same fact. The `validate_virtualization_vm` check fails a proposed change when they disagree, for example a VM assigned to `FRA1-KVM-CLUSTER` while running on `fra1-pve-01`. The check runs automatically in every proposed change that touches a VM.
+Two checks run automatically in every proposed change that touches this data.
+
+`validate_virtualization_vm` covers the VM: it names both its host and its cluster, and the host itself belongs to a cluster, so there are two paths to the same fact. The check fails when they disagree, for example a VM assigned to `FRA1-KVM-CLUSTER` while running on `fra1-pve-01`.
+
+`validate_virtualization_host` covers the host: a host names the hypervisor family it runs, and so does the cluster it joins. The check fails when a host joins a cluster of a different family, for example the Hyper-V host `fra1-hv-01` placed in `FRA1-PROXMOX-CLUSTER`, and when a host with the `compute` role, which runs its workload directly on the hardware, is made a cluster member at all.
+
+Both are comparisons rather than compatibility tables, because host and cluster point at the same `VirtualizationHypervisorType` row. A relationship picker cannot be filtered by another field's value, so the host's display label carries its hypervisor family (`fra1-hv-01 (hyperv)`) and a mismatch is visible in the picker before it is saved.
 
 ## Schema architecture
 
@@ -175,6 +233,8 @@ OrganizationCustomer
 - **VirtualizationPhysicalHost** is a full DCIM device: it inherits the generic device and physical device models, so it has a rack position, interfaces, and can be an artifact target
 - **VirtualizationVirtualMachine** belongs to exactly one host (parent relationship) and one cluster, and optionally to a customer
 - Both hosts and VMs share the compute sizing attributes (`vcpus`, `memory`, `disk`) through the `ComputeGenericUnit` generic
+- **VirtualizationHypervisorType** is referenced by both the cluster and the host, which is what turns hypervisor compatibility into an identity comparison. It also holds the artifact group, artifact definition, script language and image prefix for that family, so those facts live in one row instead of being repeated across the generator, the Service Catalog and the templates
+- A host carries no `platform` of its own: its hypervisor type already names the OS, and a second copy of that fact is what would let a Windows host sit in a Proxmox cluster
 - The Create VM form validates that a VM ID is unique within its cluster; the schema itself does not enforce it, so two clusters can both use VM ID 100
 
 ## Next steps

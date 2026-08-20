@@ -1,0 +1,52 @@
+# Hypervisor families and the conventions that follow from each one.
+#
+# Single source for facts that were previously repeated in the cluster_type
+# dropdown, CLUSTER_TYPE_TO_GROUP in generators/generate_vm_artifact_groups.py,
+# the HYPERVISORS map in the Service Catalog, and the artifact wiring in
+# .infrahub.yml. `name` matches VirtualizationCluster.cluster_type, so both
+# keys stay in step while consumers migrate across.
+#
+# Loads after 00_groups.yml (artifact_group) and 05_platforms.yml (platform).
+---
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: VirtualizationHypervisorType
+  data:
+    - name: proxmox
+      label: Proxmox VE
+      platform: [Generic, Linux]
+      artifact_group: proxmox_vms
+      artifact_definition: proxmox_vm_config
+      script_language: bash
+      image_prefix: "tpl-"
+
+    - name: kvm
+      label: KVM
+      platform: [Generic, Linux]
+      artifact_group: kvm_vms
+      artifact_definition: kvm_vm_config
+      script_language: bash
+      image_prefix: "tpl-"
+
+    - name: hyperv
+      label: Microsoft Hyper-V
+      platform: [Generic, Windows]
+      artifact_group: hyperv_vms
+      artifact_definition: hyperv_vm_config
+      script_language: powershell
+      image_prefix: "tpl-"
+
+    - name: vmware
+      label: VMware vSphere
+      platform: [VMware, ESXi]
+      artifact_group: esxi_vms
+      artifact_definition: esxi_vm_config
+      script_language: bash
+      image_prefix: "tpl-"
+
+    # No platform, group or definition: "other" exists so a cluster can be
+    # recorded before its hypervisor is known, and its VMs get the shared
+    # user-data artifact only.
+    - name: other
+      label: Other

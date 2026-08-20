@@ -1,17 +1,21 @@
 """Virtualization VM Artifact Group Assignment Generator.
 
 Triggered whenever a VirtualizationVirtualMachine is created (see the
-`virtualization_vms` group in .infrahub.yml). Derives the VM's
-hypervisor from cluster.cluster_type and adds the VM to the matching
-per-hypervisor artifact group (proxmox_vms / kvm_vms / hyperv_vms /
-esxi_vms) plus the umbrella vm_userdata_targets group, so artifact
-definitions target the right VMs without static member_of_groups
-entries duplicating what cluster_type already encodes.
+`virtualization_vms` group in .infrahub.yml). Adds the VM to the
+artifact group its cluster's hypervisor type names, plus the umbrella
+vm_userdata_targets group, so artifact definitions target the right VMs
+without static member_of_groups entries duplicating what the cluster
+already encodes.
+
+The hypervisor-to-group mapping is data, not code: it lives on
+VirtualizationHypervisorType (objects/bootstrap/07_hypervisor_types.yml)
+and arrives through the query, so a new hypervisor needs a row there
+rather than an edit here.
 
 Idempotent and concurrency-safe: membership is added through the
 RelationshipAdd mutation, which adds only the named peer and tolerates
-a peer that is already a member. cluster_type values without a mapped
-group (e.g. "other") only join the umbrella group.
+a peer that is already a member. A hypervisor type with no artifact
+group (e.g. "other") only joins the umbrella group.
 """
 
 from infrahub_sdk.generator import InfrahubGenerator  # type: ignore[import-not-found]
@@ -19,12 +23,6 @@ from infrahub_sdk.protocols import CoreStandardGroup  # type: ignore[import-not-
 
 from .common import extract_single_node
 
-CLUSTER_TYPE_TO_GROUP = {
-    "proxmox": "proxmox_vms",
-    "kvm": "kvm_vms",
-    "hyperv": "hyperv_vms",
-    "vmware": "esxi_vms",
-}
 USERDATA_GROUP = "vm_userdata_targets"
 
 
@@ -44,15 +42,14 @@ class VMArtifactGroupsGenerator(InfrahubGenerator):
 
         vm_name = vm.get("name", "unknown")
         vm_id = vm["id"]
-        cluster = vm.get("cluster") or {}
-        cluster_type = cluster.get("cluster_type")
+        hypervisor_type = (vm.get("cluster") or {}).get("hypervisor_type") or {}
+        artifact_group = (hypervisor_type.get("artifact_group") or {}).get("name")
 
         group_names = [USERDATA_GROUP]
-        hypervisor_group = CLUSTER_TYPE_TO_GROUP.get(cluster_type) if cluster_type else None
-        if hypervisor_group:
-            group_names.append(hypervisor_group)
+        if artifact_group:
+            group_names.append(artifact_group)
         else:
-            self.logger.warning(f"- {vm_name}: cluster_type {cluster_type!r} has no artifact group mapping")
+            self.logger.warning(f"- {vm_name}: hypervisor type {hypervisor_type.get('name')!r} names no artifact group")
 
         for group_name in group_names:
             group = await self.client.get(

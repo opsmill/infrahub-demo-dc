@@ -267,6 +267,8 @@ def get_device_color(device_role: Optional[str]) -> str:
         "dc_firewall": "device device-role-firewall",
         "edge_firewall": "device device-role-firewall",
         "load_balancer": "device device-role-load-balancer",
+        "hypervisor": "device device-role-hypervisor",
+        "compute": "device device-role-compute",
     }
 
     return role_color_map.get(device_role_lower, "device")
@@ -277,7 +279,8 @@ def get_role_legend() -> Dict[str, str]:
 
     Returns:
         Dict mapping role names to color hex codes for legend display.
-        Colors match the DcimDevice role attribute in schemas/base/dcim.yml
+        Colors match the role attributes in schemas/base/dcim.yml
+        (network devices) and schemas/extensions/virtualization (hosts)
     """
     return {
         "Leaf": "#e6e6fa",  # Lavender
@@ -288,6 +291,8 @@ def get_role_legend() -> Dict[str, str]:
         "Edge": "#bf7fbf",  # Medium purple
         "Firewall": "#6a5acd",  # Slate blue (dc_firewall and edge_firewall)
         "Load Balancer": "#38e7fb",  # Cyan
+        "Hypervisor": "#7ec8a0",  # Green
+        "Compute": "#9fb8d4",  # Steel blue
     }
 
 

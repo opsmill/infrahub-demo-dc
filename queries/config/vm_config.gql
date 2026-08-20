@@ -46,6 +46,13 @@ query vm_config($name: String!) {
             cluster_type {
               value
             }
+            hypervisor_type {
+              node {
+                image_prefix {
+                  value
+                }
+              }
+            }
           }
         }
         platform {

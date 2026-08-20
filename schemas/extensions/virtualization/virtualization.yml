@@ -3,12 +3,99 @@
 version: "1.0"
 
 nodes:
+  # --------------------  Hypervisor Type  --------------------
+  # Everything that follows from "this is a Proxmox estate": the OS its hosts
+  # run, the artifact group its VMs belong to, the transform that renders their
+  # provisioning script, and how that script is written. Held as data so a new
+  # hypervisor is a row here plus a template, rather than edits spread across
+  # the schema, a generator constant, the Service Catalog and .infrahub.yml.
+  - name: HypervisorType
+    namespace: Virtualization
+    description: A hypervisor family and the conventions that follow from it.
+    label: Hypervisor Type
+    icon: mdi:cog-box
+    include_in_menu: false
+    human_friendly_id:
+      - name__value
+    order_by:
+      - name__value
+    display_label: "{{ label__value }}"
+    uniqueness_constraints:
+      - [name__value]
+    attributes:
+      - name: name
+        description: Key shared with VirtualizationCluster.cluster_type.
+        kind: Text
+        unique: true
+        order_weight: 1000
+      - name: label
+        kind: Text
+        optional: true
+        order_weight: 1100
+      - name: artifact_definition
+        label: Artifact Definition
+        description: Name of the artifact definition that renders a VM's provisioning script.
+        kind: Text
+        optional: true
+        order_weight: 1200
+      - name: script_language
+        label: Script Language
+        description: Language the provisioning script is written in, for syntax highlighting.
+        kind: Dropdown
+        optional: true
+        order_weight: 1300
+        choices:
+          - name: bash
+            label: Bash
+            description: POSIX shell script.
+            color: "#7ec8a0"
+          - name: powershell
+            label: PowerShell
+            description: Windows PowerShell script.
+            color: "#0078d4"
+      - name: image_prefix
+        label: Image Prefix
+        description: Prefix of the template image a VM is cloned from, e.g. "tpl-" in tpl-ubuntu-24.04.
+        kind: Text
+        optional: true
+        order_weight: 1400
+    relationships:
+      - name: platform
+        peer: DcimPlatform
+        cardinality: one
+        kind: Attribute
+        optional: true
+        description: Operating system the hosts of this hypervisor family run.
+        order_weight: 2000
+      - name: artifact_group
+        label: Artifact Group
+        peer: CoreStandardGroup
+        cardinality: one
+        kind: Attribute
+        optional: true
+        description: Group the VMs of this hypervisor family join, so artifacts can target them.
+        order_weight: 2100
+      - name: clusters
+        peer: VirtualizationCluster
+        cardinality: many
+        kind: Attribute
+        identifier: hypervisor_type__clusters
+        optional: true
+        order_weight: 2200
+      - name: hosts
+        peer: VirtualizationPhysicalHost
+        cardinality: many
+        kind: Attribute
+        identifier: hypervisor_type__hosts
+        optional: true
+        order_weight: 2300
+
   # --------------------  Virtualization Cluster  --------------------
   - name: Cluster
     namespace: Virtualization
     description: A group of hypervisor hosts on which virtual machines run.
     label: Virtualization Cluster
-    icon: mdi:server-network
+    icon: mdi:layers-triple
     include_in_menu: false
     human_friendly_id:
       - name__value
@@ -53,6 +140,15 @@ nodes:
             description: Other hypervisor cluster type.
             color: "#808080"
     relationships:
+      - name: hypervisor_type
+        label: Hypervisor Type
+        peer: VirtualizationHypervisorType
+        cardinality: one
+        kind: Attribute
+        identifier: hypervisor_type__clusters
+        optional: true
+        description: Hypervisor family this cluster runs.
+        order_weight: 1250
       - name: hosts
         peer: VirtualizationPhysicalHost
         cardinality: many
@@ -85,7 +181,44 @@ nodes:
       - VirtualizationHostVirtualMachine
     uniqueness_constraints:
       - [name__value]
+    # Relationship pickers render the peer's display label, and they cannot be
+    # filtered by another field's value, so the hypervisor family goes in the
+    # label: picking hosts for a cluster shows "fra1-hv-01 (hyperv)" and a
+    # mismatch is visible before it is saved.
+    display_label: "{{ name__value }} ({{ hypervisor_type__name__value }})"
+    attributes:
+      # DcimDevice declares its own `role` with the network vocabulary (leaf,
+      # spine, dc_firewall, ...) on the concrete node rather than on
+      # DcimGenericDevice, so a host inherits no role at all. A server's roles
+      # are a different vocabulary, declared here.
+      - name: role
+        kind: Dropdown
+        optional: true
+        order_weight: 1400
+        choices:
+          - name: hypervisor
+            label: Hypervisor
+            description: Server running a hypervisor that hosts virtual machines.
+            color: "#7ec8a0"
+          - name: compute
+            label: Compute
+            description: Server running a workload directly on the hardware, without a hypervisor.
+            color: "#9fb8d4"
     relationships:
+      # The host's hypervisor family, and with it the OS it runs: the
+      # DcimGenericDevice `platform` is left unset on hosts, since a second
+      # copy of the same fact is what lets a Windows host end up in a Proxmox
+      # cluster. Both sides pointing at one HypervisorType turns compatibility
+      # into an identity comparison instead of a platform/cluster_type matrix.
+      - name: hypervisor_type
+        label: Hypervisor Type
+        peer: VirtualizationHypervisorType
+        cardinality: one
+        kind: Attribute
+        identifier: hypervisor_type__hosts
+        optional: true
+        description: Hypervisor family this host runs.
+        order_weight: 1140
       - name: cluster
         peer: VirtualizationCluster
         cardinality: one
@@ -99,7 +232,7 @@ nodes:
     namespace: Virtualization
     description: A virtual machine hosted on a hypervisor.
     label: Virtual Machine
-    icon: mdi:server
+    icon: mdi:monitor
     include_in_menu: false
     inherit_from:
       - CoreArtifactTarget

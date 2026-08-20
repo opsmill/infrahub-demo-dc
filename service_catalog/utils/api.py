@@ -626,7 +626,14 @@ class InfrahubClient:
             InfrahubAPIError: If API error occurs
         """
         try:
-            # Use GraphQL to filter racks by parent (row)
+            # Use GraphQL to filter racks by parent (row).
+            #
+            # The parent is deliberately not selected. It is not used below, and
+            # asking for `parent { node { id } }` alone makes the server answer
+            # 500 "Unable to identify the type of the instance": the peer is a
+            # location generic, so the selection needs a type discriminator
+            # (`__typename`, or an inline fragment) to resolve. Selecting a field
+            # nobody reads is not worth either.
             query = """
             query GetRacksByRow($row_id: ID!) {
                 LocationRack(parent__ids: [$row_id]) {
@@ -635,11 +642,6 @@ class InfrahubClient:
                             id
                             name { value }
                             shortname { value }
-                            parent {
-                                node {
-                                    id
-                                }
-                            }
                         }
                     }
                 }
@@ -668,14 +670,26 @@ class InfrahubClient:
             raise InfrahubAPIError(f"Failed to fetch racks for row: {str(e)}")
 
     def get_devices_by_rack(self, rack_id: str, branch: str = "main") -> List[Dict[str, Any]]:
-        """Fetch DcimDevice objects for a specific rack.
+        """Fetch every rack-mounted device in a rack, hypervisor hosts included.
+
+        Queries the DcimPhysicalDevice generic rather than the concrete
+        DcimDevice kind: a VirtualizationPhysicalHost is rack-mounted and gets
+        placed by the cabling generator, but it is not a DcimDevice, so the
+        concrete kind leaves hosts out of the rack drawing entirely.
+
+        The generic exposes what every rack-mounted device has (position,
+        device_type, location); `name` and `role` live further down the
+        inheritance tree, so they come from inline fragments. `role` is
+        declared separately on DcimDevice (network roles) and on
+        VirtualizationPhysicalHost (hypervisor/compute).
 
         Args:
             rack_id: LocationRack ID
             branch: Branch name to query (default: "main")
 
         Returns:
-            List of DcimDevice dictionaries with id, name, position, height, and device_type
+            List of device dictionaries with id, name, position, height, role,
+            and device_type
 
         Raises:
             InfrahubConnectionError: If connection fails
@@ -685,13 +699,11 @@ class InfrahubClient:
             # Use GraphQL to filter devices by location (rack)
             query = """
             query GetDevicesByRack($rack_id: ID!) {
-                DcimDevice(location__ids: [$rack_id]) {
+                DcimPhysicalDevice(location__ids: [$rack_id]) {
                     edges {
                         node {
                             id
-                            name { value }
                             position { value }
-                            role { value }
                             device_type {
                                 node {
                                     name { value }
@@ -703,6 +715,15 @@ class InfrahubClient:
                                     id
                                 }
                             }
+                            ... on DcimGenericDevice {
+                                name { value }
+                            }
+                            ... on DcimDevice {
+                                role { value }
+                            }
+                            ... on VirtualizationPhysicalHost {
+                                role { value }
+                            }
                         }
                     }
                 }
@@ -712,7 +733,7 @@ class InfrahubClient:
             result = self.execute_graphql(query, {"rack_id": rack_id}, branch)
 
             devices = []
-            edges = result.get("DcimDevice", {}).get("edges", [])
+            edges = result.get("DcimPhysicalDevice", {}).get("edges", [])
 
             for edge in edges:
                 node = edge.get("node", {})
@@ -730,7 +751,7 @@ class InfrahubClient:
                     "name": {"value": node.get("name", {}).get("value")},
                     "position": {"value": node.get("position", {}).get("value")},
                     "height": {"value": device_height},
-                    "role": {"value": node.get("role", {}).get("value")},
+                    "role": {"value": (node.get("role") or {}).get("value")},
                 }
 
                 # Add device type if available
@@ -779,7 +800,7 @@ class InfrahubClient:
             branch: Branch name to query (default: "main")
 
         Returns:
-            List of LocationPod dictionaries with id, name, and parent relationship
+            List of LocationPod dictionaries with id and name
 
         Raises:
             InfrahubConnectionError: If connection fails
@@ -787,6 +808,10 @@ class InfrahubClient:
         """
         try:
             # Use GraphQL to filter pods by parent (building)
+            # The parent is deliberately not selected: it is unused below, and
+            # `parent { node { id } }` alone makes the server answer 500 "Unable to
+            # identify the type of the instance" (the peer is a location generic,
+            # so the selection needs `__typename` or an inline fragment).
             query = """
             query GetPodsByBuilding($building_id: ID!) {
                 LocationPod(parent__ids: [$building_id]) {
@@ -794,11 +819,6 @@ class InfrahubClient:
                         node {
                             id
                             name { value }
-                            parent {
-                                node {
-                                    id
-                                }
-                            }
                         }
                     }
                 }
@@ -831,7 +851,7 @@ class InfrahubClient:
             branch: Branch name to query (default: "main")
 
         Returns:
-            List of LocationRack dictionaries with id, name, and parent relationship
+            List of LocationRack dictionaries with id and name
 
         Raises:
             InfrahubConnectionError: If connection fails
@@ -839,6 +859,10 @@ class InfrahubClient:
         """
         try:
             # Use GraphQL to filter racks by parent (pod)
+            # The parent is deliberately not selected: it is unused below, and
+            # `parent { node { id } }` alone makes the server answer 500 "Unable to
+            # identify the type of the instance" (the peer is a location generic,
+            # so the selection needs `__typename` or an inline fragment).
             query = """
             query GetRacksByPod($pod_id: ID!) {
                 LocationRack(parent__ids: [$pod_id]) {
@@ -846,11 +870,6 @@ class InfrahubClient:
                         node {
                             id
                             name { value }
-                            parent {
-                                node {
-                                    id
-                                }
-                            }
                         }
                     }
                 }
@@ -1447,6 +1466,58 @@ class InfrahubClient:
             return hosts
         except Exception as e:
             raise InfrahubAPIError(f"Failed to fetch physical hosts: {str(e)}")
+
+    def get_hypervisor_types(self, branch: str = "main") -> Dict[str, Dict[str, Any]]:
+        """Fetch the hypervisor types, keyed by the name clusters use.
+
+        These rows are what a hypervisor implies: which artifact definition
+        renders its provisioning script and what language that script is in.
+        Holding it as data means adding a hypervisor does not need a code change
+        here (see objects/bootstrap/07_hypervisor_types.yml).
+
+        Args:
+            branch: Branch name to query (default: "main")
+
+        Returns:
+            Dict mapping hypervisor name (proxmox, kvm, ...) to a dict with
+            label, artifact_definition, script_language and image_prefix.
+
+        Raises:
+            InfrahubAPIError: If API error occurs
+        """
+        try:
+            query = """
+            query GetHypervisorTypes {
+                VirtualizationHypervisorType {
+                    edges {
+                        node {
+                            name { value }
+                            label { value }
+                            artifact_definition { value }
+                            script_language { value }
+                            image_prefix { value }
+                        }
+                    }
+                }
+            }
+            """
+            result = self.execute_graphql(query, branch=branch)
+
+            types = {}
+            for edge in result.get("VirtualizationHypervisorType", {}).get("edges", []):
+                node = edge.get("node", {})
+                name = (node.get("name") or {}).get("value")
+                if not name:
+                    continue
+                types[name] = {
+                    "label": (node.get("label") or {}).get("value"),
+                    "artifact_definition": (node.get("artifact_definition") or {}).get("value"),
+                    "script_language": (node.get("script_language") or {}).get("value"),
+                    "image_prefix": (node.get("image_prefix") or {}).get("value"),
+                }
+            return types
+        except Exception as e:
+            raise InfrahubAPIError(f"Failed to fetch hypervisor types: {str(e)}")
 
     def get_used_vmids(self, branch: str = "main") -> Dict[str, Any]:
         """Fetch VM IDs already in use, grouped per cluster.

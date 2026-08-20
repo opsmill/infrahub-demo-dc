@@ -309,3 +309,26 @@ spec:
       full_depth: false
       manufacturer: F5 Networks
       platform: [Generic, Linux]
+    # Hypervisor host hardware. No platform: the same server runs ESXi,
+    # Proxmox, KVM or Hyper-V depending on the deployment, so the platform
+    # belongs on the host, not on the model.
+    - name: PowerEdge R650
+      part_number: R650
+      height: 1
+      full_depth: true
+      manufacturer: Dell
+    - name: PowerEdge R760
+      part_number: R760
+      height: 2
+      full_depth: true
+      manufacturer: Dell
+    - name: ProLiant DL380 Gen11
+      part_number: DL380-G11
+      height: 2
+      full_depth: true
+      manufacturer: HPE
+    - name: ProLiant DL385 Gen11
+      part_number: DL385-G11
+      height: 2
+      full_depth: true
+      manufacturer: HPE

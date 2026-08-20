@@ -83,3 +83,13 @@ spec:
       netmiko_device_type: linux
       ansible_network_os: linux
       containerlab_os: gaia
+
+    # ESXi is its own hypervisor OS, not Linux: without it a vmware host and a
+    # kvm host would both claim the Linux platform.
+    - name: ESXi
+      manufacturer: VMware
+      nornir_platform: esxi
+      napalm_driver: esxi
+      netmiko_device_type: esxi
+      ansible_network_os: esxi
+      containerlab_os: esxi

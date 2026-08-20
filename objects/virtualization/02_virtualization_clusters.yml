@@ -8,6 +8,7 @@ spec:
     - name: "FRA1-PROXMOX-CLUSTER"
       description: "Proxmox VE cluster in Frankfurt"
       cluster_type: proxmox
+      hypervisor_type: proxmox
       hosts:
         - fra1-pve-01
         - fra1-pve-02
@@ -15,6 +16,7 @@ spec:
     - name: "FRA1-KVM-CLUSTER"
       description: "KVM cluster in Frankfurt"
       cluster_type: kvm
+      hypervisor_type: kvm
       hosts:
         - fra1-kvm-01
         - fra1-kvm-02
@@ -22,11 +24,13 @@ spec:
     - name: "FRA1-ESXI-CLUSTER"
       description: "VMware ESXi cluster in Frankfurt"
       cluster_type: vmware
+      hypervisor_type: vmware
       hosts:
         - fra1-esx-01
 
     - name: "FRA1-HYPERV-CLUSTER"
       description: "Microsoft Hyper-V cluster in Frankfurt"
       cluster_type: hyperv
+      hypervisor_type: hyperv
       hosts:
         - fra1-hv-01

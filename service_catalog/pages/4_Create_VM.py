@@ -33,18 +33,6 @@ if "selected_branch" not in st.session_state:
 if "infrahub_url" not in st.session_state:
     st.session_state.infrahub_url = INFRAHUB_ADDRESS
 
-# Per-hypervisor provisioning artifact definition and the language its rendered
-# script is highlighted with. Keyed on the cluster_type choices declared in
-# schemas/extensions/virtualization/virtualization.yml - the same keys
-# CLUSTER_TYPE_TO_GROUP in generators/generate_vm_artifact_groups.py maps to
-# artifact groups, so a new hypervisor needs an entry in both.
-HYPERVISORS = {
-    "proxmox": {"definition": "proxmox_vm_config", "language": "bash"},
-    "kvm": {"definition": "kvm_vm_config", "language": "bash"},
-    "hyperv": {"definition": "hyperv_vm_config", "language": "powershell"},
-    "vmware": {"definition": "esxi_vm_config", "language": "bash"},
-}
-
 VM_CREATION_STEPS = [
     "Creating branch",
     "Creating virtual machine",
@@ -53,6 +41,24 @@ VM_CREATION_STEPS = [
     "Rendering artifacts",
     "Complete",
 ]
+
+
+def get_hypervisor(cluster_type: Any) -> Dict[str, Any]:
+    """Return the hypervisor type row for `cluster_type`.
+
+    Rows come from VirtualizationHypervisorType, cached in session state by
+    main(). Falls back to an empty dict so a cluster type without a row still
+    renders, it just gets no provisioning artifact.
+
+    Args:
+        cluster_type: Value of the cluster's cluster_type attribute
+
+    Returns:
+        The row as a dict, or an empty dict when there is none.
+    """
+    if not cluster_type:
+        return {}
+    return dict(st.session_state.get("vm_hypervisor_types", {}).get(cluster_type) or {})
 
 
 def initialize_vm_creation_state(form_data: Dict[str, Any]) -> None:
@@ -154,8 +160,7 @@ def execute_vm_creation_step(client: InfrahubClient) -> None:
 
         elif step == 5:
             # Step 5: Render provisioning artifacts
-            hypervisor = HYPERVISORS.get(form_data.get("cluster_type"), {})
-            provisioning_def = hypervisor.get("definition")
+            provisioning_def = get_hypervisor(form_data.get("cluster_type")).get("artifact_definition")
             definition_names = ["vm_userdata"] + ([provisioning_def] if provisioning_def else [])
 
             with st.status("Rendering provisioning artifacts...", expanded=True) as status:
@@ -205,7 +210,7 @@ def execute_vm_creation_step(client: InfrahubClient) -> None:
                 language = (
                     "yaml"
                     if artifact["definition_name"] == "vm_userdata"
-                    else HYPERVISORS.get(form_data.get("cluster_type"), {}).get("language", "bash")
+                    else (get_hypervisor(form_data.get("cluster_type")).get("script_language") or "bash")
                 )
                 with st.expander(f"Artifact: {artifact['name']}", expanded=False):
                     st.code(artifact["content"], language=language)
@@ -302,6 +307,15 @@ def main() -> None:
             except Exception as e:
                 st.warning(f"Could not load customers: {e}")
                 st.session_state.vm_customers = []
+
+    # Fetch the hypervisor types (cache in session state)
+    if "vm_hypervisor_types" not in st.session_state:
+        with st.spinner("Loading hypervisor types..."):
+            try:
+                st.session_state.vm_hypervisor_types = client.get_hypervisor_types()
+            except Exception as e:
+                st.warning(f"Could not load hypervisor types: {e}")
+                st.session_state.vm_hypervisor_types = {}
 
     # Fetch VM IDs already in use (cache in session state)
     if "vm_used_vmids" not in st.session_state:
