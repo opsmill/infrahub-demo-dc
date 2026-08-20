@@ -1,0 +1,15 @@
+query dc_firewall_policy($device: String!) {
+  SecurityFirewall(name__value: $device) {
+    edges {
+      node {
+        id
+        name {
+          value
+        }
+        role {
+          value
+        }
+      }
+    }
+  }
+}

@@ -194,6 +194,13 @@ generator_definitions:
     class_name: VirtualizationVMSecurityGenerator
     parameters:
       name: name__value
+  - name: attach_dc_firewall_policy
+    file_path: generators/generate_dc_firewall_policy.py
+    targets: juniper_firewall
+    query: dc_firewall_policy
+    class_name: DcFirewallPolicyGenerator
+    parameters:
+      device: name__value
 
 queries:
   - name: topology_dc
@@ -228,6 +235,8 @@ queries:
     file_path: queries/virtualization/host_cabling.gql
   - name: virtualization_vm_security
     file_path: queries/virtualization/vm_security.gql
+  - name: dc_firewall_policy
+    file_path: queries/virtualization/dc_firewall_policy.gql
   - name: proxmox_vm_config
     file_path: queries/config/proxmox_vm.gql
 schemas:

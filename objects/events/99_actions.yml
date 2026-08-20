@@ -34,3 +34,9 @@ spec:
       mutation_action: created
       action: virtualization_vm_security
       branch_scope: other_branches
+    - name: dc-firewall-on-create
+      description: Trigger virtualization policy attachment on create of a SecurityFirewall
+      node_kind: SecurityFirewall
+      mutation_action: created
+      action: dc_firewall_policy_attachment
+      branch_scope: other_branches

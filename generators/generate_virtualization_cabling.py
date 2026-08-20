@@ -1,14 +1,22 @@
 """Virtualization Host Cabling Generator.
 
 Triggered whenever a VirtualizationPhysicalHost is created or updated
-(see the `virtualization_hosts` group in .infrahub.yml). Dual-homes the
-host to two leaf switches, picking whichever leafs currently have the
-most free "customer"-role interfaces available - so cabling naturally
-load-balances across leafs and adapts to whatever ports earlier hosts
-have already consumed, regardless of which DC design(s) created them.
+(see the `virtualization_hosts` group in .infrahub.yml). Two things
+happen per host:
 
-Idempotent: already-cabled host interfaces are left alone, and a leaf
-port is never handed out to more than one host.
+1. Placement: if a LocationRack currently exists (from whichever DC
+   design has been generated, if any), the host is moved there from
+   its building-level default location, picking the least-occupied
+   rack. A no-op if no racks exist yet.
+2. Cabling: dual-homes the host to two leaf switches, picking whichever
+   leafs currently have the most free "customer"-role interfaces
+   available - so cabling naturally load-balances across leafs and
+   adapts to whatever ports earlier hosts have already consumed,
+   regardless of which DC design(s) created them.
+
+Idempotent: a host already placed in a rack is left alone, already-cabled
+host interfaces are left alone, and a leaf port is never handed out to
+more than one host.
 """
 
 from typing import Any
@@ -47,6 +55,9 @@ class VirtualizationHostCablingGenerator(InfrahubGenerator):
         # missing key and a present-but-None one - a brand new host with no
         # interfaces yet hits this every time.
         existing_interfaces = {interface["name"]: interface for interface in host.get("interfaces") or []}
+
+        current_location = host.get("location") or {}
+        await self._assign_rack(host_name, host_id, current_location.get("typename"))
 
         leafs = await self.client.filters(kind="DcimDevice", role__value="leaf", branch=self.branch)
         if not leafs:
@@ -160,3 +171,27 @@ class VirtualizationHostCablingGenerator(InfrahubGenerator):
 
             if not cabled:
                 self.logger.warning(f"No leaf switches with free ports left for {host_name}:{nic_name}")
+
+    async def _assign_rack(self, host_name: str, host_id: str, current_location_typename: str | None) -> None:
+        """Move the host into the least-occupied existing rack, if any exist.
+
+        Args:
+            host_name: Host name, for logging
+            host_id: Host ID
+            current_location_typename: __typename of the host's current location
+        """
+        if current_location_typename == "LocationRack":
+            self.logger.info(f"- {host_name} already placed in a rack, skipping")
+            return
+
+        racks = await self.client.filters(kind="LocationRack", branch=self.branch, prefetch_relationships=True)
+        if not racks:
+            self.logger.info(f"No racks exist yet, leaving {host_name} at its building-level location")
+            return
+
+        least_loaded = min(racks, key=lambda rack: len(rack.devices.peers))
+
+        host_node = await self.client.get(kind="VirtualizationPhysicalHost", branch=self.branch, id=host_id)
+        host_node.location = least_loaded.id  # type: ignore[assignment]
+        await host_node.save(allow_upsert=True)
+        self.logger.info(f"- Placed {host_name} in rack {least_loaded.name.value}")

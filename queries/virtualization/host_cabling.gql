@@ -6,6 +6,11 @@ query virtualization_host_cabling($name: String!) {
         name {
           value
         }
+        location {
+          node {
+            __typename
+          }
+        }
         interfaces {
           edges {
             node {
