@@ -1447,10 +1447,11 @@ class InfrahubClient:
     def get_used_vmids(self, branch: str = "main") -> Dict[str, Any]:
         """Fetch VM IDs already in use, grouped per cluster.
 
-        VM IDs are unique per cluster (the [cluster, vmid] uniqueness
-        constraint), so the Create VM form needs the used IDs of the selected
-        host's cluster to validate input, and a global maximum to suggest an
-        ID that is free in every cluster.
+        A VMID only has to be unique inside its cluster, and the schema does not
+        enforce that (the constraint would also reject VMID-less Hyper-V and
+        ESXi VMs), so the Create VM form is where the collision is caught: it
+        needs the used IDs of the selected host's cluster to validate input, and
+        a global maximum to suggest an ID that is free in every cluster.
 
         Args:
             branch: Branch name to query (default: "main")
