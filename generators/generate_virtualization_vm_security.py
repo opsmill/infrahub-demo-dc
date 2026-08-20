@@ -20,16 +20,21 @@ from infrahub_sdk.generator import InfrahubGenerator  # type: ignore[import-not-
 
 from .common import clean_data
 
-# Deleting a branch does not release its resource-pool IP allocations back
-# to the pool (IP uniqueness is tracked globally, not per-branch, so two
-# branches can't hand out the same address only to conflict on merge) -
-# every test branch created and deleted permanently consumes addresses.
-# 100.64.0.0/10 (~4.19M addresses, RFC 6598 shared address space, unused
-# elsewhere in this repo) gives enough headroom that repeated
-# branch-recreate-and-delete churn during iterative testing won't
-# realistically exhaust it again.
+# CoreIPAddressPool objects are visible globally (the same pool ID shows up
+# identically on every branch), so a broken/misconfigured pool created under
+# a given name stays broken for every future branch until the name changes.
+# Earlier versions of this generator set is_pool=True on the backing prefix,
+# which marks a prefix as the source for a CoreIPPrefixPool (sub-prefix
+# carving) rather than eligible for individual address allocation - every
+# allocation then failed with "no more addresses available" regardless of
+# size. Renamed once more (virtualization_vm_pool) to get a fresh pool built
+# without that bug, on top of 100.64.0.0/10 (~4.19M addresses, RFC 6598
+# shared address space, unused elsewhere in this repo) for headroom against
+# branch-recreate-and-delete churn during iterative testing (deleting a
+# branch does not release its resource-pool IP allocations back to the pool
+# either, since IP uniqueness is tracked globally, not per-branch).
 VM_SUBNET = "100.64.0.0/10"
-IP_POOL_NAME = "virtualization_vm_address_pool"
+IP_POOL_NAME = "virtualization_vm_pool"
 ADDRESS_GROUP_NAME = "virtualization-vms"
 
 
@@ -133,6 +138,14 @@ class VirtualizationVMSecurityGenerator(InfrahubGenerator):
             raise_when_missing=False,
         )
         if prefix is None:
+            # is_pool=True marks a prefix as the source for a CoreIPPrefixPool
+            # (sub-prefix carving, e.g. Technical-IPv4/Customer-IPv4 in
+            # objects/bootstrap/17_ip_prefix_pools.yml) - setting it here
+            # made this prefix ineligible for individual address allocation,
+            # so every CoreIPAddressPool.GetResource call failed with "no
+            # more addresses available" regardless of size. Every working
+            # CoreIPAddressPool-backed prefix in this instance (e.g.
+            # dc-arista-Management-pool's 172.20.3.0/24) has is_pool=False.
             prefix = await self.client.create(
                 kind="IpamPrefix",
                 branch=self.branch,
@@ -140,7 +153,6 @@ class VirtualizationVMSecurityGenerator(InfrahubGenerator):
                     "prefix": VM_SUBNET,
                     "status": "active",
                     "member_type": "address",
-                    "is_pool": True,
                 },
             )
             await prefix.save(allow_upsert=True)
