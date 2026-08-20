@@ -128,7 +128,12 @@ class VirtualizationVMSecurityGenerator(InfrahubGenerator):
             prefix = await self.client.create(
                 kind="IpamPrefix",
                 branch=self.branch,
-                data={"prefix": VM_SUBNET, "status": "active"},
+                data={
+                    "prefix": VM_SUBNET,
+                    "status": "active",
+                    "member_type": "address",
+                    "is_pool": True,
+                },
             )
             await prefix.save(allow_upsert=True)
 
