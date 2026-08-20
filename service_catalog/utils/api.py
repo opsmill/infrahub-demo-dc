@@ -1,6 +1,6 @@
 """Infrahub API client for the Service Catalog."""
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set
 
 from infrahub_sdk import Config, InfrahubClientSync
 
@@ -1456,6 +1456,56 @@ class InfrahubClient:
             return hosts
         except Exception as e:
             raise InfrahubAPIError(f"Failed to fetch physical hosts: {str(e)}")
+
+    def get_used_vmids(self, branch: str = "main") -> Dict[str, Any]:
+        """Fetch VM IDs already in use, grouped per cluster.
+
+        VM IDs are unique per cluster (the [cluster, vmid] uniqueness
+        constraint), so the Create VM form needs the used IDs of the selected
+        host's cluster to validate input, and a global maximum to suggest an
+        ID that is free in every cluster.
+
+        Args:
+            branch: Branch name to query (default: "main")
+
+        Returns:
+            Dictionary with:
+                - by_cluster: Dict mapping cluster ID -> set of used VM IDs
+                - next_free: int, one above the highest VM ID in any cluster
+
+        Raises:
+            InfrahubAPIError: If API error occurs
+        """
+        try:
+            query = """
+            query GetUsedVmids {
+                VirtualizationVirtualMachine {
+                    edges {
+                        node {
+                            vmid { value }
+                            cluster { node { id } }
+                        }
+                    }
+                }
+            }
+            """
+            result = self.execute_graphql(query, branch=branch)
+
+            by_cluster: Dict[str, Set[int]] = {}
+            highest = 99
+            for edge in result.get("VirtualizationVirtualMachine", {}).get("edges", []):
+                node = edge.get("node", {})
+                vmid = (node.get("vmid") or {}).get("value")
+                if vmid is None:
+                    continue
+                cluster_id = ((node.get("cluster") or {}).get("node") or {}).get("id")
+                if cluster_id:
+                    by_cluster.setdefault(cluster_id, set()).add(vmid)
+                highest = max(highest, vmid)
+
+            return {"by_cluster": by_cluster, "next_free": highest + 1}
+        except Exception as e:
+            raise InfrahubAPIError(f"Failed to fetch used VM IDs: {str(e)}")
 
     def create_virtual_machine(self, branch: str, data: Dict[str, Any]) -> Dict[str, Any]:
         """Create a VirtualizationVirtualMachine object.

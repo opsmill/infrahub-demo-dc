@@ -295,6 +295,15 @@ def main() -> None:
                 st.warning(f"Could not load customers: {e}")
                 st.session_state.vm_customers = []
 
+    # Fetch VM IDs already in use (cache in session state)
+    if "vm_used_vmids" not in st.session_state:
+        with st.spinner("Loading used VM IDs..."):
+            try:
+                st.session_state.vm_used_vmids = client.get_used_vmids()
+            except Exception as e:
+                st.warning(f"Could not load used VM IDs: {e}")
+                st.session_state.vm_used_vmids = {"by_cluster": {}, "next_free": 100}
+
     # VM Creation Form
     st.markdown("---")
 
@@ -403,13 +412,17 @@ def main() -> None:
                 disabled=vm_creation_active,
             )
 
-            # VMID (optional)
+            # VMID (mandatory, prefilled with the next ID free in every cluster)
+            suggested_vmid = st.session_state.vm_used_vmids["next_free"]
             vmid = st.number_input(
-                "VM ID (optional)",
+                "VM ID *",
                 min_value=100,
                 max_value=999999,
-                value=None,
-                help="Numeric ID used by the hypervisor to identify this VM (e.g. Proxmox VMID)",
+                value=suggested_vmid,
+                help=(
+                    "Numeric ID used by the hypervisor to identify this VM (e.g. Proxmox VMID). "
+                    f"Unique per cluster - {suggested_vmid} is the next unused ID."
+                ),
                 disabled=vm_creation_active,
             )
 
@@ -432,6 +445,17 @@ def main() -> None:
                 errors.append("Host is required")
             elif not selected_host.get("cluster"):
                 errors.append("Selected host is not part of a cluster (VM.cluster is mandatory)")
+
+            if vmid is None:
+                errors.append("VM ID is required")
+            elif selected_host and selected_host.get("cluster"):
+                cluster_id = selected_host["cluster"]["id"]
+                used_vmids = st.session_state.vm_used_vmids["by_cluster"].get(cluster_id, set())
+                if vmid in used_vmids:
+                    errors.append(
+                        f"VM ID {vmid} is already used in cluster {selected_host['cluster']['name']} - "
+                        f"the next unused ID is {st.session_state.vm_used_vmids['next_free']}"
+                    )
 
             if errors:
                 display_error(
