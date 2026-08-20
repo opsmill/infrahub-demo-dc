@@ -6,7 +6,7 @@
 set -euo pipefail
 
 # Cloud-init user-data rendered by Infrahub (see the vm-userdata artifact).
-USERDATA_B64="$(base64 -w0 <<'CLOUDINIT'
+USERDATA_B64="$(base64 <<'CLOUDINIT' | tr -d '\n'
 #cloud-config
 # VM: fra1-vm-win01 (Windows guest - cloudbase-init)
 set_hostname: fra1-vm-win01
@@ -19,7 +19,7 @@ users:
 # password at deploy time (cloudbase-init inject or console).
 CLOUDINIT
 )"
-METADATA_B64="$(base64 -w0 <<METADATA
+METADATA_B64="$(base64 <<METADATA | tr -d '\n'
 instance-id: fra1-vm-win01
 local-hostname: fra1-vm-win01
 METADATA

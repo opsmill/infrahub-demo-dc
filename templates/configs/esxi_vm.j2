@@ -6,6 +6,11 @@
     cloud-init's VMware datasource (Linux) or cloudbase-init's
     VMwareGuestInfoService (Windows). Requires govc with GOVC_URL /
     GOVC_USERNAME / GOVC_PASSWORD exported.
+
+    Runs from any POSIX host with govc installed (e.g. an admin
+    workstation) - not on the ESXi host itself. Uses `base64 | tr -d
+    '\n'` rather than `base64 -w0` since -w0 is GNU-coreutils-only and
+    unsupported by the BSD/macOS base64 commonly found on such hosts.
     ============================================================================ -#}
 {% set vm = data.VirtualizationVirtualMachine.edges[0].node %}
 {% set tpl = "tpl-" ~ (vm.os_version.value | lower | replace(" ", "-")) %}
@@ -17,11 +22,11 @@
 set -euo pipefail
 
 # Cloud-init user-data rendered by Infrahub (see the vm-userdata artifact).
-USERDATA_B64="$(base64 -w0 <<'CLOUDINIT'
+USERDATA_B64="$(base64 <<'CLOUDINIT' | tr -d '\n'
 {% include "templates/configs/partials/vm_userdata.j2" %}
 CLOUDINIT
 )"
-METADATA_B64="$(base64 -w0 <<METADATA
+METADATA_B64="$(base64 <<METADATA | tr -d '\n'
 instance-id: {{ vm.name.value }}
 local-hostname: {{ vm.name.value }}
 METADATA
