@@ -1554,6 +1554,11 @@ class InfrahubClient:
         artifact for the VM, re-POSTing once to cover the visibility gap,
         and raises on timeout instead of silently returning nothing.
 
+        An artifact only counts as done once it is Ready *and* carries a
+        storage_id: Infrahub creates the CoreArtifact node before it uploads the
+        rendered body, so returning on the node's existence alone hands back an
+        artifact whose content endpoint answers 404.
+
         Args:
             vm_id: VM node ID the artifacts target
             definition_names: CoreArtifactDefinition names to generate
@@ -1593,6 +1598,8 @@ class InfrahubClient:
                         id
                         name { value }
                         content_type { value }
+                        status { value }
+                        storage_id { value }
                         definition { node { name { value } } }
                     }
                 }
@@ -1612,6 +1619,8 @@ class InfrahubClient:
                 }
                 for e in result.get("CoreArtifact", {}).get("edges", [])
                 if e["node"].get("definition", {}).get("node")
+                and e["node"].get("status", {}).get("value") == "Ready"
+                and e["node"].get("storage_id", {}).get("value")
             ]
             found = {a["definition_name"] for a in artifacts}
             if set(definition_names) <= found:
