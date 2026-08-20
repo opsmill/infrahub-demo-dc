@@ -1525,6 +1525,8 @@ class InfrahubClient:
                 - vmid: int (optional)
                 - customer: str (ID, optional)
                 - group_names: List[str] (CoreStandardGroup names, e.g. ["virtualization_vms"])
+                - platform: List[str] (optional, [manufacturer, name] HFID, e.g. ["Generic", "Linux"])
+                - ssh_public_key: str (optional)
 
         Returns:
             Created virtual machine dictionary
@@ -1550,6 +1552,14 @@ class InfrahubClient:
             if customer:
                 optional_vars.append("$customer: String,")
                 optional_fields.append("customer: { id: $customer }")
+            ssh_public_key = data.get("ssh_public_key")
+            platform = data.get("platform")
+            if ssh_public_key:
+                optional_vars.append("$ssh_public_key: String,")
+                optional_fields.append("ssh_public_key: { value: $ssh_public_key }")
+            if platform:
+                optional_vars.append("$platform: [String],")
+                optional_fields.append("platform: { hfid: $platform }")
 
             mutation = f"""
             mutation CreateVirtualMachine(
@@ -1607,6 +1617,10 @@ class InfrahubClient:
                 variables["vmid"] = vmid
             if customer:
                 variables["customer"] = customer
+            if ssh_public_key:
+                variables["ssh_public_key"] = ssh_public_key
+            if platform:
+                variables["platform"] = platform
 
             result = self.execute_graphql(mutation, variables, branch)
 

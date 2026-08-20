@@ -135,9 +135,9 @@ def execute_vm_creation_step(client: InfrahubClient) -> None:
 
         elif step == 2:
             # Step 2: Create virtual machine
+            # Hypervisor group membership (e.g. proxmox_vms) is now owned by
+            # the assign_vm_hypervisor_group generator (Task 8), not this form.
             group_names = ["virtualization_vms"]
-            if form_data.get("cluster_type") == "proxmox":
-                group_names.append("proxmox_vms")
 
             vm_data = {
                 "name": form_data["name"],
@@ -145,6 +145,8 @@ def execute_vm_creation_step(client: InfrahubClient) -> None:
                 "cluster": form_data.get("cluster"),
                 "description": form_data.get("description", ""),
                 "os_version": form_data.get("os_version", ""),
+                "platform": form_data.get("platform"),
+                "ssh_public_key": form_data.get("ssh_public_key"),
                 "status": form_data["status"],
                 "vcpus": form_data.get("vcpus"),
                 "memory": form_data.get("memory"),
@@ -306,10 +308,53 @@ def main() -> None:
 
     # VM Creation Form
     st.markdown("---")
+    st.subheader("Virtual Machine Information")
+
+    # Host and Guest OS selection are rendered outside st.form: widgets
+    # inside a Streamlit form do not rerender until submit, but both the
+    # host -> cluster_type -> VM ID field and the Guest OS -> OS version
+    # options need to update live as the user changes these two selections.
+    host_options = [h["name"]["value"] for h in st.session_state.physical_hosts]
+    host_map = {h["name"]["value"]: h for h in st.session_state.physical_hosts}
+
+    if not host_options:
+        st.warning("No physical hosts found. Load objects/virtualization/ first.")
+        host_name = None
+        selected_host = None
+    else:
+        host_name = st.selectbox(
+            "Host *",
+            options=host_options,
+            help="Physical hypervisor host this VM will run on",
+            disabled=vm_creation_active,
+        )
+        selected_host = host_map.get(host_name)
+
+    if selected_host and selected_host.get("cluster"):
+        cluster = selected_host["cluster"]
+        st.caption(f"Cluster: {cluster['name']} ({cluster['cluster_type']})")
+    elif selected_host:
+        st.warning("This host is not part of a cluster - a VM requires a clustered host.")
+
+    cluster_type = None
+    if selected_host and selected_host.get("cluster"):
+        cluster_type = selected_host["cluster"].get("cluster_type")
+
+    # Guest OS family drives the platform relationship and the cloud-image
+    # naming convention (tpl-<os_version slug>).
+    guest_os = st.selectbox(
+        "Guest OS *",
+        options=["Linux", "Windows"],
+        help="Guest OS family - selects cloud-init (Linux) or cloudbase-init (Windows)",
+        disabled=vm_creation_active,
+    )
+    os_version_options = (
+        ["Ubuntu 22.04", "Ubuntu 24.04"]
+        if guest_os == "Linux"
+        else ["Windows Server 2022", "Windows Server 2025"]
+    )
 
     with st.form("vm_creation_form"):
-        st.subheader("Virtual Machine Information")
-
         col1, col2 = st.columns(2)
 
         with col1:
@@ -321,29 +366,6 @@ def main() -> None:
                 disabled=vm_creation_active,
             )
 
-            # Host selection
-            host_options = [h["name"]["value"] for h in st.session_state.physical_hosts]
-            host_map = {h["name"]["value"]: h for h in st.session_state.physical_hosts}
-
-            if not host_options:
-                st.warning("No physical hosts found. Load objects/virtualization/ first.")
-                host_name = None
-                selected_host = None
-            else:
-                host_name = st.selectbox(
-                    "Host *",
-                    options=host_options,
-                    help="Physical hypervisor host this VM will run on",
-                    disabled=vm_creation_active,
-                )
-                selected_host = host_map.get(host_name)
-
-            if selected_host and selected_host.get("cluster"):
-                cluster = selected_host["cluster"]
-                st.caption(f"Cluster: {cluster['name']} ({cluster['cluster_type']})")
-            elif selected_host:
-                st.warning("This host is not part of a cluster - a VM requires a clustered host.")
-
             # Description
             description = st.text_input(
                 "Description",
@@ -351,10 +373,19 @@ def main() -> None:
                 disabled=vm_creation_active,
             )
 
-            # OS Version
-            os_version = st.text_input(
-                "OS Version",
-                value="Ubuntu 22.04",
+            # OS Version (options depend on the Guest OS selected above)
+            os_version = st.selectbox(
+                "OS Version *",
+                options=os_version_options,
+                disabled=vm_creation_active,
+            )
+
+            # SSH public key (optional, installed by cloud-init / cloudbase-init)
+            ssh_public_key = st.text_area(
+                "SSH Public Key",
+                placeholder="ssh-ed25519 AAAA... user@host",
+                help="Installed into the guest by cloud-init / cloudbase-init (optional)",
+                height=70,
                 disabled=vm_creation_active,
             )
 
@@ -412,19 +443,25 @@ def main() -> None:
                 disabled=vm_creation_active,
             )
 
-            # VMID (mandatory, prefilled with the next ID free in every cluster)
-            suggested_vmid = st.session_state.vm_used_vmids["next_free"]
-            vmid = st.number_input(
-                "VM ID *",
-                min_value=100,
-                max_value=999999,
-                value=suggested_vmid,
-                help=(
-                    "Numeric ID used by the hypervisor to identify this VM (e.g. Proxmox VMID). "
-                    f"Unique per cluster - {suggested_vmid} is the next unused ID."
-                ),
-                disabled=vm_creation_active,
-            )
+            # VMID: only some hypervisors key VMs by a numeric ID - required
+            # for Proxmox, optional for KVM, unused (name/UUID-based) elsewhere.
+            vmid = None
+            if cluster_type in ("proxmox", "kvm"):
+                suggested_vmid = st.session_state.vm_used_vmids["next_free"]
+                required_marker = "*" if cluster_type == "proxmox" else "(optional)"
+                vmid = st.number_input(
+                    f"VM ID {required_marker}",
+                    min_value=100,
+                    max_value=999999,
+                    value=suggested_vmid,
+                    help=(
+                        "Numeric ID used by the hypervisor to identify this VM. "
+                        f"Unique per cluster - {suggested_vmid} is the next unused ID."
+                    ),
+                    disabled=vm_creation_active,
+                )
+            else:
+                st.caption("VM ID: not used by this hypervisor (identified by name/UUID).")
 
         # Submit button
         st.markdown("---")
@@ -446,9 +483,9 @@ def main() -> None:
             elif not selected_host.get("cluster"):
                 errors.append("Selected host is not part of a cluster (VM.cluster is mandatory)")
 
-            if vmid is None:
-                errors.append("VM ID is required")
-            elif selected_host and selected_host.get("cluster"):
+            if cluster_type == "proxmox" and vmid is None:
+                errors.append("VM ID is required for Proxmox clusters")
+            if vmid is not None and selected_host and selected_host.get("cluster"):
                 cluster_id = selected_host["cluster"]["id"]
                 used_vmids = st.session_state.vm_used_vmids["by_cluster"].get(cluster_id, set())
                 if vmid in used_vmids:
@@ -473,6 +510,8 @@ def main() -> None:
                     "cluster_type": cluster["cluster_type"] if cluster else None,
                     "description": description,
                     "os_version": os_version,
+                    "platform": ["Generic", guest_os],
+                    "ssh_public_key": ssh_public_key.strip() or None,
                     "status": status,
                     "vcpus": vcpus,
                     "memory": memory,
