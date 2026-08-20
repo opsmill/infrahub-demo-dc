@@ -12,7 +12,7 @@ on:
         description: "Infrahub version to validate against"
         required: true
         # Tracks the declared testcontainers floor (never set it lower).
-        default: "1.10.9"
+        default: "1.11.0"
       infrahub_sdk_version:
         description: "Optional: also bump infrahub-sdk to this version"
         required: false
