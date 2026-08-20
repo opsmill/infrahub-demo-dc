@@ -57,6 +57,7 @@ infrahub-demo-dc/
 │   ├── generate_segment.py    # Network segment generator
 │   ├── generate_virtualization_cabling.py      # Host rack placement and leaf cabling
 │   ├── generate_virtualization_vm_security.py  # VM addressing and HTTPS-only policy
+│   ├── generate_vm_artifact_groups.py          # Per-hypervisor VM artifact group assignment
 │   ├── generate_dc_firewall_policy.py          # Attach VM policy to DC firewalls
 │   ├── common.py              # Shared utilities
 │   └── schema_protocols.py    # Type protocols
@@ -66,7 +67,7 @@ infrahub-demo-dc/
 │   ├── config/                # Configuration queries
 │   ├── topology/              # Topology queries
 │   ├── validation/            # Validation queries
-│   └── virtualization/        # Host cabling and VM security queries
+│   └── virtualization/        # Host cabling, VM security, and artifact group queries
 ├── schemas/                  # Data model definitions
 │   ├── base/                # Core models
 │   │   ├── dcim.yml

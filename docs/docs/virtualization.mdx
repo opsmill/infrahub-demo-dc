@@ -45,9 +45,9 @@ The demo ships one virtualization environment in the Frankfurt metro:
 
 | Kind | Objects |
 | ---- | ------- |
-| Clusters | `FRA1-PROXMOX-CLUSTER` (Proxmox VE), `FRA1-KVM-CLUSTER` (KVM) |
-| Physical hosts | `fra1-pve-01`, `fra1-pve-02`, `fra1-kvm-01`, `fra1-kvm-02` |
-| Virtual machines | `fra1-vm-web01`, `fra1-vm-web02`, `fra1-vm-app01`, `fra1-vm-app02`, `fra1-vm-db01`, `fra1-vm-cache01` (VM IDs 100-105) |
+| Clusters | `FRA1-PROXMOX-CLUSTER` (Proxmox VE), `FRA1-KVM-CLUSTER` (KVM), `FRA1-ESXI-CLUSTER` (VMware ESXi), `FRA1-HYPERV-CLUSTER` (Microsoft Hyper-V) |
+| Physical hosts | `fra1-pve-01`, `fra1-pve-02`, `fra1-kvm-01`, `fra1-kvm-02`, `fra1-esx-01`, `fra1-hv-01` |
+| Virtual machines | `fra1-vm-web01`, `fra1-vm-web02`, `fra1-vm-app01`, `fra1-vm-app02`, `fra1-vm-db01`, `fra1-vm-cache01` (VM IDs 100-105), plus the Windows VMs `fra1-vm-win01` (ESXi) and `fra1-vm-win02` (Hyper-V), which don't use a VM ID |
 
 ## What the generators do
 
@@ -82,22 +82,75 @@ A third generator attaches `virtualization-vms-policy` to every firewall with th
 
 After the demo task finishes, switch to the demo branch (for example `add-dc3`) in the web interface:
 
-1. Navigate to **Virtualization Cluster** to see the two Frankfurt clusters and their member hosts
+1. Navigate to **Virtualization Cluster** to see the four Frankfurt clusters and their member hosts
 2. Open a **Physical Host** such as `fra1-pve-01` and check its rack location and cabled interfaces
 3. Open a **Virtual Machine** such as `fra1-vm-web01` and check its host, cluster, customer, and the primary IP address the generator assigned
 
 To confirm the security wiring, open the `virtualization-vms` address group and verify it contains one address per VM.
 
+## Provisioning artifacts
+
+Every VM gets two artifacts: a provisioning script that matches its hypervisor, and a cloud-init user-data file that's the same artifact everywhere but branches on the guest OS.
+
+### Per-hypervisor provisioning scripts
+
+| Cluster type | Provisioning artifact | Target group | What it does |
+| ------------ | ---------------------- | ------------- | ------------ |
+| `proxmox` | `proxmox_vm_config` (bash) | `proxmox_vms` | `qm clone`s the template, attaches a cloud-init drive, injects user-data with `--cicustom` |
+| `kvm` | `kvm_vm_config` (bash) | `kvm_vms` | Builds a NoCloud seed ISO with `cloud-localds`, boots the clone with `virt-install` |
+| `hyperv` | `hyperv_vm_config` (PowerShell) | `hyperv_vms` | Builds a NoCloud ISO with `oscdimg`, creates a Generation 2 VM with `New-VM` |
+| `vmware` | `esxi_vm_config` (bash/govc) | `esxi_vms` | Clones the template with `govc`, passes user-data through `guestinfo.userdata` (base64) |
+
+The guest OS still changes a few settings inside each script:
+
+| Cluster type | Linux guest | Windows guest |
+| ------------ | ----------- | -------------- |
+| Proxmox VE | `--ostype l26` | `--ostype win11` |
+| KVM/libvirt | `--os-variant ubuntu22.04` | `--os-variant win2k22` |
+| Hyper-V | Secure Boot disabled (template signing varies) | Secure Boot left on |
+| VMware ESXi | cloud-init's VMware guestinfo datasource | cloudbase-init's `VMwareGuestInfoService` |
+
+### The `vm_userdata` artifact
+
+`vm_userdata` (content type `application/yaml`) targets the `vm_userdata_targets` group - every VM, regardless of hypervisor. It renders a `#cloud-config` document:
+
+- Windows guests get a cloudbase-init cloud-config: hostname, an `Admin` user in the `Administrators` group, and the SSH key if one is set
+- Everything else gets a cloud-init cloud-config: hostname, an `admin` user with passwordless sudo, and the SSH key if one is set
+
+The SSH key comes from the VM's `ssh_public_key` attribute. No password is ever stored in Infrahub - set the first-boot password at deploy time instead (console access, or a cloudbase-init inject for Windows). Every per-hypervisor script includes `vm_userdata` directly, so the two stay in sync.
+
+### Group membership
+
+The `assign_vm_artifact_groups` generator runs whenever a VM is created, the same trigger as the security generator. It reads the VM's `cluster.cluster_type` and adds the VM to the matching hypervisor group (`proxmox_vms`, `kvm_vms`, `hyperv_vms`, or `esxi_vms`) plus `vm_userdata_targets`. The demo data carries no static `member_of_groups` entry for the hypervisor groups - membership is derived from `cluster_type`, so it stays correct if a VM ever moves clusters.
+
+## Image prerequisites
+
+Each provisioning script expects a template image already on the target hypervisor, named `tpl-<os_version slug>`: lowercase the VM's `os_version` and replace spaces with dashes. `Ubuntu 22.04` becomes `tpl-ubuntu-22.04`; `Windows Server 2022` becomes `tpl-windows-server-2022`.
+
+| Hypervisor | Where the template lives |
+| ---------- | ------------------------- |
+| Proxmox VE | A template VM (`qm template`), found by name via `qm list` |
+| KVM/libvirt | A qcow2 image in `/var/lib/libvirt/images/` |
+| Hyper-V | A VHDX in `C:\HyperV\Templates\` |
+| VMware ESXi | A template VM, cloned with `govc vm.clone` |
+
+The template must have cloud-init (Linux) or cloudbase-init (Windows) preinstalled. The provisioning scripts only inject user-data and metadata - they never install the agent, so a template without it boots without applying the SSH key or user configuration.
+
 ## Creating a VM from the Service Catalog
 
 The Service Catalog includes a **Create VM** page for form-based provisioning. Enable the catalog first (see [using the service catalog](./service-catalog.mdx)), then open `http://localhost:8501` and select **Create VM**.
 
-The form asks for a name, the physical host, an optional description, OS version, customer, status, compute sizing (vCPUs, memory, disk), and a VM ID. The VM ID is prefilled with the next unused ID and validated against the IDs already taken in the host's cluster. The cluster is derived from the host you pick. On submit, the page:
+The form asks for a name, the physical host, a Guest OS (Linux or Windows - it sets the OS version choices and picks cloud-init or cloudbase-init for the `vm_userdata` artifact), an optional description, customer, status, compute sizing (vCPUs, memory, disk), and an optional SSH public key. The cluster is derived from the host you pick.
+
+A VM ID field appears only for Proxmox and KVM clusters - required for Proxmox, optional for KVM - since Hyper-V and ESXi identify VMs by name instead. When shown, it's prefilled with the next unused ID and validated against the IDs already taken in the host's cluster.
+
+On submit, the page:
 
 1. Creates a new branch
 2. Creates the virtual machine on that branch
 3. Waits for the security generator to assign the IP and update the address group
 4. Creates a proposed change for review
+5. Regenerates the VM's provisioning artifacts and displays the rendered script and user-data, each with a download button
 
 Merge the proposed change to bring the VM into `main`.
 
