@@ -39,12 +39,6 @@ query virtualization_host_cabling($name: String!) {
               name {
                 value
               }
-              role {
-                value
-              }
-              status {
-                value
-              }
               ... on InterfacePhysical {
                 connector {
                   node {

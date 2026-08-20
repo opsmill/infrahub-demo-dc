@@ -21,7 +21,6 @@ class CheckVirtualizationVM(InfrahubCheck):
 
     def validate(self, data: Any) -> None:
         """Validate the VM's cluster/host agreement."""
-        errors = []
         vm = get_data(data)
 
         vm_name = vm.get("name", "unknown")
@@ -30,13 +29,11 @@ class CheckVirtualizationVM(InfrahubCheck):
         host_cluster = host.get("cluster") or {}
 
         if not host_cluster.get("id"):
-            errors.append(f"{vm_name}: host {host.get('name', 'unknown')} is not a member of any cluster")
+            self.log_error(message=f"{vm_name}: host {host.get('name', 'unknown')} is not a member of any cluster")
         elif vm_cluster.get("id") != host_cluster.get("id"):
-            errors.append(
-                f"{vm_name}: cluster is {vm_cluster.get('name', 'none')} but its host "
-                f"{host.get('name', 'unknown')} belongs to {host_cluster.get('name', 'none')}"
+            self.log_error(
+                message=(
+                    f"{vm_name}: cluster is {vm_cluster.get('name', 'none')} but its host "
+                    f"{host.get('name', 'unknown')} belongs to {host_cluster.get('name', 'none')}"
+                )
             )
-
-        if errors:
-            for error in errors:
-                self.log_error(message=error)

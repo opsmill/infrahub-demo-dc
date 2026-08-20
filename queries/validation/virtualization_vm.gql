@@ -5,9 +5,6 @@ query virtualization_vm_validation($device: String!) {
         name {
           value
         }
-        vmid {
-          value
-        }
         cluster {
           node {
             id

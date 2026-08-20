@@ -23,9 +23,8 @@ from typing import Any
 from infrahub_sdk.generator import InfrahubGenerator  # type: ignore[import-not-found]
 from infrahub_sdk.protocols import CoreIPAddressPool  # type: ignore[import-not-found]
 
-from .common import clean_data
+from .common import extract_single_node
 from .schema_protocols import (
-    IpamIPAddress,
     SecurityAddressGroup,
     SecurityIPAddress,
     VirtualizationVirtualMachine,
@@ -44,28 +43,21 @@ class VirtualizationVMSecurityGenerator(InfrahubGenerator):
         Args:
             data: GraphQL query result containing one VirtualizationVirtualMachine
         """
-        cleaned_data = clean_data(data)
-        if not isinstance(cleaned_data, dict):
-            raise ValueError("clean_data() did not return a dictionary")
-
-        vms = cleaned_data.get("VirtualizationVirtualMachine", [])
-        if not vms:
+        vm = extract_single_node(data, "VirtualizationVirtualMachine")
+        if vm is None:
             self.logger.warning("No VirtualizationVirtualMachine data found in query result")
             return
 
-        vm = vms[0]  # Generator runs per-VM
         vm_name = vm.get("name", "unknown")
-        vm_id = vm.get("id")
+        vm_id = vm["id"]
 
+        # The query already returns the primary address' id and value, the only
+        # two things needed below, so an existing address needs no extra fetch.
         primary_address = vm.get("primary_address")
-        ip_node: Any
         if primary_address:
-            ip_node = await self.client.get(
-                kind=IpamIPAddress,
-                branch=self.branch,
-                id=primary_address["id"],
-            )
-            self.logger.info(f"- {vm_name} already has primary address {ip_node.address.value}")
+            ip_id = primary_address["id"]
+            ip_address = primary_address["address"]
+            self.logger.info(f"- {vm_name} already has primary address {ip_address}")
         else:
             # Declared in objects/bootstrap/21_ip_address_pools.yml - a missing
             # pool means bootstrap has not run, which is a hard error.
@@ -74,7 +66,7 @@ class VirtualizationVMSecurityGenerator(InfrahubGenerator):
                 branch=self.branch,
                 name__value=IP_POOL_NAME,
             )
-            ip_node = await self.client.allocate_next_ip_address(
+            ip_node: Any = await self.client.allocate_next_ip_address(
                 resource_pool=ip_pool,
                 identifier=f"{vm_name}-primary",
                 data={"description": f"{vm_name} primary address"},
@@ -87,7 +79,9 @@ class VirtualizationVMSecurityGenerator(InfrahubGenerator):
             )
             vm_node.primary_address = ip_node.id  # type: ignore[assignment]
             await vm_node.save(allow_upsert=True)
-            self.logger.info(f"- Allocated {ip_node.address.value} to {vm_name}")
+            ip_id = ip_node.id
+            ip_address = ip_node.address.value
+            self.logger.info(f"- Allocated {ip_address} to {vm_name}")
 
         # Keyed on the IPAM address, not the VM name: renaming a VM must reuse
         # the SecurityIPAddress already registered for its IP instead of
@@ -95,7 +89,7 @@ class VirtualizationVMSecurityGenerator(InfrahubGenerator):
         security_ips = await self.client.filters(
             kind=SecurityIPAddress,
             branch=self.branch,
-            ipam_ip_address__ids=[ip_node.id],
+            ipam_ip_address__ids=[ip_id],
         )
         if security_ips:
             security_ip = security_ips[0]
@@ -106,7 +100,7 @@ class VirtualizationVMSecurityGenerator(InfrahubGenerator):
                 data={
                     "name": f"{vm_name}-ip",
                     "description": f"Primary address of {vm_name}",
-                    "ipam_ip_address": ip_node.id,
+                    "ipam_ip_address": ip_id,
                 },
             )
             await security_ip.save(allow_upsert=True)
@@ -123,4 +117,4 @@ class VirtualizationVMSecurityGenerator(InfrahubGenerator):
         # addresses its siblings added in between, and a VM dropped from the
         # group would silently escape the HTTPS-only policy.
         await address_group.add_relationships(relation_to_update="ip_addresses", related_nodes=[security_ip.id])
-        self.logger.info(f"- Added {vm_name} ({ip_node.address.value}) to {ADDRESS_GROUP_NAME}")
+        self.logger.info(f"- Added {vm_name} ({ip_address}) to {ADDRESS_GROUP_NAME}")

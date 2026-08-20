@@ -19,7 +19,7 @@ peer that is already attached.
 
 from infrahub_sdk.generator import InfrahubGenerator  # type: ignore[import-not-found]
 
-from .common import clean_data
+from .common import extract_single_node
 from .schema_protocols import SecurityPolicy
 
 VIRTUALIZATION_POLICY_NAME = "virtualization-vms-policy"
@@ -34,20 +34,15 @@ class DcFirewallPolicyGenerator(InfrahubGenerator):
         Args:
             data: GraphQL query result containing one dc_firewall SecurityFirewall
         """
-        cleaned_data = clean_data(data)
-        if not isinstance(cleaned_data, dict):
-            raise ValueError("clean_data() did not return a dictionary")
-
-        firewalls = cleaned_data.get("SecurityFirewall", [])
-        if not firewalls:
+        firewall = extract_single_node(data, "SecurityFirewall")
+        if firewall is None:
             # The query filters on role__value: "dc_firewall" - an empty
             # result is the normal no-op for any other firewall role.
             self.logger.info("No dc_firewall matched the query, skipping")
             return
 
-        firewall = firewalls[0]  # Generator runs per-firewall
         firewall_name = firewall.get("name", "unknown")
-        firewall_id = firewall.get("id")
+        firewall_id = firewall["id"]
 
         policy = await self.client.get(
             kind=SecurityPolicy,

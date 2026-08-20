@@ -17,7 +17,7 @@ group (e.g. "other") only join the umbrella group.
 from infrahub_sdk.generator import InfrahubGenerator  # type: ignore[import-not-found]
 from infrahub_sdk.protocols import CoreStandardGroup  # type: ignore[import-not-found]
 
-from .common import clean_data
+from .common import extract_single_node
 
 CLUSTER_TYPE_TO_GROUP = {
     "proxmox": "proxmox_vms",
@@ -37,18 +37,13 @@ class VMArtifactGroupsGenerator(InfrahubGenerator):
         Args:
             data: GraphQL query result containing one VirtualizationVirtualMachine
         """
-        cleaned_data = clean_data(data)
-        if not isinstance(cleaned_data, dict):
-            raise ValueError("clean_data() did not return a dictionary")
-
-        vms = cleaned_data.get("VirtualizationVirtualMachine", [])
-        if not vms:
+        vm = extract_single_node(data, "VirtualizationVirtualMachine")
+        if vm is None:
             self.logger.warning("No VirtualizationVirtualMachine data found in query result")
             return
 
-        vm = vms[0]  # Generator runs per-VM
         vm_name = vm.get("name", "unknown")
-        vm_id = vm.get("id")
+        vm_id = vm["id"]
         cluster = vm.get("cluster") or {}
         cluster_type = cluster.get("cluster_type")
 

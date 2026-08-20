@@ -5,7 +5,6 @@ VirtualMachines in Infrahub. It creates a branch, adds the VM, and creates
 a proposed change for review.
 """
 
-import time
 from typing import Any, Dict
 
 import streamlit as st  # type: ignore[import-untyped]
@@ -17,6 +16,8 @@ from utils import (
     InfrahubClient,
     display_error,
     display_success,
+    render_progress_tracker,
+    wait_for_processing,
 )
 from utils.api import (
     InfrahubAPIError,
@@ -32,38 +33,26 @@ if "selected_branch" not in st.session_state:
 if "infrahub_url" not in st.session_state:
     st.session_state.infrahub_url = INFRAHUB_ADDRESS
 
+# Per-hypervisor provisioning artifact definition and the language its rendered
+# script is highlighted with. Keyed on the cluster_type choices declared in
+# schemas/extensions/virtualization/virtualization.yml - the same keys
+# CLUSTER_TYPE_TO_GROUP in generators/generate_vm_artifact_groups.py maps to
+# artifact groups, so a new hypervisor needs an entry in both.
+HYPERVISORS = {
+    "proxmox": {"definition": "proxmox_vm_config", "language": "bash"},
+    "kvm": {"definition": "kvm_vm_config", "language": "bash"},
+    "hyperv": {"definition": "hyperv_vm_config", "language": "powershell"},
+    "vmware": {"definition": "esxi_vm_config", "language": "bash"},
+}
 
-def wait_for_processing(duration: int = 15) -> None:
-    """Wait for Infrahub to process the VM with a progress indicator.
-
-    Args:
-        duration: Wait duration in seconds (default: 15, to cover the
-            secure_virtualization_vm generator allocating an IP and
-            registering it in the HTTPS-only address group)
-    """
-    progress_bar = st.progress(0, text="Processing...")
-    time_display = st.empty()
-
-    for i in range(duration + 1):
-        progress = i / duration
-        percentage = int(progress * 100)
-
-        progress_bar.progress(progress, text=f"Processing... {percentage}% complete")
-
-        remaining = duration - i
-        elapsed = i
-
-        time_display.markdown(f"**Time:** {elapsed}s elapsed / {remaining}s remaining")
-
-        if i < duration:
-            time.sleep(1)
-
-    progress_bar.progress(1.0, text="Processing complete!")
-    time_display.markdown("**Processing time completed**")
-
-    time.sleep(1)
-    progress_bar.empty()
-    time_display.empty()
+VM_CREATION_STEPS = [
+    "Creating branch",
+    "Creating virtual machine",
+    "Processing",
+    "Creating proposed change",
+    "Rendering artifacts",
+    "Complete",
+]
 
 
 def initialize_vm_creation_state(form_data: Dict[str, Any]) -> None:
@@ -77,43 +66,10 @@ def initialize_vm_creation_state(form_data: Dict[str, Any]) -> None:
         "vm_name": vm_name,
         "branch_name": branch_name,
         "form_data": form_data,
-        "branch_created": False,
-        "vm_created": False,
         "vm_id": None,
-        "pc_created": False,
-        "error": None,
         "pc_url": None,
         "artifacts": [],
     }
-
-
-def render_progress_tracker() -> None:
-    """Render the progress tracker based on current state."""
-    if "vm_creation" not in st.session_state or not st.session_state.vm_creation.get("active"):
-        return
-
-    state = st.session_state.vm_creation
-    current_step = state["step"]
-
-    steps = [
-        "Creating branch",
-        "Creating virtual machine",
-        "Processing",
-        "Creating proposed change",
-        "Rendering artifacts",
-        "Complete",
-    ]
-
-    progress_md = "### Progress\n\n"
-    for i, step_name in enumerate(steps, 1):
-        if i < current_step:
-            progress_md += f"* {step_name}\n\n"
-        elif i == current_step:
-            progress_md += f"-> **{step_name}**\n\n"
-        else:
-            progress_md += f"- {step_name}\n\n"
-
-    st.markdown(progress_md)
 
 
 def execute_vm_creation_step(client: InfrahubClient) -> None:
@@ -132,7 +88,6 @@ def execute_vm_creation_step(client: InfrahubClient) -> None:
                 branch = client.create_branch(branch_name, from_branch="main")
                 st.write(f"Branch created: {branch['name']}")
                 status.update(label="Branch created!", state="complete")
-                state["branch_created"] = True
                 state["step"] = 2
                 st.rerun()
 
@@ -166,13 +121,14 @@ def execute_vm_creation_step(client: InfrahubClient) -> None:
                 vm = client.create_virtual_machine(branch_name, vm_data)
                 st.write(f"VM created: {vm['name']['value']}")
                 status.update(label="Virtual machine created!", state="complete")
-                state["vm_created"] = True
                 state["vm_id"] = vm["id"]
                 state["step"] = 3
                 st.rerun()
 
         elif step == 3:
-            # Step 3: Wait for processing
+            # Step 3: give the secure_virtualization_vm generator time to
+            # allocate an IP and register it in the HTTPS-only address group, so
+            # the proposed change created next carries the complete diff.
             with st.status("Processing...", expanded=True) as status:
                 st.write("Waiting for Infrahub to assign an IP and apply the HTTPS-only security policy...")
                 wait_for_processing(15)
@@ -192,25 +148,17 @@ def execute_vm_creation_step(client: InfrahubClient) -> None:
                 pc_url = client.get_proposed_change_url(pc_id)
                 st.write("Proposed Change created")
                 status.update(label="Proposed Change created!", state="complete")
-                state["pc_created"] = True
                 state["pc_url"] = pc_url
                 state["step"] = 5
                 st.rerun()
 
         elif step == 5:
             # Step 5: Render provisioning artifacts
-            definition_by_cluster_type = {
-                "proxmox": "proxmox_vm_config",
-                "kvm": "kvm_vm_config",
-                "hyperv": "hyperv_vm_config",
-                "vmware": "esxi_vm_config",
-            }
-            cluster_type = form_data.get("cluster_type")
-            provisioning_def = definition_by_cluster_type.get(cluster_type)
+            hypervisor = HYPERVISORS.get(form_data.get("cluster_type"), {})
+            provisioning_def = hypervisor.get("definition")
             definition_names = ["vm_userdata"] + ([provisioning_def] if provisioning_def else [])
 
             with st.status("Rendering provisioning artifacts...", expanded=True) as status:
-                artifacts: list = []
                 try:
                     st.write("Waiting for the security generator to allocate an IP...")
                     if not client.wait_for_vm_ip(state["vm_id"], branch_name):
@@ -218,7 +166,7 @@ def execute_vm_creation_step(client: InfrahubClient) -> None:
                     st.write(f"Generating: {', '.join(definition_names)}")
                     artifacts = client.generate_and_wait_for_artifacts(state["vm_id"], definition_names, branch_name)
                     for artifact in artifacts:
-                        artifact["content"] = client.get_artifact_content(artifact["id"], branch_name)
+                        artifact["content"] = client.get_artifact_content(artifact["storage_id"])
                     status.update(label="Artifacts rendered", state="complete")
                 except Exception as e:
                     artifacts = []
@@ -257,7 +205,7 @@ def execute_vm_creation_step(client: InfrahubClient) -> None:
                 language = (
                     "yaml"
                     if artifact["definition_name"] == "vm_userdata"
-                    else ("powershell" if form_data.get("cluster_type") == "hyperv" else "bash")
+                    else HYPERVISORS.get(form_data.get("cluster_type"), {}).get("language", "bash")
                 )
                 with st.expander(f"Artifact: {artifact['name']}", expanded=False):
                     st.code(artifact["content"], language=language)
@@ -274,7 +222,6 @@ def execute_vm_creation_step(client: InfrahubClient) -> None:
         InfrahubGraphQLError,
         InfrahubAPIError,
     ) as e:
-        state["error"] = str(e)
         state["active"] = False
 
         if step == 1:
@@ -297,11 +244,10 @@ def execute_vm_creation_step(client: InfrahubClient) -> None:
             )
 
 
-def handle_vm_creation(client: InfrahubClient, form_data: Dict[str, Any]) -> None:
+def handle_vm_creation(form_data: Dict[str, Any]) -> None:
     """Initialize the VM creation workflow.
 
     Args:
-        client: InfrahubClient instance
         form_data: Dictionary containing form data
     """
     initialize_vm_creation_state(form_data)
@@ -374,8 +320,8 @@ def main() -> None:
     # inside a Streamlit form do not rerender until submit, but both the
     # host -> cluster_type -> VM ID field and the Guest OS -> OS version
     # options need to update live as the user changes these two selections.
-    host_options = [h["name"]["value"] for h in st.session_state.physical_hosts]
-    host_map = {h["name"]["value"]: h for h in st.session_state.physical_hosts}
+    host_options = [h["name"] for h in st.session_state.physical_hosts]
+    host_map = {h["name"]: h for h in st.session_state.physical_hosts}
 
     if not host_options:
         st.warning("No physical hosts found. Load objects/virtualization/ first.")
@@ -578,7 +524,7 @@ def main() -> None:
                     "customer": customer_id,
                 }
 
-                handle_vm_creation(client, form_data)
+                handle_vm_creation(form_data)
 
     # Create placeholder for progress section
     st.markdown("---")
@@ -590,7 +536,7 @@ def main() -> None:
             st.markdown("## Virtual Machine Creation Progress")
             st.markdown("")
 
-            render_progress_tracker()
+            render_progress_tracker("vm_creation", VM_CREATION_STEPS)
 
             st.markdown("---")
             st.markdown("### Status Updates")

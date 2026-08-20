@@ -151,6 +151,32 @@ def clean_data(data: Any) -> Any:
     return data
 
 
+def extract_single_node(data: Any, kind: str) -> dict[str, Any] | None:
+    """
+    Return the single node of `kind` from a generator's query result.
+
+    Generators triggered per object receive a query result holding at most one
+    node of the queried kind, wrapped in the usual edges/node/value envelope.
+    This cleans the envelope and unwraps that node.
+
+    Args:
+        data: Raw GraphQL result handed to InfrahubGenerator.generate().
+        kind: Node kind key in the result, e.g. "VirtualizationVirtualMachine".
+
+    Returns:
+        The cleaned node dictionary, or None when the query matched nothing.
+
+    Raises:
+        ValueError: If clean_data() did not return a dictionary.
+    """
+    cleaned_data = clean_data(data)
+    if not isinstance(cleaned_data, dict):
+        raise ValueError("clean_data() did not return a dictionary")
+
+    nodes = cleaned_data.get(kind) or []
+    return nodes[0] if nodes else None
+
+
 # ============================================================================
 # TOPOLOGY CREATOR CLASS
 # ============================================================================

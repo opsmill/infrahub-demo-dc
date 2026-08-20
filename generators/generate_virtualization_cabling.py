@@ -30,7 +30,7 @@ from typing import Any
 from infrahub_sdk.exceptions import GraphQLError  # type: ignore[import-not-found]
 from infrahub_sdk.generator import InfrahubGenerator  # type: ignore[import-not-found]
 
-from .common import clean_data, safe_sort_interface_list
+from .common import extract_single_node, safe_sort_interface_list
 from .schema_protocols import (
     DcimCable,
     DcimDevice,
@@ -70,18 +70,13 @@ class VirtualizationHostCablingGenerator(InfrahubGenerator):
         Args:
             data: GraphQL query result containing one VirtualizationPhysicalHost
         """
-        cleaned_data = clean_data(data)
-        if not isinstance(cleaned_data, dict):
-            raise ValueError("clean_data() did not return a dictionary")
-
-        hosts = cleaned_data.get("VirtualizationPhysicalHost", [])
-        if not hosts:
+        host = extract_single_node(data, "VirtualizationPhysicalHost")
+        if host is None:
             self.logger.warning("No VirtualizationPhysicalHost data found in query result")
             return
 
-        host = hosts[0]  # Generator runs per-host
         host_name = host.get("name", "unknown")
-        host_id = host.get("id")
+        host_id = host["id"]
         # clean_data() collapses an empty relationship's {edges: []} to None
         # rather than [] (it checks truthiness), so `or []` covers both a
         # missing key and a present-but-None one - a brand new host with no
@@ -98,12 +93,14 @@ class VirtualizationHostCablingGenerator(InfrahubGenerator):
         # host declared in Frankfurt can never end up racked or cabled in
         # another city's DC.
         rack_ids = await self._get_metro_rack_ids(metro_id)
+        if not rack_ids:
+            self.logger.info(
+                f"No racks exist in {host_name}'s metro yet, leaving it at its "
+                "building-level location and skipping cabling"
+            )
+            return
 
         await self._assign_rack(host_name, host_id, current_location.get("typename"), rack_ids)
-
-        if not rack_ids:
-            self.logger.info(f"No racks exist in {host_name}'s metro yet, skipping cabling")
-            return
 
         leafs = await self.client.filters(
             kind=DcimDevice,
@@ -160,18 +157,7 @@ class VirtualizationHostCablingGenerator(InfrahubGenerator):
 
         for index, nic_name in enumerate(HOST_INTERFACE_NAMES):
             existing = existing_interfaces.get(nic_name)
-            if existing and existing.get("connector"):
-                self.logger.info(f"- {host_name}:{nic_name} already cabled, skipping")
-                continue
-
-            host_iface = await self.client.get(
-                kind=InterfacePhysical,
-                branch=self.branch,
-                device__name__value=host_name,
-                name__value=nic_name,
-                raise_when_missing=False,
-            )
-            if host_iface is None:
+            if existing is None:
                 # NICs are cloned from the VIRTUALIZATION_HOST object template
                 # at host creation - a missing one means the host was created
                 # without the template.
@@ -180,6 +166,15 @@ class VirtualizationHostCablingGenerator(InfrahubGenerator):
                     f"VIRTUALIZATION_HOST object template), skipping"
                 )
                 continue
+            if existing.get("connector"):
+                self.logger.info(f"- {host_name}:{nic_name} already cabled, skipping")
+                continue
+
+            host_iface = await self.client.get(
+                kind=InterfacePhysical,
+                branch=self.branch,
+                id=existing["id"],
+            )
 
             # A concurrent generator run for another host can grab the same
             # port between our scan above and this write - Infrahub rejects
@@ -189,11 +184,10 @@ class VirtualizationHostCablingGenerator(InfrahubGenerator):
             while not cabled and ranked_leafs:
                 leaf = ranked_leafs[index % len(ranked_leafs)]
                 pool = leaf_free_ports[leaf.name.value]
-                if not pool:
-                    ranked_leafs = [item for item in ranked_leafs if item.name.value != leaf.name.value]
-                    continue
                 leaf_iface = pool.pop(0)
                 if not pool:
+                    # Dropping an exhausted leaf here is what keeps every leaf
+                    # left in ranked_leafs backed by at least one free port.
                     ranked_leafs = [item for item in ranked_leafs if item.name.value != leaf.name.value]
 
                 host_iface.status.value = "active"
@@ -279,14 +273,10 @@ class VirtualizationHostCablingGenerator(InfrahubGenerator):
             host_name: Host name, for logging
             host_id: Host ID
             current_location_typename: __typename of the host's current location
-            rack_ids: IDs of the racks in the host's metro
+            rack_ids: IDs of the racks in the host's metro (never empty)
         """
         if current_location_typename == "LocationRack":
             self.logger.info(f"- {host_name} already placed in a rack, skipping")
-            return
-
-        if not rack_ids:
-            self.logger.info(f"No racks exist yet, leaving {host_name} at its building-level location")
             return
 
         racks = await self.client.filters(

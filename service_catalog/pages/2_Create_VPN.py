@@ -4,7 +4,6 @@ This page provides a form-based interface for creating new VPN Network Segments 
 It creates a branch, adds the segment, and creates a proposed change for review.
 """
 
-import time
 from typing import Any, Dict
 
 import streamlit as st  # type: ignore[import-untyped]
@@ -16,6 +15,8 @@ from utils import (
     InfrahubClient,
     display_error,
     display_success,
+    render_progress_tracker,
+    wait_for_processing,
 )
 from utils.api import (
     InfrahubAPIError,
@@ -31,36 +32,13 @@ if "selected_branch" not in st.session_state:
 if "infrahub_url" not in st.session_state:
     st.session_state.infrahub_url = INFRAHUB_ADDRESS
 
-
-def wait_for_processing(duration: int = 10) -> None:
-    """Wait for Infrahub to process the segment with a progress indicator.
-
-    Args:
-        duration: Wait duration in seconds (default: 10)
-    """
-    progress_bar = st.progress(0, text="Processing...")
-    time_display = st.empty()
-
-    for i in range(duration + 1):
-        progress = i / duration
-        percentage = int(progress * 100)
-
-        progress_bar.progress(progress, text=f"Processing... {percentage}% complete")
-
-        remaining = duration - i
-        elapsed = i
-
-        time_display.markdown(f"**Time:** {elapsed}s elapsed / {remaining}s remaining")
-
-        if i < duration:
-            time.sleep(1)
-
-    progress_bar.progress(1.0, text="Processing complete!")
-    time_display.markdown("**Processing time completed**")
-
-    time.sleep(1)
-    progress_bar.empty()
-    time_display.empty()
+SEGMENT_CREATION_STEPS = [
+    "Creating branch",
+    "Creating network segment",
+    "Processing",
+    "Creating proposed change",
+    "Complete",
+]
 
 
 def initialize_segment_creation_state(form_data: Dict[str, Any]) -> None:
@@ -82,34 +60,6 @@ def initialize_segment_creation_state(form_data: Dict[str, Any]) -> None:
         "error": None,
         "pc_url": None,
     }
-
-
-def render_progress_tracker() -> None:
-    """Render the progress tracker based on current state."""
-    if "segment_creation" not in st.session_state or not st.session_state.segment_creation.get("active"):
-        return
-
-    state = st.session_state.segment_creation
-    current_step = state["step"]
-
-    steps = [
-        "Creating branch",
-        "Creating network segment",
-        "Processing",
-        "Creating proposed change",
-        "Complete",
-    ]
-
-    progress_md = "### Progress\n\n"
-    for i, step_name in enumerate(steps, 1):
-        if i < current_step:
-            progress_md += f"* {step_name}\n\n"
-        elif i == current_step:
-            progress_md += f"-> **{step_name}**\n\n"
-        else:
-            progress_md += f"- {step_name}\n\n"
-
-    st.markdown(progress_md)
 
 
 def execute_segment_creation_step(client: InfrahubClient) -> None:
@@ -507,7 +457,7 @@ def main() -> None:
             st.markdown("## Network Segment Creation Progress")
             st.markdown("")
 
-            render_progress_tracker()
+            render_progress_tracker("segment_creation", SEGMENT_CREATION_STEPS)
 
             st.markdown("---")
             st.markdown("### Status Updates")

@@ -1,6 +1,7 @@
 """UI utilities and shared components for the Infrahub Service Catalog."""
 
 import os
+import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -93,6 +94,56 @@ def display_progress(message: str, progress: float) -> None:
     """
     st.text(message)
     st.progress(progress)
+
+
+def wait_for_processing(duration: int) -> None:
+    """Wait for Infrahub to process a change, showing a countdown.
+
+    Used by the multi-step creation pages while an Infrahub generator runs in
+    the background.
+
+    Args:
+        duration: Wait duration in seconds.
+    """
+    progress_bar = st.progress(0, text="Processing...")
+    time_display = st.empty()
+
+    for elapsed in range(duration + 1):
+        progress = elapsed / duration
+        progress_bar.progress(progress, text=f"Processing... {int(progress * 100)}% complete")
+        time_display.markdown(f"**Time:** {elapsed}s elapsed / {duration - elapsed}s remaining")
+
+        if elapsed < duration:
+            time.sleep(1)
+
+    progress_bar.progress(1.0, text="Processing complete!")
+    time_display.markdown("**Processing time completed**")
+
+    time.sleep(1)
+    progress_bar.empty()
+    time_display.empty()
+
+
+def render_progress_tracker(state_key: str, steps: List[str]) -> None:
+    """Render the step tracker of a multi-step creation workflow.
+
+    Args:
+        state_key: Session-state key holding the workflow state (its "step"
+            entry is the 1-based index of the step in progress).
+        steps: Step labels, in order.
+    """
+    current_step = st.session_state[state_key]["step"]
+
+    progress_md = "### Progress\n\n"
+    for index, step_name in enumerate(steps, 1):
+        if index < current_step:
+            progress_md += f"* {step_name}\n\n"
+        elif index == current_step:
+            progress_md += f"-> **{step_name}**\n\n"
+        else:
+            progress_md += f"- {step_name}\n\n"
+
+    st.markdown(progress_md)
 
 
 def format_datacenter_table(

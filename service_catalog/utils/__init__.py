@@ -20,7 +20,9 @@ from .ui import (
     format_datacenter_table,
     get_device_color,
     load_logo,
+    render_progress_tracker,
     truncate_device_name,
+    wait_for_processing,
 )
 
 __all__ = [
@@ -41,5 +43,7 @@ __all__ = [
     "format_datacenter_table",
     "get_device_color",
     "load_logo",
+    "render_progress_tracker",
     "truncate_device_name",
+    "wait_for_processing",
 ]
