@@ -5,16 +5,43 @@
 # Cluster: FRA1-PROXMOX-CLUSTER (proxmox)
 set -euo pipefail
 
-qm create 100 \
-  --name "fra1-vm-web01" \
+TEMPLATE_VMID="$(qm list | awk -v t="tpl-ubuntu-22.04" '$2 == t {print $1}')"
+if [ -z "$TEMPLATE_VMID" ]; then
+  echo "ERROR: template tpl-ubuntu-22.04 not found on this node" >&2
+  exit 1
+fi
+
+# Cloud-init user-data rendered by Infrahub (see the vm-userdata artifact).
+cat > "/var/lib/vz/snippets/fra1-vm-web01-user-data.yml" <<'CLOUDINIT'
+#cloud-config
+# VM: fra1-vm-web01 (Linux guest - cloud-init)
+hostname: fra1-vm-web01
+manage_etc_hosts: true
+users:
+  - name: admin
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    shell: /bin/bash
+    ssh_authorized_keys:
+      - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA demo@opsmill
+packages:
+  - qemu-guest-agent
+runcmd:
+  - systemctl enable --now qemu-guest-agent
+CLOUDINIT
+
+qm clone "$TEMPLATE_VMID" 100 --name "fra1-vm-web01" --full
+
+qm set 100 \
   --cores 4 \
   --memory 8192 \
   --net0 virtio,bridge=vmbr0 \
-  --ipconfig0 ip=100.64.0.1/16 \
-  --scsihw virtio-scsi-pci \
-  --scsi0 local-lvm:80 \
+  --ide2 local-lvm:cloudinit \
+  --cicustom "user=local:snippets/fra1-vm-web01-user-data.yml" \
+  --ipconfig0 "ip=100.64.0.1/16" \
   --ostype l26 \
   --agent enabled=1
+
+qm disk resize 100 scsi0 80G
 
 qm set 100 --description "Web server VM - Ubuntu 22.04"
 
