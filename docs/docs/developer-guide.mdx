@@ -33,7 +33,8 @@ infrahub-demo-dc/
 │   ├── spine.py
 │   ├── leaf.py
 │   ├── edge.py
-│   └── loadbalancer.py
+│   ├── loadbalancer.py
+│   └── virtualization_vm.py
 ├── objects/                   # Demo data
 │   ├── bootstrap/             # Initial data (19 files: groups, locations, platforms, roles, devices, etc.)
 │   ├── cloud_security/        # Cloud security examples (services, devices, gateways)
@@ -48,11 +49,15 @@ infrahub-demo-dc/
 │   ├── pop/                   # Point of presence design files
 │   │   ├── pop-1.yml          # POP-1 design data
 │   │   └── pop-2.yml          # POP-2 design data
-│   └── security/              # Security zones, policies, rules (15 files)
+│   ├── security/              # Security zones, policies, rules (16 files)
+│   └── virtualization/        # Clusters, physical hosts, and VMs
 ├── generators/                # Topology generators
 │   ├── generate_dc.py         # Data center generator
 │   ├── generate_pop.py        # POP generator
 │   ├── generate_segment.py    # Network segment generator
+│   ├── generate_virtualization_cabling.py      # Host rack placement and leaf cabling
+│   ├── generate_virtualization_vm_security.py  # VM addressing and HTTPS-only policy
+│   ├── generate_dc_firewall_policy.py          # Attach VM policy to DC firewalls
 │   ├── common.py              # Shared utilities
 │   └── schema_protocols.py    # Type protocols
 ├── menus/                     # UI menu definitions
@@ -60,19 +65,22 @@ infrahub-demo-dc/
 ├── queries/                   # GraphQL queries
 │   ├── config/                # Configuration queries
 │   ├── topology/              # Topology queries
-│   └── validation/            # Validation queries
+│   ├── validation/            # Validation queries
+│   └── virtualization/        # Host cabling and VM security queries
 ├── schemas/                  # Data model definitions
 │   ├── base/                # Core models
 │   │   ├── dcim.yml
 │   │   ├── ipam.yml
 │   │   ├── location.yml
-│   │   └── topology.yml
+│   │   ├── topology.yml
+│   │   └── virtualization.yml
 │   └── extensions/          # Extended models
 │       ├── console/
 │       ├── routing/
 │       ├── security/
 │       ├── service/
-│       └── topology/
+│       ├── topology/
+│       └── virtualization/
 ├── docs/                     # Documentation (Docusaurus)
 │   ├── docs/                # Documentation content (.mdx files)
 │   ├── static/              # Static assets
@@ -85,7 +93,8 @@ infrahub-demo-dc/
 │   └── get_configs.py       # Retrieve device configurations
 ├── service_catalog/         # Streamlit Service Catalog application
 │   ├── pages/               # Streamlit pages
-│   │   └── 1_Create_DC.py  # DC creation UI
+│   │   ├── 1_Create_DC.py  # DC creation UI
+│   │   └── 4_Create_VM.py  # VM creation UI
 │   ├── utils/               # Utility modules
 │   │   ├── api.py           # Infrahub API client
 │   │   ├── config.py        # Configuration

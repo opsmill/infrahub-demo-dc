@@ -1,0 +1,131 @@
+---
+title: Virtual machine management
+---
+
+This tutorial shows how the demo models a virtualization layer on top of the data center fabric: hypervisor clusters, the physical hosts that form them, and the virtual machines running on those hosts. You'll load the demo data, follow what the generators do with it, and create a VM of your own through the Service Catalog.
+
+## Overview
+
+The virtualization schema tracks:
+
+- **Clusters** - groups of hypervisor hosts (VMware vSphere, KVM, Proxmox VE, Hyper-V, or other)
+- **Physical hosts** - rack-mounted servers that run a hypervisor and appear in the DCIM model like any other device
+- **Virtual machines** - VMs with compute sizing (vCPUs, memory, disk), a hypervisor VM ID, and an optional customer link
+
+Everything around a VM is automated. When you load a host, a generator places it in a rack and cables it to the fabric. When you load a VM, another generator assigns it a primary IP address and puts it behind an HTTPS-only firewall policy. A validation check keeps the data consistent in every proposed change.
+
+## Prerequisites
+
+Before starting this tutorial:
+
+- Complete the [installation guide](./install.mdx) and have Infrahub running
+- Load the bootstrap data and schemas
+- Have access to the Infrahub web interface at `http://localhost:8000`
+
+## Loading the virtualization demo
+
+The virtualization data loads automatically as part of every DC demo task:
+
+```bash
+uv run invoke demo-dc-arista   # or demo-dc-juniper, demo-dc-cisco
+```
+
+Each task runs the same pipeline:
+
+1. Creates a branch and loads the DC topology design
+2. Waits for the DC generator to build the fabric
+3. Loads the virtualization security policy, then the clusters, hosts, and VMs
+4. Creates a proposed change for review
+
+The order matters, and the task handles it for you. Host cabling needs the leaf switches that the DC generator creates, so the virtualization objects load only after the generator finishes. The security policy loads before the first VM, because VM creation immediately triggers the security generator, which expects the policy to exist.
+
+### Sample data
+
+The demo ships one virtualization environment in the Frankfurt metro:
+
+| Kind | Objects |
+| ---- | ------- |
+| Clusters | `FRA1-PROXMOX-CLUSTER` (Proxmox VE), `FRA1-KVM-CLUSTER` (KVM) |
+| Physical hosts | `fra1-pve-01`, `fra1-pve-02`, `fra1-kvm-01`, `fra1-kvm-02` |
+| Virtual machines | `fra1-vm-web01`, `fra1-vm-web02`, `fra1-vm-app01`, `fra1-vm-app02`, `fra1-vm-db01`, `fra1-vm-cache01` (VM IDs 100-105) |
+
+## What the generators do
+
+Three generators react to the loaded data. You don't run any of them by hand.
+
+### Rack placement and fabric cabling
+
+The `cable_virtualization_host` generator runs whenever a physical host is created or updated. For each host, scoped to the host's own metro:
+
+1. **Placement** - if racks exist in the metro (from whichever DC design was generated there), the host moves into the least-occupied one
+2. **Cabling** - the host's `eth0` and `eth1` interfaces are dual-homed to the two leaf switches with the most free `customer`-role ports, so cabling load-balances across leafs
+
+The host's NICs come from the `VIRTUALIZATION_HOST` object template in the bootstrap data, not from the generator. The generator is idempotent: a placed host stays in its rack, cabled interfaces are left alone, and a leaf port is never handed out twice.
+
+### Automatic addressing and HTTPS-only security
+
+The `secure_virtualization_vm` generator runs whenever a VM is created:
+
+1. Allocates a primary IP address from the `virtualization_vm_pool` address pool (backed by the `100.64.0.0/16` prefix in the bootstrap data)
+2. Registers that address in the shared `virtualization-vms` security address group
+
+The static rules in `virtualization-vms-policy` reference that group, so every new VM is covered without editing a rule:
+
+- `allow-https-to-virtualization-vms` permits HTTPS traffic to the group
+- `deny-all-other-to-virtualization-vms` denies everything else
+
+### Firewall policy attachment
+
+A third generator attaches `virtualization-vms-policy` to every firewall with the `dc_firewall` role as soon as the firewall is created, regardless of which DC design created it. The HTTPS-only rules then render in that firewall's `juniper_firewall_config` artifact. See the [security management tutorial](./security-management.mdx) for how policy data becomes firewall configuration.
+
+## Exploring the virtualization objects
+
+After the demo task finishes, switch to the demo branch (for example `add-dc3`) in the web interface:
+
+1. Navigate to **Virtualization Cluster** to see the two Frankfurt clusters and their member hosts
+2. Open a **Physical Host** such as `fra1-pve-01` and check its rack location and cabled interfaces
+3. Open a **Virtual Machine** such as `fra1-vm-web01` and check its host, cluster, customer, and the primary IP address the generator assigned
+
+To confirm the security wiring, open the `virtualization-vms` address group and verify it contains one address per VM.
+
+## Creating a VM from the Service Catalog
+
+The Service Catalog includes a **Create VM** page for form-based provisioning. Enable the catalog first (see [using the service catalog](./service-catalog.mdx)), then open `http://localhost:8501` and select **Create VM**.
+
+The form asks for a name, the physical host, an optional description, OS version, customer, status, compute sizing (vCPUs, memory, disk), and a VM ID. The VM ID is prefilled with the next unused ID and validated against the IDs already taken in the host's cluster. The cluster is derived from the host you pick. On submit, the page:
+
+1. Creates a new branch
+2. Creates the virtual machine on that branch
+3. Waits for the security generator to assign the IP and update the address group
+4. Creates a proposed change for review
+
+Merge the proposed change to bring the VM into `main`.
+
+## Validation
+
+A VM names both its host and its cluster, and the host itself belongs to a cluster - two paths to the same fact. The `validate_virtualization_vm` check fails a proposed change when they disagree, for example a VM assigned to `FRA1-KVM-CLUSTER` while running on `fra1-pve-01`. The check runs automatically in every proposed change that touches a VM.
+
+## Schema architecture
+
+```text
+VirtualizationCluster
+  ├── VirtualizationPhysicalHost (member host)
+  │     └── VirtualizationVirtualMachine (parent: host)
+  └── VirtualizationVirtualMachine (cluster membership)
+
+OrganizationCustomer
+  └── VirtualizationVirtualMachine (customer link)
+```
+
+### Key relationships
+
+- **VirtualizationPhysicalHost** is a full DCIM device: it inherits the generic device and physical device models, so it has a rack position, interfaces, and can be an artifact target
+- **VirtualizationVirtualMachine** belongs to exactly one host (parent relationship) and one cluster, and optionally to a customer
+- Both hosts and VMs share the compute sizing attributes (`vcpus`, `memory`, `disk`) through the `ComputeGenericUnit` generic
+- VM IDs are unique per cluster, not globally: two clusters can both use VM ID 100
+
+## Next steps
+
+- **[Working with security management](./security-management.mdx)** - how the HTTPS-only policy renders into firewall configuration
+- **[Using the service catalog](./service-catalog.mdx)** - enable the catalog application used to create VMs
+- **[Developer guide](./developer-guide.mdx)** - generator, check, and schema implementation details
