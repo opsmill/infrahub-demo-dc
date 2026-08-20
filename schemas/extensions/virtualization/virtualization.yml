@@ -107,9 +107,13 @@ nodes:
       - ComputeGenericUnit
     uniqueness_constraints:
       - [name__value]
-      # A hypervisor VMID (e.g. Proxmox) is only unique within its cluster -
-      # two independent clusters may both legitimately use VMID 100.
-      - [cluster, vmid__value]
+      # No [cluster, vmid__value] constraint. A VMID is only unique within its
+      # cluster, so the pair looks like the right constraint, but the validator
+      # counts an unset vmid as a value: only Proxmox and KVM VMs carry one, so
+      # the second VMID-less Hyper-V or ESXi VM in a cluster would be rejected
+      # with "Violates uniqueness constraint 'cluster-vmid'". Per-cluster VMID
+      # collisions are caught in the Create VM form instead, from the
+      # per-cluster used-ID map get_used_vmids() already returns.
     attributes:
       - name: vmid
         label: VM ID
