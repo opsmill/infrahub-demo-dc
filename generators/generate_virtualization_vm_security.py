@@ -20,8 +20,16 @@ from infrahub_sdk.generator import InfrahubGenerator  # type: ignore[import-not-
 
 from .common import clean_data
 
-VM_SUBNET = "10.100.0.0/16"
-IP_POOL_NAME = "virtualization_vm_ips"
+# Deleting a branch does not release its resource-pool IP allocations back
+# to the pool (IP uniqueness is tracked globally, not per-branch, so two
+# branches can't hand out the same address only to conflict on merge) -
+# every test branch created and deleted permanently consumes addresses.
+# 100.64.0.0/10 (~4.19M addresses, RFC 6598 shared address space, unused
+# elsewhere in this repo) gives enough headroom that repeated
+# branch-recreate-and-delete churn during iterative testing won't
+# realistically exhaust it again.
+VM_SUBNET = "100.64.0.0/10"
+IP_POOL_NAME = "virtualization_vm_address_pool"
 ADDRESS_GROUP_NAME = "virtualization-vms"
 
 
