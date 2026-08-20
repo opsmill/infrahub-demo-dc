@@ -31,21 +31,30 @@ uv run invoke init
 ## Build and Test Commands
 
 ```bash
-# Run all tests
-uv run pytest
+# Everything, including the integration suite (starts a real Infrahub deployment via Docker)
+uv run invoke test
 
-# Run tests with verbose output
-uv run pytest -vv
+# No Docker needed - seconds, not minutes
+uv run invoke test-unit
 
-# Run specific test categories
-uv run pytest tests/unit/
-uv run pytest tests/integration/
+# The tier every pull request runs
+uv run invoke test-integration
 
 # Lint and type check
-uv run invoke lint         # Full suite: ruff, mypy, markdown, yaml
+uv run invoke lint         # Full suite: rumdl, yamllint, ruff, mypy
 uv run ruff check . --fix  # Format and lint
 uv run mypy .              # Type checking only
 ```
+
+The integration suite starts its own throwaway Infrahub deployment with `infrahub-testcontainers`;
+it does not use `invoke start`. It is split into two tiers by marker: `core` runs on every pull
+request, and `extended` adds the second vendor data center, the POP and segment services, day-two
+operations and the conflict workflow. `ci.yml` selects it for a pull request whose branch bumps the
+Infrahub version (`update-infrahub-*`, but not `update-infrahub-sdk-*`) and for a manual run of the
+CI workflow with `tier=full`. That tier does not block a merge, because an upstream Infrahub fault
+stops it passing reliably — see
+[tests/AGENTS.md](./tests/AGENTS.md), which records the signature and what to check before blaming
+the demo.
 
 ## Code Style Guidelines
 
@@ -108,12 +117,33 @@ See [tests/AGENTS.md](./tests/AGENTS.md) for detailed testing conventions.
 uv run invoke lint  # Runs: rumdl, yamllint, ruff, mypy
 ```
 
+Each tool is also callable on its own — these are the same tasks CI runs, so a local pass means CI
+passes too:
+
+```bash
+uv run invoke lint-markdown  # rumdl check .
+uv run invoke lint-yaml      # yamllint -s .
+uv run invoke lint-ruff      # ruff check . && ruff format --check --diff
+uv run invoke lint-mypy      # mypy --show-error-codes .
+```
+
 This ensures:
 
 - Markdown files have proper formatting (blank lines around code blocks, language specifiers)
 - YAML files are valid
 - Python code passes ruff linting
 - Type hints are correct (mypy)
+
+The same parity holds for the test tasks CI runs — `test-unit` and `test-integration --tier=core`
+run on every pull request, `test-integration --tier=full` when the pull request bumps the Infrahub
+version or the CI workflow is dispatched with `tier=full`:
+
+```bash
+uv run invoke test-unit         # pytest tests/unit tests/smoke; pytest tests/integration -m offline
+uv run invoke test-integration  # pytest tests/integration -m "not extended" (--tier=core, default)
+                                 # or the whole suite (--tier=full)
+uv run invoke test              # pytest tests -- unit and integration together
+```
 
 ## Security Considerations
 
@@ -132,7 +162,7 @@ This ensures:
 ## Development Environment
 
 - **Package Manager**: `uv` (required)
-- **Python Version**: 3.10, 3.11, or 3.12
+- **Python Version**: 3.11, 3.12, 3.13, or 3.14
 - **Container Runtime**: Docker (for Infrahub)
 
 ### Environment Variables
@@ -157,7 +187,11 @@ INFRAHUB_GIT_LOCAL="true"  # Use local repo instead of GitHub
 3. **Jinja2 autoescape** - Set `autoescape=False` for device configs
 4. **HTML entities** - Use `get_interface_roles()` which handles HTML decoding
 5. **Missing `.infrahub.yml` entries** - Register all generators/transforms/checks
-6. **Wrong box style in Rich** - Use `box.SIMPLE` for terminal compatibility
+6. **Missing `watch` entries** - A transform or generator that imports a helper module
+   (`transforms/common.py`) or picks a template from device data (`f"{platform}.j2"`) must declare
+   those paths under `watch.files`, or its artifacts go stale when they change. Not supported on
+   `check_definitions`, whose model forbids unknown keys
+7. **Wrong box style in Rich** - Use `box.SIMPLE` for terminal compatibility
 
 ## Sub-Project Guidelines
 

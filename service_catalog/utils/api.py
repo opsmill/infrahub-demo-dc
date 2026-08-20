@@ -1556,8 +1556,7 @@ class InfrahubClient:
         response = self._client._post(url=url, payload={})
         if response.status_code >= 300:
             raise InfrahubAPIError(
-                f"Artifact generate POST failed for {def_id}: "
-                f"{response.status_code} {response.text}"
+                f"Artifact generate POST failed for {def_id}: {response.status_code} {response.text}"
             )
 
     def generate_and_wait_for_artifacts(
@@ -1656,8 +1655,7 @@ class InfrahubClient:
         response = self._client._get(url=url)
         if response.status_code >= 300:
             raise InfrahubAPIError(
-                f"Failed to fetch artifact content for {artifact_id}: "
-                f"{response.status_code} {response.text}"
+                f"Failed to fetch artifact content for {artifact_id}: {response.status_code} {response.text}"
             )
         return response.text
 

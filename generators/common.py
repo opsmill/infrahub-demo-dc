@@ -534,9 +534,17 @@ class TopologyCreator:
             len(spine_devices),  # Need at least this many racks for spines
             len(border_leaf_devices) + len(console_devices) + len(oob_devices),  # Or this many for other infrastructure
         )
-        # Center the middle rack range in the row
-        middle_start = (total_racks // 2) - (middle_device_count // 2)
-        middle_racks = list(range(middle_start + 1, middle_start + middle_device_count + 1))
+        # Center the middle rack range in the row, clamped to the racks that actually exist.
+        # A design can call for more infrastructure devices than it has leaf racks -- the Arista and
+        # Sonic "with border leafs" designs place 6 into 4 -- which centers the range on rack 0 and
+        # runs past the last rack. Both ends have to be trimmed, because the row is what it is; the
+        # per-role loops below already warn and stop when they run out of middle racks.
+        middle_start = max(0, (total_racks // 2) - (middle_device_count // 2))
+        middle_racks = [
+            rack_num
+            for rack_num in range(middle_start + 1, middle_start + middle_device_count + 1)
+            if rack_num <= total_racks
+        ]
 
         # Track rack occupancy (rack_number -> list of (device, position, height))
         rack_occupancy: dict[int, list[tuple[Any, int, int]]] = {i: [] for i in range(1, total_racks + 1)}

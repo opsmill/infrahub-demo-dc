@@ -5,7 +5,7 @@ import sys
 import time
 from pathlib import Path
 
-from invoke import Context, task  # type: ignore[import-not-found]
+from invoke import Context, Exit, task  # type: ignore[import-not-found]
 from rich import box  # type: ignore[import-not-found]
 from rich.console import Console  # type: ignore[import-not-found]
 from rich.panel import Panel  # type: ignore[import-not-found]
@@ -486,12 +486,43 @@ def init(context: Context) -> None:
     console.print()
 
 
-@task(name="run-tests")
-def run_tests(context: Context) -> None:
-    """Run all tests."""
+@task(name="test-unit")
+def test_unit(context: Context) -> None:
+    """Run every test that needs no Infrahub deployment."""
+    console.print()
+    console.print(Panel("[bold cyan]Running Unit Tests[/bold cyan]", border_style="cyan", box=box.SIMPLE))
+    # Two invocations because the deployment-free tests live in two places: the unit and smoke
+    # directories, and the integration tests marked `offline`, which read repository files only.
+    # `bootstrapped_deployment` skips container setup for anything carrying that marker.
+    exec_cmds = ["pytest tests/unit tests/smoke", "pytest tests/integration -m offline"]
+    for cmd in exec_cmds:
+        context.run(cmd)
+    console.print("[green]✓[/green] Unit tests completed")
+
+
+@task(
+    name="test-integration",
+    help={"tier": "core (default) runs everything but the extended tier; full runs all of it."},
+)
+def test_integration(context: Context, tier: str = "core") -> None:
+    """Run the integration suite against a throwaway Infrahub deployment."""
+    if tier not in {"core", "full"}:
+        raise Exit(f"tier must be 'core' or 'full', got {tier!r}")
+    console.print()
+    console.print(Panel("[bold cyan]Running Integration Tests[/bold cyan]", border_style="cyan", box=box.SIMPLE))
+    # The extended tier roughly triples the runtime: core runs on every pull request, full on
+    # Infrahub-version bump branches and explicit tier=full dispatches of ci.yml.
+    marker = "" if tier == "full" else ' -m "not extended"'
+    context.run(f"pytest tests/integration{marker}")
+    console.print("[green]✓[/green] Integration tests completed")
+
+
+@task(name="test")
+def test_all(context: Context) -> None:
+    """Run every test, unit and integration."""
     console.print()
     console.print(Panel("[bold cyan]Running Tests[/bold cyan]", border_style="cyan", box=box.SIMPLE))
-    context.run("pytest -vv tests")
+    context.run("pytest tests")
     console.print("[green]✓[/green] Tests completed")
 
 
@@ -509,25 +540,32 @@ def format_code(context: Context) -> None:
     console.print()
 
 
-@task(name="_lint-markdown")
+@task(name="lint-markdown")
 def lint_markdown(context: Context) -> None:
     """Run Linter to check all Markdown files."""
     print(" - Check code with rumdl")
+    # No --fail-on: rumdl defaults to `any`, which fails on info, warning and error alike. Passing
+    # `error` would keep only error-severity rules enforced and silently stop the rest failing --
+    # the same regression the `-s` on yamllint below exists to prevent, in the other direction.
+    # ci.yml's markdown gate runs this same invoke task, so that parity is structural rather than two
+    # invocations that have to be kept in step by hand.
     exec_cmd = "rumdl check ."
     with context.cd(MAIN_DIRECTORY_PATH):
         context.run(exec_cmd)
 
 
-@task(name="_lint-yaml")
+@task(name="lint-yaml")
 def lint_yaml(context: Context) -> None:
     """Run Linter to check all YAML files."""
     print(" - Check code with yamllint")
-    exec_cmd = "yamllint ."
+    # -s promotes warnings to errors. CI has always passed it and this task never did; without it,
+    # routing CI through this task silently ends warning-level YAML enforcement.
+    exec_cmd = "yamllint -s ."
     with context.cd(MAIN_DIRECTORY_PATH):
         context.run(exec_cmd)
 
 
-@task(name="_lint-mypy")
+@task(name="lint-mypy")
 def lint_mypy(context: Context) -> None:
     """Run mypy to check all Python files."""
     print(" - Check code with mypy")
@@ -536,13 +574,18 @@ def lint_mypy(context: Context) -> None:
         context.run(exec_cmd)
 
 
-@task(name="_lint-ruff")
+@task(name="lint-ruff")
 def lint_ruff(context: Context) -> None:
-    """Run ruff to check all Python files."""
+    """Run ruff to lint and check formatting of all Python files."""
     print(" - Check code with ruff")
-    exec_cmd = "ruff check ."
+    # Two commands, not one: `ruff check` does not check formatting, and the `format` task cannot
+    # stand in for it because `format` rewrites files and would pass in CI regardless of what it
+    # rewrote. `ruff check --select I .` is deliberately absent -- `I` is already in select, and
+    # --select sets rather than extends the rule list, so it can never fail on its own.
+    exec_cmds = ["ruff check .", "ruff format --check --diff"]
     with context.cd(MAIN_DIRECTORY_PATH):
-        context.run(exec_cmd)
+        for cmd in exec_cmds:
+            context.run(cmd)
 
 
 @task(name="lint")
@@ -639,7 +682,7 @@ def docs_build(context: Context) -> None:
         )
     )
 
-    exec_cmd = "npm run build"
+    exec_cmd = "pnpm run build"
 
     with context.cd(DOCUMENTATION_DIRECTORY):
         output = context.run(exec_cmd)

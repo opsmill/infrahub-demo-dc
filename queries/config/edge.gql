@@ -1,24 +1,47 @@
 query edge_config($device: String!) {
-  DcimDevice(name__value: $device) {
+  # Queried on the generic, not on DcimDevice: an edge can be physical (a DC edge router) or
+  # virtual (a POP C8000V), and both land in the `edges` group this artifact targets.
+  DcimGenericDevice(name__value: $device) {
     edges {
       node {
         id
         name { value }
-        role { value }
-        location {
-          node {
-            ... on LocationGeneric { name { value } }
+
+        # role, device_type and location are declared on the concrete kinds rather than on the
+        # generic, so they have to be selected per kind. A virtual device has no location.
+        ... on DcimDevice {
+          role { value }
+          location {
+            node {
+              ... on LocationGeneric { name { value } }
+            }
+          }
+          device_type {
+            node {
+              name { value }
+              manufacturer { node { name { value } } }
+              platform {
+                node {
+                  netmiko_device_type { value }
+                  napalm_driver { value }
+                  ansible_network_os { value }
+                }
+              }
+            }
           }
         }
-        device_type {
-          node {
-            name { value }
-            manufacturer { node { name { value } } }
-            platform {
-              node {
-                netmiko_device_type { value }
-                napalm_driver { value }
-                ansible_network_os { value }
+        ... on DcimVirtualDevice {
+          role { value }
+          device_type {
+            node {
+              name { value }
+              manufacturer { node { name { value } } }
+              platform {
+                node {
+                  netmiko_device_type { value }
+                  napalm_driver { value }
+                  ansible_network_os { value }
+                }
               }
             }
           }

@@ -47,7 +47,12 @@ def get_data(data: Any) -> Any:
     if isinstance(cleaned_data, dict) and cleaned_data:
         first_key = next(iter(cleaned_data))
         first_value = cleaned_data[first_key]
-        if isinstance(first_value, list) and first_value:
+        if isinstance(first_value, list):
+            if not first_value:
+                raise ValueError(
+                    f"The query returned no {first_key}, so there is nothing to validate. This "
+                    f"usually means the check targets a device of a kind the query does not match."
+                )
             return first_value[0]
         # Return empty dict if first_value is None to avoid NoneType errors
         return first_value if first_value is not None else {}

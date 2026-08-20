@@ -52,6 +52,42 @@ docker-compose up
 
 For detailed setup instructions, configuration options, and usage guide, see the [demo-dc docs](https://docs.infrahub.app/demo-dc).
 
+## Testing
+
+```bash
+# Unit and specification tests: seconds, no containers
+uv run invoke test-unit
+
+# The integration tier every pull request runs
+uv run invoke test-integration --tier=core
+
+# Everything, including the extended workflows
+uv run invoke test-integration --tier=full
+```
+
+The integration suite starts its own throwaway Infrahub deployment with
+[infrahub-testcontainers](https://pypi.org/project/infrahub-testcontainers/), bootstraps it from this
+repository and drives complete workflows against it: building a data center from a design, generating
+device configurations, reviewing and merging a proposed change, adding a POP and a network segment,
+day-two operations, and conflict detection. It needs Docker; it does not use `invoke start`.
+
+The whole suite shares one deployment, so modules run in file-name order and build on what earlier
+ones merged. They are split into two tiers:
+
+- **`core`** runs on every pull request.
+- **`extended`** adds the second vendor data center, the POP and segment services, day-two operations
+  and the conflict workflow. It runs on a pull request that bumps the Infrahub version, and on a
+  manual run of the CI workflow with its `tier` input set to `full`.
+
+The extended tier does not block a merge, because it cannot currently pass: Infrahub intermittently
+fails to resolve a member of its own internal generator group, which fails whichever generator is
+running at the time. Dispatch it deliberately when changing a generator or a transform, and read a
+failure there against that known fault before assuming the demo is broken. To test a specific
+Infrahub version, set `INFRAHUB_TESTING_IMAGE_VER`.
+
+See the [developer guide](https://docs.infrahub.app/demo-dc/developer-guide) for details, and
+[tests/AGENTS.md](tests/AGENTS.md) for the conventions the suite follows.
+
 ## License
 
 This project is licensed under the MIT License. See [LICENSE.txt](LICENSE.txt) for details.

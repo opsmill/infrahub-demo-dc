@@ -1,7 +1,15 @@
 ---
+# Syntax checks for every query registered in .infrahub.yml. These run through the Infrahub SDK's
+# pytest plugin and need no running instance, so they are the cheapest way to catch a malformed query.
+#
+# Executing the same queries against a live schema -- which is what catches a renamed attribute or a
+# changed relationship -- is covered by tests/integration/test_30_graphql.py.
+#
+# Keep this list in step with the `queries` section of .infrahub.yml. The integration suite fails if
+# the two drift apart.
 version: "1.0"
 infrahub_tests:
-  # --------------------  GraphQLQuery  --------------------
+  # --------------------  Topology  --------------------
   - resource: GraphQLQuery
     resource_name: topology_dc
     tests:
@@ -27,11 +35,36 @@ infrahub_tests:
           kind: graphql-query-smoke
 
   - resource: GraphQLQuery
+    resource_name: topology_cabling
+    tests:
+      - name: syntax_check
+        spec:
+          path: queries/topology/cabling.gql
+          kind: graphql-query-smoke
+
+  - resource: GraphQLQuery
+    resource_name: equinix_pop_config
+    tests:
+      - name: syntax_check
+        spec:
+          path: queries/topology/equinix_pop.gql
+          kind: graphql-query-smoke
+
+  # --------------------  Device configuration  --------------------
+  - resource: GraphQLQuery
     resource_name: leaf_config
     tests:
       - name: syntax_check
         spec:
           path: queries/config/leaf.gql
+          kind: graphql-query-smoke
+
+  - resource: GraphQLQuery
+    resource_name: openconfig_leaf_config
+    tests:
+      - name: syntax_check
+        spec:
+          path: queries/config/openconfig_leaf.gql
           kind: graphql-query-smoke
 
   - resource: GraphQLQuery
@@ -42,6 +75,31 @@ infrahub_tests:
           path: queries/config/spine.gql
           kind: graphql-query-smoke
 
+  - resource: GraphQLQuery
+    resource_name: edge_config
+    tests:
+      - name: syntax_check
+        spec:
+          path: queries/config/edge.gql
+          kind: graphql-query-smoke
+
+  - resource: GraphQLQuery
+    resource_name: loadbalancer_config
+    tests:
+      - name: syntax_check
+        spec:
+          path: queries/config/loadbalancer.gql
+          kind: graphql-query-smoke
+
+  - resource: GraphQLQuery
+    resource_name: juniper_firewall_config
+    tests:
+      - name: syntax_check
+        spec:
+          path: queries/config/juniper_firewall.gql
+          kind: graphql-query-smoke
+
+  # --------------------  Virtualization  --------------------
   - resource: GraphQLQuery
     resource_name: virtualization_host_cabling
     tests:
@@ -88,4 +146,31 @@ infrahub_tests:
       - name: syntax_check
         spec:
           path: queries/validation/virtualization_vm.gql
+          kind: graphql-query-smoke
+
+  # --------------------  Validation  --------------------
+  - resource: GraphQLQuery
+    resource_name: loadbalancer_validation
+    tests:
+      - name: syntax_check
+        spec:
+          path: queries/validation/loadbalancer_validation.gql
+          kind: graphql-query-smoke
+
+  # --------------------  Services  --------------------
+  - resource: GraphQLQuery
+    resource_name: segment
+    tests:
+      - name: syntax_check
+        spec:
+          path: queries/segment/segment.gql
+          kind: graphql-query-smoke
+
+  # --------------------  Visualization  --------------------
+  - resource: GraphQLQuery
+    resource_name: rack_elevation_query
+    tests:
+      - name: syntax_check
+        spec:
+          path: queries/visualization/rack_elevation.gql
           kind: graphql-query-smoke

@@ -88,3 +88,7 @@ service_catalog/.streamlit/
 
 # Local git mirror used to test INFRAHUB_GIT_LOCAL from a git worktree
 .local-mirror/
+
+# spec-kit runtime artifacts
+.specify/**/.cache/
+.specify/feature.json

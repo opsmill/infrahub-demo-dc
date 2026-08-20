@@ -214,9 +214,7 @@ def execute_vm_creation_step(client: InfrahubClient) -> None:
                     if not client.wait_for_vm_ip(state["vm_id"], branch_name):
                         st.warning("No IP allocated yet - artifacts may render without one.")
                     st.write(f"Generating: {', '.join(definition_names)}")
-                    artifacts = client.generate_and_wait_for_artifacts(
-                        state["vm_id"], definition_names, branch_name
-                    )
+                    artifacts = client.generate_and_wait_for_artifacts(state["vm_id"], definition_names, branch_name)
                     for artifact in artifacts:
                         artifact["content"] = client.get_artifact_content(artifact["id"], branch_name)
                     status.update(label="Artifacts rendered", state="complete")
@@ -250,8 +248,10 @@ def execute_vm_creation_step(client: InfrahubClient) -> None:
             """)
 
             for artifact in state.get("artifacts", []):
-                language = "powershell" if form_data.get("cluster_type") == "hyperv" else (
-                    "yaml" if artifact["definition_name"] == "vm_userdata" else "bash"
+                language = (
+                    "powershell"
+                    if form_data.get("cluster_type") == "hyperv"
+                    else ("yaml" if artifact["definition_name"] == "vm_userdata" else "bash")
                 )
                 with st.expander(f"Artifact: {artifact['name']}", expanded=False):
                     st.code(artifact["content"], language=language)
@@ -403,9 +403,7 @@ def main() -> None:
         disabled=vm_creation_active,
     )
     os_version_options = (
-        ["Ubuntu 22.04", "Ubuntu 24.04"]
-        if guest_os == "Linux"
-        else ["Windows Server 2022", "Windows Server 2025"]
+        ["Ubuntu 22.04", "Ubuntu 24.04"] if guest_os == "Linux" else ["Windows Server 2022", "Windows Server 2025"]
     )
 
     with st.form("vm_creation_form"):

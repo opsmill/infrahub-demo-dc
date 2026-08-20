@@ -91,9 +91,7 @@ class VirtualizationHostCablingGenerator(InfrahubGenerator):
         current_location = host.get("location") or {}
         metro_id = self._resolve_metro_id(current_location)
         if metro_id is None:
-            self.logger.warning(
-                f"{host_name} has no metro in its location hierarchy, skipping placement and cabling"
-            )
+            self.logger.warning(f"{host_name} has no metro in its location hierarchy, skipping placement and cabling")
             return
 
         # Every rack and leaf candidate below is restricted to this set, so a
