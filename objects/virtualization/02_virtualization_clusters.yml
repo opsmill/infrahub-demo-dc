@@ -18,3 +18,15 @@ spec:
       hosts:
         - fra1-kvm-01
         - fra1-kvm-02
+
+    - name: "FRA1-ESXI-CLUSTER"
+      description: "VMware ESXi cluster in Frankfurt"
+      cluster_type: vmware
+      hosts:
+        - fra1-esx-01
+
+    - name: "FRA1-HYPERV-CLUSTER"
+      description: "Microsoft Hyper-V cluster in Frankfurt"
+      cluster_type: hyperv
+      hosts:
+        - fra1-hv-01

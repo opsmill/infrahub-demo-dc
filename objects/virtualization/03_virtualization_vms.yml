@@ -18,7 +18,6 @@ spec:
       disk: 80
       vmid: 100
       member_of_groups:
-        - proxmox_vms
         - virtualization_vms
 
     - name: "fra1-vm-db01"
@@ -34,7 +33,6 @@ spec:
       disk: 500
       vmid: 101
       member_of_groups:
-        - proxmox_vms
         - virtualization_vms
 
     - name: "fra1-vm-web02"
@@ -50,7 +48,6 @@ spec:
       disk: 80
       vmid: 102
       member_of_groups:
-        - proxmox_vms
         - virtualization_vms
 
     - name: "fra1-vm-app01"
@@ -95,5 +92,35 @@ spec:
       memory: 8
       disk: 40
       vmid: 105
+      member_of_groups:
+        - virtualization_vms
+
+    - name: "fra1-vm-win01"
+      description: "Windows application server VM"
+      host: "fra1-esx-01"
+      cluster: "FRA1-ESXI-CLUSTER"
+      customer: "OpsMill"
+      platform: [Generic, Windows]
+      os_version: "Windows Server 2022"
+      status: active
+      vcpus: 4
+      memory: 16
+      disk: 120
+      ssh_public_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA demo@opsmill"
+      member_of_groups:
+        - virtualization_vms
+
+    - name: "fra1-vm-win02"
+      description: "Windows file server VM"
+      host: "fra1-hv-01"
+      cluster: "FRA1-HYPERV-CLUSTER"
+      customer: "Customer 2"
+      platform: [Generic, Windows]
+      os_version: "Windows Server 2022"
+      status: active
+      vcpus: 4
+      memory: 16
+      disk: 250
+      ssh_public_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA demo@opsmill"
       member_of_groups:
         - virtualization_vms

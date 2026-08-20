@@ -52,3 +52,27 @@ spec:
       disk: 2000
       member_of_groups:
         - virtualization_hosts
+
+    - name: "fra1-esx-01"
+      description: "VMware ESXi host in Frankfurt"
+      object_template: VIRTUALIZATION_HOST
+      location: "fra-1"
+      platform: [Generic, Linux]
+      status: active
+      vcpus: 48
+      memory: 384
+      disk: 3000
+      member_of_groups:
+        - virtualization_hosts
+
+    - name: "fra1-hv-01"
+      description: "Microsoft Hyper-V host in Frankfurt"
+      object_template: VIRTUALIZATION_HOST
+      location: "fra-1"
+      platform: [Generic, Windows]
+      status: active
+      vcpus: 48
+      memory: 384
+      disk: 3000
+      member_of_groups:
+        - virtualization_hosts
