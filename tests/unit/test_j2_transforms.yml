@@ -60,6 +60,19 @@ infrahub_tests:
           output: output.txt
 
   - resource: Jinja2Transform
+    resource_name: esxi_vm_config
+    tests:
+      - name: syntax_check
+        spec:
+          kind: jinja2-transform-smoke
+      - name: renders_guestinfo_flow
+        expect: PASS
+        spec:
+          kind: "jinja2-transform-unit-render"
+          directory: esxi_vm
+          output: output.txt
+
+  - resource: Jinja2Transform
     resource_name: vm_userdata
     tests:
       - name: syntax_check
