@@ -105,7 +105,9 @@ spec:
     - name: virtualization_hosts
       description: Physical hosts that trigger the virtualization cabling generator
     - name: virtualization_vms
-      description: Virtual machines that trigger the virtualization VM security generator
+      description: >-
+        Virtual machines that trigger the virtualization VM generators
+        (secure_virtualization_vm and assign_vm_artifact_groups)
     - name: dc_firewall_policy_targets
       description: >-
         Target group for the attach_dc_firewall_policy generator. Dispatch

@@ -6,10 +6,18 @@ jinja2_transforms:
     query: topology_simulator
     template_path: templates/clab_topology.j2
   # Proxmox
+  #
+  # Every per-hypervisor provisioning template `{% include %}`s the shared
+  # user-data partial, which Infrahub cannot see from `template_path` alone.
+  # Without the `watch` entry, editing the partial leaves all four provisioning
+  # artifacts rendered from the old copy.
   - name: proxmox_vm_config
     description: Template to generate a Proxmox VE VM provisioning script
     query: vm_config
     template_path: templates/configs/proxmox_vm.j2
+    watch:
+      files:
+        - templates/configs/partials/vm_userdata.j2
   - name: vm_userdata
     description: Cloud-init / cloudbase-init user-data for a virtual machine
     query: vm_config
@@ -19,16 +27,25 @@ jinja2_transforms:
     description: Template to generate a KVM/libvirt VM provisioning script
     query: vm_config
     template_path: templates/configs/kvm_vm.j2
+    watch:
+      files:
+        - templates/configs/partials/vm_userdata.j2
   # Hyper-V
   - name: hyperv_vm_config
     description: Template to generate a Microsoft Hyper-V VM provisioning script
     query: vm_config
     template_path: templates/configs/hyperv_vm.j2
+    watch:
+      files:
+        - templates/configs/partials/vm_userdata.j2
   # ESXi
   - name: esxi_vm_config
     description: Template to generate a VMware ESXi VM provisioning script
     query: vm_config
     template_path: templates/configs/esxi_vm.j2
+    watch:
+      files:
+        - templates/configs/partials/vm_userdata.j2
 
 artifact_definitions:
   # Cisco
@@ -283,6 +300,9 @@ generator_definitions:
       files:
         - generators/common.py
         - generators/schema_protocols.py
+  # The virtualization generators import `clean_data` from `generators/common.py`,
+  # which imports `generators/schema_protocols.py`. Same invisible-dependency
+  # problem as the topology generators above.
   - name: cable_virtualization_host
     file_path: generators/generate_virtualization_cabling.py
     targets: virtualization_hosts
@@ -290,6 +310,10 @@ generator_definitions:
     class_name: VirtualizationHostCablingGenerator
     parameters:
       name: name__value
+    watch:
+      files:
+        - generators/common.py
+        - generators/schema_protocols.py
   - name: secure_virtualization_vm
     file_path: generators/generate_virtualization_vm_security.py
     targets: virtualization_vms
@@ -297,6 +321,10 @@ generator_definitions:
     class_name: VirtualizationVMSecurityGenerator
     parameters:
       name: name__value
+    watch:
+      files:
+        - generators/common.py
+        - generators/schema_protocols.py
   - name: assign_vm_artifact_groups
     file_path: generators/generate_vm_artifact_groups.py
     targets: virtualization_vms
@@ -304,6 +332,10 @@ generator_definitions:
     class_name: VMArtifactGroupsGenerator
     parameters:
       name: name__value
+    watch:
+      files:
+        - generators/common.py
+        - generators/schema_protocols.py
   - name: attach_dc_firewall_policy
     file_path: generators/generate_dc_firewall_policy.py
     targets: dc_firewall_policy_targets
@@ -311,6 +343,10 @@ generator_definitions:
     class_name: DcFirewallPolicyGenerator
     parameters:
       device: name__value
+    watch:
+      files:
+        - generators/common.py
+        - generators/schema_protocols.py
 
 queries:
   - name: topology_dc

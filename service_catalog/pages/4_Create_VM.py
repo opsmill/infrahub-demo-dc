@@ -138,8 +138,10 @@ def execute_vm_creation_step(client: InfrahubClient) -> None:
 
         elif step == 2:
             # Step 2: Create virtual machine
-            # Hypervisor group membership (e.g. proxmox_vms) is now owned by
-            # the assign_vm_hypervisor_group generator (Task 8), not this form.
+            # Artifact group membership (proxmox_vms / kvm_vms / hyperv_vms /
+            # esxi_vms / vm_userdata_targets) is owned by the
+            # assign_vm_artifact_groups generator, not this form. The form only
+            # adds the VM to the generator trigger group.
             group_names = ["virtualization_vms"]
 
             vm_data = {
