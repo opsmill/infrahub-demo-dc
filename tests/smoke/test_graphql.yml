@@ -59,6 +59,14 @@ infrahub_tests:
           kind: graphql-query-smoke
 
   - resource: GraphQLQuery
+    resource_name: vm_artifact_groups
+    tests:
+      - name: syntax_check
+        spec:
+          path: queries/virtualization/vm_artifact_groups.gql
+          kind: graphql-query-smoke
+
+  - resource: GraphQLQuery
     resource_name: dc_firewall_policy
     tests:
       - name: syntax_check

@@ -250,6 +250,13 @@ generator_definitions:
     class_name: VirtualizationVMSecurityGenerator
     parameters:
       name: name__value
+  - name: assign_vm_artifact_groups
+    file_path: generators/generate_vm_artifact_groups.py
+    targets: virtualization_vms
+    query: vm_artifact_groups
+    class_name: VMArtifactGroupsGenerator
+    parameters:
+      name: name__value
   - name: attach_dc_firewall_policy
     file_path: generators/generate_dc_firewall_policy.py
     targets: dc_firewall_policy_targets
@@ -291,6 +298,8 @@ queries:
     file_path: queries/virtualization/host_cabling.gql
   - name: virtualization_vm_security
     file_path: queries/virtualization/vm_security.gql
+  - name: vm_artifact_groups
+    file_path: queries/virtualization/vm_artifact_groups.gql
   - name: dc_firewall_policy
     file_path: queries/virtualization/dc_firewall_policy.gql
   - name: virtualization_vm_validation

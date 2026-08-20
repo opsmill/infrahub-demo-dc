@@ -19,6 +19,9 @@ spec:
     - name: virtualization_vm_security
       description: Assign a Virtualization Virtual Machine an IP and add it to the HTTPS-only policy
       generator: secure_virtualization_vm
+    - name: virtualization_vm_artifact_groups
+      description: Place a Virtualization Virtual Machine in its per-hypervisor artifact groups
+      generator: assign_vm_artifact_groups
     - name: dc_firewall_policy_attachment
       description: Attach the virtualization VM HTTPS-only policy to a new DC firewall
       generator: attach_dc_firewall_policy

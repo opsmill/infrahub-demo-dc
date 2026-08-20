@@ -82,6 +82,14 @@ spec:
       description: Racks
     - name: proxmox_vms
       description: Virtual machines hosted on a Proxmox VE cluster
+    - name: kvm_vms
+      description: Virtual machines hosted on a KVM/libvirt cluster
+    - name: hyperv_vms
+      description: Virtual machines hosted on a Microsoft Hyper-V cluster
+    - name: esxi_vms
+      description: Virtual machines hosted on a VMware ESXi cluster
+    - name: vm_userdata_targets
+      description: All virtual machines - target group for the vm-userdata artifact
 
 ---
 # Generator target groups. generator_definitions.targets in .infrahub.yml

@@ -34,6 +34,12 @@ spec:
       mutation_action: created
       action: virtualization_vm_security
       branch_scope: other_branches
+    - name: virtualization-vm-groups-on-create
+      description: Trigger artifact group assignment on create of a Virtualization Virtual Machine
+      node_kind: VirtualizationVirtualMachine
+      mutation_action: created
+      action: virtualization_vm_artifact_groups
+      branch_scope: other_branches
     - name: dc-firewall-on-create
       description: Trigger virtualization policy attachment on create of a SecurityFirewall
       node_kind: SecurityFirewall
