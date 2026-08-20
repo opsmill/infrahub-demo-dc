@@ -20,8 +20,8 @@ from infrahub_sdk.generator import InfrahubGenerator  # type: ignore[import-not-
 
 from .common import clean_data
 
-VM_SUBNET = "10.100.0.0/24"
-IP_POOL_NAME = "virtualization_vm_ip_pool"
+VM_SUBNET = "10.100.0.0/16"
+IP_POOL_NAME = "virtualization_vm_ips"
 ADDRESS_GROUP_NAME = "virtualization-vms"
 
 
