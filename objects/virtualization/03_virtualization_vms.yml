@@ -18,6 +18,7 @@ spec:
       vmid: 100
       member_of_groups:
         - proxmox_vms
+        - virtualization_vms
 
     - name: "fra1-vm-db01"
       description: "Database server VM"
@@ -32,6 +33,7 @@ spec:
       vmid: 101
       member_of_groups:
         - proxmox_vms
+        - virtualization_vms
 
     - name: "fra1-vm-web02"
       description: "Web server VM"
@@ -46,6 +48,7 @@ spec:
       vmid: 102
       member_of_groups:
         - proxmox_vms
+        - virtualization_vms
 
     - name: "fra1-vm-app01"
       description: "Application server VM"
@@ -58,6 +61,8 @@ spec:
       memory: 16
       disk: 100
       vmid: 103
+      member_of_groups:
+        - virtualization_vms
 
     - name: "fra1-vm-app02"
       description: "Application server VM"
@@ -70,6 +75,8 @@ spec:
       memory: 16
       disk: 100
       vmid: 104
+      member_of_groups:
+        - virtualization_vms
 
     - name: "fra1-vm-cache01"
       description: "Cache server VM"
@@ -82,3 +89,5 @@ spec:
       memory: 8
       disk: 40
       vmid: 105
+      member_of_groups:
+        - virtualization_vms

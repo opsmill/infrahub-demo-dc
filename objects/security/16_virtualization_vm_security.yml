@@ -1,0 +1,46 @@
+# Security policy restricting inbound access to virtualization VMs to HTTPS only.
+# The address group starts empty - the cable_virtualization_host sibling generator,
+# secure_virtualization_vm, adds each VM's IP to it as VMs are created.
+---
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: SecurityAddressGroup
+  data:
+    - name: "virtualization-vms"
+      description: "IP addresses of all virtualization VirtualMachine objects"
+---
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: SecurityPolicy
+  data:
+    - name: "virtualization-vms-policy"
+      description: "Restrict inbound access to virtualization VMs to HTTPS only"
+---
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: SecurityPolicyRule
+  data:
+    - index: 100
+      name: "allow-https-to-virtualization-vms"
+      action: "permit"
+      log: true
+      policy: "virtualization-vms-policy"
+      source_zone: "external"
+      destination_zone: "server-farm"
+      destination_addresses:
+        - ["virtualization-vms"]
+      services:
+        - ["web-services"]
+
+    - index: 900
+      name: "deny-all-other-to-virtualization-vms"
+      action: "deny"
+      log: true
+      policy: "virtualization-vms-policy"
+      source_zone: "external"
+      destination_zone: "server-farm"
+      destination_addresses:
+        - ["virtualization-vms"]

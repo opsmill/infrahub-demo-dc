@@ -84,3 +84,5 @@ spec:
       description: Virtual machines hosted on a Proxmox VE cluster
     - name: virtualization_hosts
       description: Physical hosts that trigger the virtualization cabling generator
+    - name: virtualization_vms
+      description: Virtual machines that trigger the virtualization VM security generator

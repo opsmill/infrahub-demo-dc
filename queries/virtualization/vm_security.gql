@@ -1,0 +1,20 @@
+query virtualization_vm_security($name: String!) {
+  VirtualizationVirtualMachine(name__value: $name) {
+    edges {
+      node {
+        id
+        name {
+          value
+        }
+        primary_address {
+          node {
+            id
+            address {
+              value
+            }
+          }
+        }
+      }
+    }
+  }
+}

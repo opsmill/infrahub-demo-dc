@@ -187,6 +187,13 @@ generator_definitions:
     class_name: VirtualizationHostCablingGenerator
     parameters:
       name: name__value
+  - name: secure_virtualization_vm
+    file_path: generators/generate_virtualization_vm_security.py
+    targets: virtualization_vms
+    query: virtualization_vm_security
+    class_name: VirtualizationVMSecurityGenerator
+    parameters:
+      name: name__value
 
 queries:
   - name: topology_dc
@@ -219,6 +226,8 @@ queries:
     file_path: queries/visualization/rack_elevation.gql
   - name: virtualization_host_cabling
     file_path: queries/virtualization/host_cabling.gql
+  - name: virtualization_vm_security
+    file_path: queries/virtualization/vm_security.gql
   - name: proxmox_vm_config
     file_path: queries/config/proxmox_vm.gql
 schemas:

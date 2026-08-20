@@ -28,3 +28,9 @@ spec:
       mutation_action: created
       action: virtualization_host_cabling
       branch_scope: other_branches
+    - name: virtualization-vm-on-create
+      description: Trigger HTTPS-only security setup on create of a Virtualization Virtual Machine
+      node_kind: VirtualizationVirtualMachine
+      mutation_action: created
+      action: virtualization_vm_security
+      branch_scope: other_branches

@@ -16,3 +16,6 @@ spec:
     - name: virtualization_host_cabling
       description: Cable a Virtualization Physical Host to leaf switches
       generator: cable_virtualization_host
+    - name: virtualization_vm_security
+      description: Assign a Virtualization Virtual Machine an IP and add it to the HTTPS-only policy
+      generator: secure_virtualization_vm
