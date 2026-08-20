@@ -14,6 +14,11 @@ jinja2_transforms:
     description: Cloud-init / cloudbase-init user-data for a virtual machine
     query: vm_config
     template_path: templates/configs/partials/vm_userdata.j2
+  # KVM
+  - name: kvm_vm_config
+    description: Template to generate a KVM/libvirt VM provisioning script
+    query: vm_config
+    template_path: templates/configs/kvm_vm.j2
 
 artifact_definitions:
   # Cisco
@@ -111,6 +116,14 @@ artifact_definitions:
     content_type: application/yaml
     targets: vm_userdata_targets
     transformation: vm_userdata
+    parameters:
+      name: name__value
+  # KVM
+  - name: kvm_vm_config
+    artifact_name: kvm-vm
+    content_type: text/plain
+    targets: kvm_vms
+    transformation: kvm_vm_config
     parameters:
       name: name__value
 

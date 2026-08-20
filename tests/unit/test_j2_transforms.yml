@@ -34,6 +34,19 @@ infrahub_tests:
           output: output.txt
 
   - resource: Jinja2Transform
+    resource_name: kvm_vm_config
+    tests:
+      - name: syntax_check
+        spec:
+          kind: jinja2-transform-smoke
+      - name: renders_nocloud_seed_flow
+        expect: PASS
+        spec:
+          kind: "jinja2-transform-unit-render"
+          directory: kvm_vm
+          output: output.txt
+
+  - resource: Jinja2Transform
     resource_name: vm_userdata
     tests:
       - name: syntax_check
