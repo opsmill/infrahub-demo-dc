@@ -214,13 +214,41 @@ def _load_virtualization_objects(context: Context, branch: str) -> None:
     context.run(f"uv run infrahubctl object load objects/virtualization/ --branch {branch}")
 
 
-@task(optional=["branch"], name="demo-dc-arista")
-def demo_dc_arista(context: Context, branch: str = "add-dc3") -> None:
-    """Create branch and load Arista DC demo topology."""
+def _wait_for_generator(description: str, wait_seconds: int) -> None:
+    """Display a progress bar while a server-side generator finishes processing."""
+    with Progress(
+        SpinnerColumn(spinner_name="dots12", style="bold bright_yellow"),
+        TextColumn("[progress.description]{task.description}", style="bold white"),
+        BarColumn(
+            bar_width=40,
+            style="yellow",
+            complete_style="bright_green",
+            finished_style="bold bright_green",
+            pulse_style="bright_yellow",
+        ),
+        TextColumn("[bold bright_cyan]{task.percentage:>3.0f}%"),
+        TextColumn("•", style="dim"),
+        TimeElapsedColumn(),
+        console=console,
+    ) as progress:
+        progress_task = progress.add_task(description, total=wait_seconds)
+        for _ in range(wait_seconds):
+            time.sleep(1)
+            progress.update(progress_task, advance=1)
+
+
+def _run_dc_demo(context: Context, title: str, dc_file: str, branch: str) -> None:
+    """Run the full DC demo pipeline on a fresh branch.
+
+    Owns the ordering so individual demo tasks stay thin: create the branch,
+    load the DC topology, wait for the topology generator to build the fabric
+    (the virtualization cabling needs the generated leaf switches), load the
+    virtualization objects, then open a proposed change.
+    """
     console.print()
     console.print(
         Panel(
-            f"[bold cyan]Arista Data Center Demo[/bold cyan]\n[dim]Branch:[/dim] {branch}",
+            f"[bold cyan]{title}[/bold cyan]\n[dim]Branch:[/dim] {branch}",
             border_style="cyan",
             box=box.SIMPLE,
         )
@@ -232,160 +260,56 @@ def demo_dc_arista(context: Context, branch: str = "add-dc3") -> None:
     console.print("\n[yellow]→[/yellow] Waiting for branch to be ready...")
     time.sleep(10)
 
-    console.print(f"\n[cyan]→[/cyan] Loading DC Arista topology to branch: [bold]{branch}[/bold]")
-    context.run(f"uv run infrahubctl object load objects/dc/dc-arista-s.yml --branch {branch}")
+    console.print(f"\n[cyan]→[/cyan] Loading [bold]{dc_file}[/bold] to branch: [bold]{branch}[/bold]")
+    context.run(f"uv run infrahubctl object load {dc_file} --branch {branch}")
 
-    console.print(f"\n[green]✓[/green] DC Arista topology loaded to branch '[bold green]{branch}[/bold green]'")
+    console.print(f"\n[green]✓[/green] DC topology loaded to branch '[bold green]{branch}[/bold green]'")
 
-    # Wait for generator to finish creating the data
     console.print("\n[yellow]→[/yellow] Waiting for generator to complete data creation...")
-    wait_seconds = 60  # Wait 60 seconds for generator to process
-
-    with Progress(
-        SpinnerColumn(spinner_name="dots12", style="bold bright_yellow"),
-        TextColumn("[progress.description]{task.description}", style="bold white"),
-        BarColumn(
-            bar_width=40,
-            style="yellow",
-            complete_style="bright_green",
-            finished_style="bold bright_green",
-            pulse_style="bright_yellow",
-        ),
-        TextColumn("[bold bright_cyan]{task.percentage:>3.0f}%"),
-        TextColumn("•", style="dim"),
-        TimeElapsedColumn(),
-        console=console,
-    ) as progress:
-        task = progress.add_task("⏳ Generator processing", total=wait_seconds)
-        for _ in range(wait_seconds):
-            time.sleep(1)
-            progress.update(task, advance=1)
-
+    _wait_for_generator("⏳ Generator processing", wait_seconds=60)
     console.print("[green]✓[/green] Generator processing complete")
 
     _load_virtualization_objects(context, branch)
 
-    # Create proposed change
     console.print(
         f"\n[bright_magenta]→[/bright_magenta] Creating proposed change for branch '[bold]{branch}[/bold]'..."
     )
     context.run(f"uv run python scripts/create_proposed_change.py --branch {branch}", pty=True)
 
     console.print()
+
+
+@task(optional=["branch"], name="demo-dc-arista")
+def demo_dc_arista(context: Context, branch: str = "add-dc3") -> None:
+    """Create branch and load Arista DC demo topology."""
+    _run_dc_demo(
+        context,
+        title="Arista Data Center Demo",
+        dc_file="objects/dc/dc-arista-s.yml",
+        branch=branch,
+    )
 
 
 @task(optional=["branch"], name="demo-dc-juniper")
 def demo_dc_juniper(context: Context, branch: str = "add-dc5") -> None:
     """Create branch and load Juniper DC demo topology."""
-    console.print()
-    console.print(
-        Panel(
-            f"[bold cyan]Juniper Data Center Demo[/bold cyan]\n[dim]Branch:[/dim] {branch}",
-            border_style="cyan",
-            box=box.SIMPLE,
-        )
+    _run_dc_demo(
+        context,
+        title="Juniper Data Center Demo",
+        dc_file="objects/dc/dc-juniper-s.yml",
+        branch=branch,
     )
-
-    console.print(f"\n[cyan]→[/cyan] Creating branch: [bold]{branch}[/bold]")
-    context.run(f"uv run infrahubctl branch create {branch}")
-
-    console.print(f"\n[cyan]→[/cyan] Loading DC Juniper topology to branch: [bold]{branch}[/bold]")
-    context.run(f"uv run infrahubctl object load objects/dc/dc-juniper-s.yml --branch {branch}")
-
-    console.print(f"\n[green]✓[/green] DC Juniper topology loaded to branch '[bold green]{branch}[/bold green]'")
-
-    # Wait for generator to finish creating the data
-    console.print("\n[yellow]→[/yellow] Waiting for generator to complete data creation...")
-    wait_seconds = 60  # Wait 60 seconds for generator to process
-
-    with Progress(
-        SpinnerColumn(spinner_name="dots12", style="bold bright_yellow"),
-        TextColumn("[progress.description]{task.description}", style="bold white"),
-        BarColumn(
-            bar_width=40,
-            style="yellow",
-            complete_style="bright_green",
-            finished_style="bold bright_green",
-            pulse_style="bright_yellow",
-        ),
-        TextColumn("[bold bright_cyan]{task.percentage:>3.0f}%"),
-        TextColumn("•", style="dim"),
-        TimeElapsedColumn(),
-        console=console,
-    ) as progress:
-        task = progress.add_task("⏳ Generator processing", total=wait_seconds)
-        for _ in range(wait_seconds):
-            time.sleep(1)
-            progress.update(task, advance=1)
-
-    console.print("[green]✓[/green] Generator processing complete")
-
-    _load_virtualization_objects(context, branch)
-
-    # Create proposed change
-    console.print(
-        f"\n[bright_magenta]→[/bright_magenta] Creating proposed change for branch '[bold]{branch}[/bold]'..."
-    )
-    context.run(f"uv run python scripts/create_proposed_change.py --branch {branch}", pty=True)
-
-    console.print()
 
 
 @task(optional=["branch"], name="demo-dc-cisco")
 def demo_dc_cisco(context: Context, branch: str = "add-dc2") -> None:
     """Create branch and load Cisco DC demo topology."""
-    console.print()
-    console.print(
-        Panel(
-            f"[bold cyan]Cisco Data Center Demo[/bold cyan]\n[dim]Branch:[/dim] {branch}",
-            border_style="cyan",
-            box=box.SIMPLE,
-        )
+    _run_dc_demo(
+        context,
+        title="Cisco Data Center Demo",
+        dc_file="objects/dc/dc-cisco-s.yml",
+        branch=branch,
     )
-
-    console.print(f"\n[cyan]→[/cyan] Creating branch: [bold]{branch}[/bold]")
-    context.run(f"uv run infrahubctl branch create {branch}")
-
-    console.print(f"\n[cyan]→[/cyan] Loading DC Cisco topology to branch: [bold]{branch}[/bold]")
-    context.run(f"uv run infrahubctl object load objects/dc/dc-cisco-s.yml --branch {branch}")
-
-    console.print(f"\n[green]✓[/green] DC Cisco topology loaded to branch '[bold green]{branch}[/bold green]'")
-
-    # Wait for generator to finish creating the data
-    console.print("\n[yellow]→[/yellow] Waiting for generator to complete data creation...")
-    wait_seconds = 60  # Wait 60 seconds for generator to process
-
-    with Progress(
-        SpinnerColumn(spinner_name="dots12", style="bold bright_yellow"),
-        TextColumn("[progress.description]{task.description}", style="bold white"),
-        BarColumn(
-            bar_width=40,
-            style="yellow",
-            complete_style="bright_green",
-            finished_style="bold bright_green",
-            pulse_style="bright_yellow",
-        ),
-        TextColumn("[bold bright_cyan]{task.percentage:>3.0f}%"),
-        TextColumn("•", style="dim"),
-        TimeElapsedColumn(),
-        console=console,
-    ) as progress:
-        task = progress.add_task("⏳ Generator processing", total=wait_seconds)
-        for _ in range(wait_seconds):
-            time.sleep(1)
-            progress.update(task, advance=1)
-
-    console.print("[green]✓[/green] Generator processing complete")
-
-    _load_virtualization_objects(context, branch)
-
-    # Create proposed change
-    console.print(
-        f"\n[bright_magenta]→[/bright_magenta] Creating proposed change for branch '[bold]{branch}[/bold]'..."
-    )
-    context.run(f"uv run python scripts/create_proposed_change.py --branch {branch}", pty=True)
-
-    console.print()
 
 
 @task(optional=["branch"], name="demo-vpn-opsmill")
@@ -410,27 +334,7 @@ def demo_vpn_opsmill(context: Context, branch: str = "add-vpn-opsmill") -> None:
 
     # Wait for generator to finish creating the data
     console.print("\n[yellow]→[/yellow] Waiting for segment generator to complete...")
-    wait_seconds = 30  # Segment processing is faster than DC topology
-
-    with Progress(
-        SpinnerColumn(spinner_name="dots12", style="bold bright_yellow"),
-        TextColumn("[progress.description]{task.description}", style="bold white"),
-        BarColumn(
-            bar_width=40,
-            style="yellow",
-            complete_style="bright_green",
-            finished_style="bold bright_green",
-            pulse_style="bright_yellow",
-        ),
-        TextColumn("[bold bright_cyan]{task.percentage:>3.0f}%"),
-        TextColumn("•", style="dim"),
-        TimeElapsedColumn(),
-        console=console,
-    ) as progress:
-        task = progress.add_task("⏳ Segment generator processing", total=wait_seconds)
-        for _ in range(wait_seconds):
-            time.sleep(1)
-            progress.update(task, advance=1)
+    _wait_for_generator("⏳ Segment generator processing", wait_seconds=30)
 
     console.print("[green]✓[/green] Segment generator processing complete")
 
