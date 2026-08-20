@@ -10,6 +10,10 @@ jinja2_transforms:
     description: Template to generate a Proxmox VE VM provisioning script
     query: vm_config
     template_path: templates/configs/proxmox_vm.j2
+  - name: vm_userdata
+    description: Cloud-init / cloudbase-init user-data for a virtual machine
+    query: vm_config
+    template_path: templates/configs/partials/vm_userdata.j2
 
 artifact_definitions:
   # Cisco
@@ -100,6 +104,13 @@ artifact_definitions:
     content_type: text/plain
     targets: proxmox_vms
     transformation: proxmox_vm_config
+    parameters:
+      name: name__value
+  - name: vm_userdata
+    artifact_name: vm-userdata
+    content_type: application/yaml
+    targets: vm_userdata_targets
+    transformation: vm_userdata
     parameters:
       name: name__value
 

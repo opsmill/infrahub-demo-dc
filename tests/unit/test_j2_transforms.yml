@@ -32,3 +32,22 @@ infrahub_tests:
           kind: "jinja2-transform-unit-render"
           directory: proxmox_vm_no_vmid
           output: output.txt
+
+  - resource: Jinja2Transform
+    resource_name: vm_userdata
+    tests:
+      - name: syntax_check
+        spec:
+          kind: jinja2-transform-smoke
+      - name: linux_cloud_init
+        expect: PASS
+        spec:
+          kind: "jinja2-transform-unit-render"
+          directory: vm_userdata_linux
+          output: output.txt
+      - name: windows_cloudbase_init
+        expect: PASS
+        spec:
+          kind: "jinja2-transform-unit-render"
+          directory: vm_userdata_windows
+          output: output.txt
