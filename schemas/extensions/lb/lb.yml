@@ -58,14 +58,6 @@ nodes:
         kind: Attribute
         description: The primary IP address assigned to the server.
         order_weight: 1300
-      - name: virtual_ips
-        label: VIPs
-        state: absent
-        peer: LoadbalancerVIP
-        identifier: vip__backend
-        cardinality: many
-        kind: Component
-        description: The list of VIP using this server as Backend.
 
   - name: HealthCheck
     namespace: Loadbalancer

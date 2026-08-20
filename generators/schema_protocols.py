@@ -9,12 +9,16 @@ from typing import TYPE_CHECKING
 from infrahub_sdk.protocols import (
     BuiltinIPAddress,
     BuiltinIPPrefix,
+    BuiltinTag,
     CoreArtifactTarget,
     CoreNode,
+    CoreObjectTemplate,
+    CoreStandardGroup,
+    IpamNamespace,
 )
 
 if TYPE_CHECKING:
-    from infrahub_sdk.node import RelatedNode, RelationshipManager
+    from infrahub_sdk.node import RelationshipAttribute, RelationshipManager
     from infrahub_sdk.protocols_base import (
         Boolean,
         BooleanOptional,
@@ -31,59 +35,61 @@ if TYPE_CHECKING:
 
 
 class DcimConnector(CoreNode):
-    connected_endpoints: RelationshipManager
+    connected_endpoints: RelationshipManager[DcimEndpoint]
 
 
 class TopologyDeployment(CoreNode):
     description: StringOptional
     emulation: Boolean
     name: String
-    customer_subnet: RelatedNode
-    design: RelatedNode
-    devices: RelationshipManager
-    location: RelatedNode
-    management_subnet: RelatedNode
+    customer_subnet: RelationshipAttribute[IpamPrefix]
+    design: RelationshipAttribute[DesignTopology]
+    devices: RelationshipManager[DcimGenericDevice]
+    location: RelationshipAttribute[LocationMetro]
+    management_subnet: RelationshipAttribute[IpamPrefix]
 
 
 class DcimEndpoint(CoreNode):
-    connector: RelatedNode
+    connector: RelationshipAttribute[DcimConnector]
 
 
 class LocationGeneric(CoreNode):
     description: StringOptional
     name: String
     shortname: String
-    tags: RelationshipManager
+    tags: RelationshipManager[BuiltinTag]
+    parent: RelationshipAttribute[LocationGeneric]
+    children: RelationshipManager[LocationGeneric]
 
 
 class OrganizationGeneric(CoreNode):
     description: StringOptional
     name: String
-    tags: RelationshipManager
+    tags: RelationshipManager[BuiltinTag]
 
 
 class ServiceGeneric(CoreNode):
     name: String
     status: Dropdown
-    owner: RelatedNode
+    owner: RelationshipAttribute[OrganizationGeneric]
 
 
 class DcimGenericDevice(CoreNode):
     description: StringOptional
     name: String
     os_version: StringOptional
-    interfaces: RelationshipManager
-    platform: RelatedNode
-    primary_address: RelatedNode
-    tags: RelationshipManager
+    interfaces: RelationshipManager[DcimInterface]
+    platform: RelationshipAttribute[DcimPlatform]
+    primary_address: RelationshipAttribute[IpamIPAddress]
+    tags: RelationshipManager[BuiltinTag]
 
 
 class ServiceGenericDevice(CoreNode):
-    device: RelatedNode
+    device: RelationshipAttribute[DcimGenericDevice]
 
 
 class ServiceGenericInterfaces(CoreNode):
-    interfaces: RelationshipManager
+    interfaces: RelationshipManager[DcimInterface]
 
 
 class DcimGenericSFP(CoreNode):
@@ -91,9 +97,9 @@ class DcimGenericSFP(CoreNode):
     serial: StringOptional
     sfp_type: Dropdown
     status: Dropdown
-    interface: RelatedNode
-    manufacturer: RelatedNode
-    spare_location: RelatedNode
+    interface: RelationshipAttribute[DcimInterface]
+    manufacturer: RelationshipAttribute[OrganizationManufacturer]
+    spare_location: RelationshipAttribute[LocationHosting]
 
 
 class ComputeGenericUnit(CoreNode):
@@ -103,18 +109,18 @@ class ComputeGenericUnit(CoreNode):
 
 
 class InterfaceHasSubInterface(CoreNode):
-    sub_interfaces: RelationshipManager
+    sub_interfaces: RelationshipManager[InterfaceVirtual]
 
 
 class VirtualizationHostVirtualMachine(CoreNode):
     name: String
-    virtual_machines: RelationshipManager
+    virtual_machines: RelationshipManager[VirtualizationVirtualMachine]
 
 
 class LocationHosting(CoreNode):
     shortname: String
-    devices: RelationshipManager
-    prefixes: RelationshipManager
+    devices: RelationshipManager[DcimPhysicalDevice]
+    prefixes: RelationshipManager[IpamPrefix]
 
 
 class DcimInterface(CoreNode):
@@ -123,8 +129,8 @@ class DcimInterface(CoreNode):
     name: String
     role: DropdownOptional
     status: Dropdown
-    device: RelatedNode
-    tags: RelationshipManager
+    device: RelationshipAttribute[DcimGenericDevice]
+    tags: RelationshipManager[BuiltinTag]
 
 
 class InterfaceLayer2(CoreNode):
@@ -134,15 +140,15 @@ class InterfaceLayer2(CoreNode):
 class InterfaceLayer3(CoreNode):
     dot1q_id: IntegerOptional
     mac_address: StringOptional
-    ip_addresses: RelationshipManager
+    ip_addresses: RelationshipManager[IpamIPAddress]
 
 
 class NetworkManagementServer(CoreNode):
     description: StringOptional
     name: String
     status: Dropdown
-    ip_addresses: RelationshipManager
-    location: RelationshipManager
+    ip_addresses: RelationshipManager[IpamIPAddress]
+    location: RelationshipManager[LocationGeneric]
 
 
 class ServicePeering(CoreNode):
@@ -154,8 +160,8 @@ class DcimPhysicalDevice(CoreNode):
     position: IntegerOptional
     rack_face: Dropdown
     serial: StringOptional
-    device_type: RelatedNode
-    location: RelatedNode
+    device_type: RelationshipAttribute[DcimDeviceType]
+    location: RelationshipAttribute[LocationHosting]
 
 
 class RoutingPolicy(CoreNode):
@@ -163,13 +169,13 @@ class RoutingPolicy(CoreNode):
     description: StringOptional
     name: String
     policy_type: Dropdown
-    weight: IntegerOptional
+    weight: Integer
 
 
 class RoutingProtocol(CoreNode):
     description: String
     status: Dropdown
-    device: RelatedNode
+    device: RelationshipAttribute[DcimGenericDevice]
 
 
 class CloudResource(CoreNode):
@@ -177,7 +183,7 @@ class CloudResource(CoreNode):
     description: StringOptional
     name: String
     status: Dropdown
-    tags: RelationshipManager
+    tags: RelationshipManager[BuiltinTag]
 
 
 class ServiceRouting(CoreNode):
@@ -190,25 +196,25 @@ class CloudAccount(CoreNode):
     environment: DropdownOptional
     name: String
     status: Dropdown
-    owner: RelatedNode
-    provider: RelatedNode
-    tags: RelationshipManager
+    owner: RelationshipAttribute[OrganizationGeneric]
+    provider: RelationshipAttribute[CloudProvider]
+    tags: RelationshipManager[BuiltinTag]
 
 
 class SecurityAddressGroup(CoreNode):
     description: StringOptional
     name: String
-    fqdns: RelationshipManager
-    ip_addresses: RelationshipManager
-    ip_ranges: RelationshipManager
-    prefixes: RelationshipManager
+    fqdns: RelationshipManager[SecurityFQDN]
+    ip_addresses: RelationshipManager[SecurityIPAddress]
+    ip_ranges: RelationshipManager[SecurityIPRange]
+    prefixes: RelationshipManager[SecurityPrefix]
 
 
 class RoutingAggregateRoute(RoutingProtocol):
-    discard: BooleanOptional
+    discard: Boolean
     export_policies: StringOptional
     import_policies: StringOptional
-    destination: RelationshipManager
+    destination: RelationshipManager[IpamPrefix]
 
 
 class SecurityApplication(CoreNode):
@@ -224,69 +230,69 @@ class RoutingAutonomousSystem(CoreNode):
     asn: Integer
     description: StringOptional
     name: String
-    location: RelatedNode
-    owner: RelatedNode
+    location: RelationshipAttribute[LocationGeneric]
+    owner: RelationshipAttribute[OrganizationProvider]
 
 
 class CloudAvailabilityZone(CoreNode):
     name: String
     zone_code: String
-    region: RelatedNode
+    region: RelationshipAttribute[CloudRegion]
 
 
 class ServiceBGP(ServiceGeneric, ServiceGenericDevice, ServiceGenericInterfaces, ServiceRouting):
-    graceful_restart: BooleanOptional
-    multipath: BooleanOptional
+    graceful_restart: Boolean
+    multipath: Boolean
     session_type: Dropdown
-    local_as: RelatedNode
-    local_ip: RelatedNode
-    peer_group: RelatedNode
-    remote_as: RelatedNode
-    remote_ip: RelatedNode
-    router_id: RelatedNode
+    local_as: RelationshipAttribute[RoutingAutonomousSystem]
+    local_ip: RelationshipAttribute[IpamIPAddress]
+    peer_group: RelationshipAttribute[RoutingBGPPeerGroup]
+    remote_as: RelationshipAttribute[RoutingAutonomousSystem]
+    remote_ip: RelationshipAttribute[IpamIPAddress]
+    router_id: RelationshipAttribute[IpamIPAddress]
 
 
 class RoutingBGPCommunity(CoreNode):
     community: String
     description: StringOptional
     name: String
-    routing_policy: RelationshipManager
-    tags: RelationshipManager
+    routing_policy: RelationshipManager[RoutingPolicy]
+    tags: RelationshipManager[BuiltinTag]
 
 
 class RoutingBGPPeerGroup(CoreNode):
-    bfd_enabled: BooleanOptional
+    bfd_enabled: Boolean
     description: String
-    ebgp_multihop: IntegerOptional
+    ebgp_multihop: Integer
     local_pref: IntegerOptional
     maximum_routes: IntegerOptional
     name: String
     password: StringOptional
-    peer_group_type: DropdownOptional
-    route_reflector_client: BooleanOptional
+    peer_group_type: Dropdown
+    route_reflector_client: Boolean
     send_community: BooleanOptional
-    send_community_extended: BooleanOptional
+    send_community_extended: Boolean
 
 
 class ServiceBGPPeering(ServiceGeneric, ServicePeering):
-    bfd_enabled: BooleanOptional
+    bfd_enabled: Boolean
     local_pref: IntegerOptional
     maximum_routes: IntegerOptional
     med: IntegerOptional
     password: StringOptional
-    remove_private_as: BooleanOptional
-    send_community: BooleanOptional
-    send_extended_community: BooleanOptional
+    remove_private_as: Boolean
+    send_community: Boolean
+    send_extended_community: Boolean
     session_type: Dropdown
-    ttl_security: IntegerOptional
-    deployment: RelatedNode
+    ttl_security: Integer
+    deployment: RelationshipAttribute[TopologyDataCenter]
 
 
 class RoutingBGPRRCluster(CoreNode):
     description: StringOptional
     name: String
-    cluster_id: RelatedNode
-    peer_groups: RelationshipManager
+    cluster_id: RelationshipAttribute[IpamIPAddress]
+    peer_groups: RelationshipManager[RoutingBGPPeerGroup]
 
 
 class DcimBidiSFP(DcimGenericSFP):
@@ -295,14 +301,14 @@ class DcimBidiSFP(DcimGenericSFP):
 
 
 class TopologyBranchOffice(CoreArtifactTarget, TopologyDeployment):
-    owner: RelatedNode
+    owner: RelationshipAttribute[OrganizationCustomer]
 
 
 class LocationBuilding(LocationGeneric, LocationHosting):
     facility_id: StringOptional
     is_cloud: Boolean
     physical_address: StringOptional
-    owner: RelatedNode
+    owner: RelationshipAttribute[OrganizationGeneric]
 
 
 class DcimCable(DcimConnector):
@@ -317,14 +323,15 @@ class VirtualizationCluster(CoreNode):
     cluster_type: DropdownOptional
     description: StringOptional
     name: String
-    hosts: RelationshipManager
-    virtual_machines: RelationshipManager
+    hosts: RelationshipManager[VirtualizationPhysicalHost]
+    hypervisor_type: RelationshipAttribute[VirtualizationHypervisorType]
+    virtual_machines: RelationshipManager[VirtualizationVirtualMachine]
 
 
 class TopologyColocationCenter(CoreArtifactTarget, TopologyDeployment):
-    provider: RelatedNode
-    public_subnet: RelatedNode
-    technical_subnet: RelatedNode
+    provider: RelationshipAttribute[OrganizationProvider]
+    public_subnet: RelationshipAttribute[IpamPrefix]
+    technical_subnet: RelationshipAttribute[IpamPrefix]
 
 
 class DcimConsoleInterface(DcimInterface, DcimEndpoint, CoreArtifactTarget):
@@ -338,15 +345,15 @@ class LocationCountry(LocationGeneric):
 
 class OrganizationCustomer(OrganizationGeneric):
     customer_id: StringOptional
-    ip_prefixes: RelationshipManager
-    namespaces: RelationshipManager
+    ip_prefixes: RelationshipManager[IpamPrefix]
+    namespaces: RelationshipManager[IpamNamespace]
 
 
 class TopologyDataCenter(CoreArtifactTarget, TopologyDeployment):
     strategy: Dropdown
-    provider: RelatedNode
-    public_subnet: RelatedNode
-    technical_subnet: RelatedNode
+    provider: RelationshipAttribute[OrganizationProvider]
+    public_subnet: RelationshipAttribute[IpamPrefix]
+    technical_subnet: RelationshipAttribute[IpamPrefix]
 
 
 class DcimDevice(CoreArtifactTarget, DcimGenericDevice, DcimPhysicalDevice):
@@ -360,9 +367,9 @@ class DcimDeviceType(CoreNode):
     name: String
     part_number: StringOptional
     weight: IntegerOptional
-    manufacturer: RelatedNode
-    platform: RelatedNode
-    tags: RelationshipManager
+    manufacturer: RelationshipAttribute[OrganizationManufacturer]
+    platform: RelationshipAttribute[DcimPlatform]
+    tags: RelationshipManager[BuiltinTag]
 
 
 class NetworkDhcpOption(CoreNode):
@@ -374,7 +381,7 @@ class NetworkDhcpOption(CoreNode):
 
 class NetworkDhcpServer(NetworkManagementServer):
     lease_time: String
-    dhcp_options: RelationshipManager
+    dhcp_options: RelationshipManager[NetworkDhcpOption]
 
 
 class DocsDocs(CoreNode):
@@ -385,10 +392,10 @@ class DocsDocs(CoreNode):
 class CloudElasticIP(CloudResource):
     name: String
     public_ip: IPHost
-    account: RelatedNode
-    instance: RelatedNode
-    network_interface: RelatedNode
-    region: RelatedNode
+    account: RelationshipAttribute[CloudAccount]
+    instance: RelationshipAttribute[CloudInstance]
+    network_interface: RelationshipAttribute[CloudNetworkInterface]
+    region: RelationshipAttribute[CloudRegion]
 
 
 class DesignElement(CoreNode):
@@ -396,8 +403,8 @@ class DesignElement(CoreNode):
     name: String
     quantity: Integer
     role: DropdownOptional
-    device_type: RelatedNode
-    template: RelatedNode
+    device_type: RelationshipAttribute[DcimDeviceType]
+    template: RelationshipAttribute[CoreObjectTemplate]
 
 
 class SecurityFQDN(CoreNode):
@@ -409,15 +416,27 @@ class SecurityFQDN(CoreNode):
 class SecurityFirewall(CoreArtifactTarget, DcimGenericDevice, DcimPhysicalDevice):
     role: DropdownOptional
     status: Dropdown
-    policies: RelationshipManager
+    policies: RelationshipManager[SecurityPolicy]
 
 
 class LoadbalancerHealthCheck(CoreNode):
     check: Dropdown
     description: String
-    fall: IntegerOptional
-    rise: IntegerOptional
-    timeout: IntegerOptional
+    fall: Integer
+    rise: Integer
+    timeout: Integer
+
+
+class VirtualizationHypervisorType(CoreNode):
+    artifact_definition: StringOptional
+    image_prefix: StringOptional
+    label: StringOptional
+    name: String
+    script_language: DropdownOptional
+    artifact_group: RelationshipAttribute[CoreStandardGroup]
+    clusters: RelationshipManager[VirtualizationCluster]
+    hosts: RelationshipManager[VirtualizationPhysicalHost]
+    platform: RelationshipAttribute[DcimPlatform]
 
 
 class IpamIPAddress(BuiltinIPAddress):
@@ -427,7 +446,7 @@ class IpamIPAddress(BuiltinIPAddress):
 class SecurityIPAddress(CoreNode):
     description: StringOptional
     name: String
-    ipam_ip_address: RelatedNode
+    ipam_ip_address: RelationshipAttribute[IpamIPAddress]
 
 
 class SecurityIPRange(CoreNode):
@@ -446,29 +465,29 @@ class CloudInstance(CloudResource):
     private_ip: IPHostOptional
     public_ip: IPHostOptional
     root_volume_size_gb: IntegerOptional
-    account: RelatedNode
-    network_interfaces: RelationshipManager
-    security_groups: RelationshipManager
-    subnet: RelatedNode
-    zone: RelatedNode
+    account: RelationshipAttribute[CloudAccount]
+    network_interfaces: RelationshipManager[CloudNetworkInterface]
+    security_groups: RelationshipManager[CloudSecurityGroup]
+    subnet: RelationshipAttribute[CloudSubnet]
+    zone: RelationshipAttribute[CloudAvailabilityZone]
 
 
 class CloudInternetGateway(CloudResource):
     name: String
-    account: RelatedNode
-    virtual_network: RelatedNode
+    account: RelationshipAttribute[CloudAccount]
+    virtual_network: RelationshipAttribute[CloudVirtualNetwork]
 
 
 class IpamL2Domain(CoreNode):
     name: String
-    vlans: RelationshipManager
+    vlans: RelationshipManager[IpamVLAN]
 
 
 class OrganizationManufacturer(CoreNode):
     description: StringOptional
     name: String
-    device_type: RelationshipManager
-    platform: RelationshipManager
+    device_type: RelationshipManager[DcimDeviceType]
+    platform: RelationshipManager[DcimPlatform]
 
 
 class LocationMetro(LocationGeneric):
@@ -478,8 +497,8 @@ class LocationMetro(LocationGeneric):
 class CloudNATGateway(CloudResource):
     name: String
     public_ip: IPHostOptional
-    account: RelatedNode
-    subnet: RelatedNode
+    account: RelationshipAttribute[CloudAccount]
+    subnet: RelationshipAttribute[CloudSubnet]
 
 
 class NetworkNTPServer(NetworkManagementServer):
@@ -496,32 +515,32 @@ class CloudNetworkInterface(CloudResource):
     name: String
     private_ip: IPHostOptional
     public_ip: IPHostOptional
-    instance: RelatedNode
-    ip_addresses: RelationshipManager
-    security_groups: RelationshipManager
-    subnet: RelatedNode
+    instance: RelationshipAttribute[CloudInstance]
+    ip_addresses: RelationshipManager[IpamIPAddress]
+    security_groups: RelationshipManager[CloudSecurityGroup]
+    subnet: RelationshipAttribute[CloudSubnet]
 
 
 class ServiceNetworkSegment(ServiceGeneric, ServiceGenericInterfaces):
     customer_name: String
     environment: Dropdown
-    external_routing: BooleanOptional
+    external_routing: Boolean
     name: String
     segment_type: Dropdown
     tenant_isolation: Dropdown
     vlan_id: Integer
-    deployment: RelatedNode
-    prefix: RelatedNode
+    deployment: RelationshipAttribute[TopologyDeployment]
+    prefix: RelationshipAttribute[IpamPrefix]
 
 
 class ServiceOSPF(ServiceGeneric, ServiceGenericDevice, ServiceGenericInterfaces, ServiceRouting):
     process_id: String
-    reference_bandwidth: IntegerOptional
+    reference_bandwidth: Integer
     router_type: Dropdown
     version: Dropdown
-    area: RelatedNode
-    ospf_interface_profile: RelatedNode
-    router_id: RelatedNode
+    area: RelationshipAttribute[RoutingOSPFArea]
+    ospf_interface_profile: RelationshipAttribute[RoutingOSPFInterface]
+    router_id: RelationshipAttribute[IpamIPAddress]
 
 
 class RoutingOSPFArea(CoreNode):
@@ -542,26 +561,26 @@ class RoutingOSPFInterface(CoreNode):
 class ServiceOSPFPeering(ServiceGeneric, ServicePeering):
     area_type: Dropdown
     authentication_key: StringOptional
-    authentication_type: DropdownOptional
+    authentication_type: Dropdown
     cost: IntegerOptional
-    dead_interval: IntegerOptional
-    hello_interval: IntegerOptional
+    dead_interval: Integer
+    hello_interval: Integer
     network_type: Dropdown
-    priority: IntegerOptional
-    retransmit_interval: IntegerOptional
-    deployment: RelatedNode
+    priority: Integer
+    retransmit_interval: Integer
+    deployment: RelationshipAttribute[TopologyDataCenter]
 
 
 class ServicePIM(ServiceGeneric, ServiceGenericDevice, ServiceGenericInterfaces, ServiceRouting):
-    dr_priority: IntegerOptional
-    rp_mode: DropdownOptional
-    pim_interface_profile: RelationshipManager
-    rp_address: RelatedNode
+    dr_priority: Integer
+    rp_mode: Dropdown
+    pim_interface_profile: RelationshipManager[RoutingPIMInterface]
+    rp_address: RelationshipAttribute[IpamIPAddress]
 
 
 class RoutingPIMInterface(CoreNode):
-    dr_priority: IntegerOptional
-    hello_interval: IntegerOptional
+    dr_priority: Integer
+    hello_interval: Integer
     name: String
     pim_mode: Dropdown
 
@@ -573,7 +592,9 @@ class InterfacePhysical(DcimInterface, InterfaceLayer2, InterfaceLayer3, DcimEnd
 class VirtualizationPhysicalHost(
     CoreArtifactTarget, DcimGenericDevice, DcimPhysicalDevice, ComputeGenericUnit, VirtualizationHostVirtualMachine
 ):
-    cluster: RelatedNode
+    role: DropdownOptional
+    cluster: RelationshipAttribute[VirtualizationCluster]
+    hypervisor_type: RelationshipAttribute[VirtualizationHypervisorType]
 
 
 class DcimPlatform(CoreNode):
@@ -584,8 +605,8 @@ class DcimPlatform(CoreNode):
     napalm_driver: StringOptional
     netmiko_device_type: StringOptional
     nornir_platform: StringOptional
-    devices: RelationshipManager
-    manufacturer: RelatedNode
+    devices: RelationshipManager[DcimGenericDevice]
+    manufacturer: RelationshipAttribute[OrganizationManufacturer]
 
 
 class LocationPod(LocationGeneric):
@@ -595,8 +616,8 @@ class LocationPod(LocationGeneric):
 class SecurityPolicy(CoreNode):
     description: StringOptional
     name: String
-    firewalls: RelationshipManager
-    rules: RelationshipManager
+    firewalls: RelationshipManager[SecurityFirewall]
+    rules: RelationshipManager[SecurityPolicyRule]
 
 
 class RoutingPolicyAggregate(RoutingPolicy):
@@ -618,32 +639,32 @@ class RoutingPolicyPIM(RoutingPolicy):
 class SecurityPolicyRule(CoreNode):
     action: Dropdown
     index: Integer
-    log: BooleanOptional
+    log: Boolean
     name: String
-    applications: RelationshipManager
-    destination_addresses: RelationshipManager
-    destination_zone: RelatedNode
-    policy: RelatedNode
-    schedule: RelatedNode
-    security_profile: RelatedNode
-    services: RelationshipManager
-    source_addresses: RelationshipManager
-    source_zone: RelatedNode
-    url_categories: RelationshipManager
+    applications: RelationshipManager[SecurityApplication]
+    destination_addresses: RelationshipManager[SecurityAddressGroup]
+    destination_zone: RelationshipAttribute[SecurityZone]
+    policy: RelationshipAttribute[SecurityPolicy]
+    schedule: RelationshipAttribute[SecuritySchedule]
+    security_profile: RelationshipAttribute[SecuritySecurityProfile]
+    services: RelationshipManager[SecurityServiceGroup]
+    source_addresses: RelationshipManager[SecurityAddressGroup]
+    source_zone: RelationshipAttribute[SecurityZone]
+    url_categories: RelationshipManager[SecurityURLCategory]
 
 
 class IpamPrefix(BuiltinIPPrefix):
     role: DropdownOptional
     status: Dropdown
-    gateway: RelatedNode
-    location: RelatedNode
-    organization: RelatedNode
+    gateway: RelationshipAttribute[IpamIPAddress]
+    location: RelationshipAttribute[LocationHosting]
+    organization: RelationshipAttribute[OrganizationGeneric]
 
 
 class SecurityPrefix(CoreNode):
     description: StringOptional
     name: String
-    ipam_prefix: RelatedNode
+    ipam_prefix: RelationshipAttribute[IpamPrefix]
 
 
 class OrganizationProvider(OrganizationGeneric):
@@ -654,22 +675,22 @@ class CloudProvider(CoreNode):
     console_url: URLOptional
     name: String
     provider_type: Dropdown
-    accounts: RelationshipManager
-    organization: RelatedNode
+    accounts: RelationshipManager[CloudAccount]
+    organization: RelationshipAttribute[OrganizationGeneric]
 
 
 class LocationRack(LocationGeneric, LocationHosting, CoreArtifactTarget):
     facility_id: StringOptional
     height: Integer
-    owner: RelatedNode
+    owner: RelationshipAttribute[OrganizationGeneric]
 
 
 class CloudRegion(CoreNode):
     geographic_location: StringOptional
     name: String
     region_code: String
-    availability_zones: RelationshipManager
-    provider: RelatedNode
+    availability_zones: RelationshipManager[CloudAvailabilityZone]
+    provider: RelationshipAttribute[CloudProvider]
 
 
 class LocationRegion(LocationGeneric):
@@ -679,13 +700,13 @@ class LocationRegion(LocationGeneric):
 class CloudRouteTable(CloudResource):
     is_main: Boolean
     name: String
-    subnets: RelationshipManager
-    virtual_network: RelatedNode
+    subnets: RelationshipManager[CloudSubnet]
+    virtual_network: RelationshipAttribute[CloudVirtualNetwork]
 
 
 class LocationRow(LocationGeneric):
     facility_id: StringOptional
-    owner: RelatedNode
+    owner: RelationshipAttribute[OrganizationGeneric]
 
 
 class SecuritySchedule(CoreNode):
@@ -694,21 +715,21 @@ class SecuritySchedule(CoreNode):
     end_time: String
     name: String
     start_time: String
-    timezone: StringOptional
+    timezone: String
 
 
 class CloudSecurityGroup(CloudResource):
     name: String
-    account: RelatedNode
-    virtual_network: RelatedNode
+    account: RelationshipAttribute[CloudAccount]
+    virtual_network: RelationshipAttribute[CloudVirtualNetwork]
 
 
 class SecuritySecurityProfile(CoreNode):
-    antivirus_enabled: BooleanOptional
+    antivirus_enabled: Boolean
     description: StringOptional
-    ips_enabled: BooleanOptional
+    ips_enabled: Boolean
     name: String
-    url_filtering_enabled: BooleanOptional
+    url_filtering_enabled: Boolean
 
 
 class SecuritySegmentACLRule(CoreNode):
@@ -716,12 +737,12 @@ class SecuritySegmentACLRule(CoreNode):
     description: StringOptional
     direction: Dropdown
     index: Integer
-    log: BooleanOptional
+    log: Boolean
     name: String
-    acl: RelatedNode
-    destination_addresses: RelationshipManager
-    services: RelationshipManager
-    source_addresses: RelationshipManager
+    acl: RelationshipAttribute[SecuritySegmentAccessControlList]
+    destination_addresses: RelationshipManager[SecurityAddressGroup]
+    services: RelationshipManager[SecurityServiceGroup]
+    source_addresses: RelationshipManager[SecurityAddressGroup]
 
 
 class SecuritySegmentAccessControlList(CoreNode):
@@ -733,16 +754,16 @@ class SecuritySegmentAccessControlList(CoreNode):
 class SecuritySegmentSecurityProfile(CoreNode):
     default_action: Dropdown
     description: StringOptional
-    enable_arp_inspection: BooleanOptional
-    enable_dhcp_snooping: BooleanOptional
-    enable_micro_segmentation: BooleanOptional
+    enable_arp_inspection: Boolean
+    enable_dhcp_snooping: Boolean
+    enable_micro_segmentation: Boolean
     max_mac_addresses: IntegerOptional
     name: String
 
 
 class SecuritySegmentSecurityZone(CoreNode):
     description: StringOptional
-    isolation_level: DropdownOptional
+    isolation_level: Dropdown
     name: String
     trust_level: Integer
 
@@ -751,8 +772,7 @@ class LoadbalancerServer(CoreNode):
     description: StringOptional
     hostname: String
     status: Dropdown
-    ip_address: RelatedNode
-    virtual_ips: RelationshipManager
+    ip_address: RelationshipAttribute[IpamIPAddress]
 
 
 class SecurityService(CoreNode):
@@ -765,8 +785,8 @@ class SecurityService(CoreNode):
 class SecurityServiceGroup(CoreNode):
     description: StringOptional
     name: String
-    service_ranges: RelationshipManager
-    services: RelationshipManager
+    service_ranges: RelationshipManager[SecurityServiceRange]
+    services: RelationshipManager[SecurityService]
 
 
 class SecurityServiceRange(CoreNode):
@@ -785,23 +805,23 @@ class CloudSubnet(CloudResource):
     auto_assign_public_ip: Boolean
     name: String
     subnet_type: Dropdown
-    availability_zone: RelatedNode
-    cidr_block: RelatedNode
-    tags: RelationshipManager
-    virtual_network: RelatedNode
+    availability_zone: RelationshipAttribute[CloudAvailabilityZone]
+    cidr_block: RelationshipAttribute[IpamPrefix]
+    tags: RelationshipManager[BuiltinTag]
+    virtual_network: RelationshipAttribute[CloudVirtualNetwork]
 
 
 class DesignTopology(CoreArtifactTarget):
     description: StringOptional
     name: String
     type: DropdownOptional
-    elements: RelationshipManager
+    elements: RelationshipManager[DesignElement]
 
 
 class SecurityURLCategory(CoreNode):
     description: StringOptional
     name: String
-    risk_level: DropdownOptional
+    risk_level: Dropdown
 
 
 class ServiceVIP(ServiceGeneric, ServiceGenericDevice):
@@ -811,10 +831,10 @@ class ServiceVIP(ServiceGeneric, ServiceGenericDevice):
     mode: Dropdown
     name: String
     ssl_certificate: StringOptional
-    backend_servers: RelationshipManager
-    frontend_servers: RelationshipManager
-    health_checks: RelationshipManager
-    vip_ip: RelatedNode
+    backend_servers: RelationshipManager[LoadbalancerServer]
+    frontend_servers: RelationshipManager[DcimGenericDevice]
+    health_checks: RelationshipManager[LoadbalancerHealthCheck]
+    vip_ip: RelationshipAttribute[IpamIPAddress]
 
 
 class IpamVLAN(CoreNode):
@@ -823,13 +843,13 @@ class IpamVLAN(CoreNode):
     role: DropdownOptional
     status: Dropdown
     vlan_id: Integer
-    l2domain: RelatedNode
-    location: RelationshipManager
-    prefixes: RelationshipManager
+    l2domain: RelationshipAttribute[IpamL2Domain]
+    location: RelationshipManager[LocationHosting]
+    prefixes: RelationshipManager[IpamPrefix]
 
 
 class InterfaceVirtual(DcimInterface, InterfaceLayer2, InterfaceLayer3):
-    parent_interface: RelatedNode
+    parent_interface: RelationshipAttribute[InterfaceHasSubInterface]
 
 
 class DcimVirtualDevice(CoreArtifactTarget, DcimGenericDevice):
@@ -837,23 +857,24 @@ class DcimVirtualDevice(CoreArtifactTarget, DcimGenericDevice):
     memory: IntegerOptional
     role: DropdownOptional
     storage: IntegerOptional
-    device_type: RelatedNode
-    hosting_device: RelatedNode
+    device_type: RelationshipAttribute[DcimDeviceType]
+    hosting_device: RelationshipAttribute[DcimDevice]
 
 
 class ServiceVirtualFabric(CoreNode):
     deployment_size: Dropdown
     name: String
     status: Dropdown
-    customer: RelatedNode
-    deployment: RelatedNode
+    customer: RelationshipAttribute[OrganizationCustomer]
+    deployment: RelationshipAttribute[TopologyDataCenter]
 
 
 class VirtualizationVirtualMachine(CoreArtifactTarget, DcimGenericDevice, ComputeGenericUnit):
+    ssh_public_key: StringOptional
     vmid: IntegerOptional
-    cluster: RelatedNode
-    customer: RelatedNode
-    host: RelatedNode
+    cluster: RelationshipAttribute[VirtualizationCluster]
+    customer: RelationshipAttribute[OrganizationCustomer]
+    host: RelationshipAttribute[VirtualizationHostVirtualMachine]
 
 
 class CloudVirtualNetwork(CloudResource):
@@ -861,10 +882,10 @@ class CloudVirtualNetwork(CloudResource):
     dns_support: Boolean
     is_default: Boolean
     name: String
-    account: RelatedNode
-    cidr_blocks: RelationshipManager
-    region: RelatedNode
-    subnets: RelationshipManager
+    account: RelationshipAttribute[CloudAccount]
+    cidr_blocks: RelationshipManager[IpamPrefix]
+    region: RelationshipAttribute[CloudRegion]
+    subnets: RelationshipManager[CloudSubnet]
 
 
 class SecurityZone(CoreNode):

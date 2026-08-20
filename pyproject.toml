@@ -17,19 +17,14 @@ dependencies = [
     # way, and the difference is only who moves the version -- and the bump pull request is the
     # designated mover. No upper bound: a relock is the deliberate act, and a stale ceiling costs
     # more than it buys.
-    #
-    # BETA FLOOR, temporary: a floor should name the last stable release. Move this to >=1.23.0 when
-    # 1.23.0 ships stable.
-    "infrahub-sdk[all,ctl]>=1.23.0b0",
+    "infrahub-sdk[all,ctl]>=1.23.0",
     "invoke>=2.2.1,<3.0.0",
     "rich>=13.9.4,<14.0.0",
 ]
 
 [dependency-groups]
 dev = [
-    # BETA FLOOR, temporary: move to >=1.11.0 when 1.11.0 ships stable. See the infrahub-sdk entry
-    # for why this is a floor rather than a pin.
-    "infrahub-testcontainers>=1.11.0b2",
+    "infrahub-testcontainers>=1.11.0",
     "mypy>=2.3.1",
     "pytest>=9.0.0",
     "pytest-asyncio>=1.3.0",
