@@ -12,9 +12,10 @@ HTTPS-only policy without editing any rule by hand.
 The backing prefix and CoreIPAddressPool are bootstrap data
 (objects/bootstrap/21_ip_address_pools.yml), not created here.
 
-Idempotent: reuses an existing primary_address/SecurityIPAddress
-instead of recreating them, and never adds the same address to the
-group twice.
+Idempotent and concurrency-safe: reuses an existing
+primary_address/SecurityIPAddress instead of recreating them, and adds
+the address to the group through the RelationshipAdd mutation, which
+adds only the named peer and tolerates a peer that is already a member.
 """
 
 from typing import Any
@@ -115,12 +116,11 @@ class VirtualizationVMSecurityGenerator(InfrahubGenerator):
             branch=self.branch,
             name__value=ADDRESS_GROUP_NAME,
         )
-        await address_group.ip_addresses.fetch()
-        existing_ids = {peer.id for peer in address_group.ip_addresses.peers}
-        if security_ip.id in existing_ids:
-            self.logger.info(f"- {vm_name} already in {ADDRESS_GROUP_NAME}, skipping")
-            return
-
-        address_group.ip_addresses.extend([security_ip.id])  # type: ignore[list-item]
-        await address_group.save(allow_upsert=True)
+        # add_relationships issues a RelationshipAdd mutation, which touches
+        # only the peers it names. `ip_addresses.extend()` + `save()` writes back
+        # the whole address list as it was read moments earlier, and one of these
+        # generators runs per VM concurrently - so each run would clobber the
+        # addresses its siblings added in between, and a VM dropped from the
+        # group would silently escape the HTTPS-only policy.
+        await address_group.add_relationships(relation_to_update="ip_addresses", related_nodes=[security_ip.id])
         self.logger.info(f"- Added {vm_name} ({ip_node.address.value}) to {ADDRESS_GROUP_NAME}")

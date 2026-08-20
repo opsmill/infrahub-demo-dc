@@ -11,7 +11,10 @@ firewall device.
 The role predicate lives in the GraphQL query (role__value:
 "dc_firewall"), so any other firewall role (e.g. corp-firewall's
 edge_firewall) yields an empty result and the generator no-ops.
-Idempotent: never attaches the same firewall twice.
+
+Idempotent and concurrency-safe: the firewall is attached through the
+RelationshipAdd mutation, which adds only the named peer and tolerates a
+peer that is already attached.
 """
 
 from infrahub_sdk.generator import InfrahubGenerator  # type: ignore[import-not-found]
@@ -51,12 +54,11 @@ class DcFirewallPolicyGenerator(InfrahubGenerator):
             branch=self.branch,
             name__value=VIRTUALIZATION_POLICY_NAME,
         )
-        await policy.firewalls.fetch()
-        existing_ids = {peer.id for peer in policy.firewalls.peers}
-        if firewall_id in existing_ids:
-            self.logger.info(f"- {firewall_name} already attached to {VIRTUALIZATION_POLICY_NAME}, skipping")
-            return
-
-        policy.firewalls.extend([firewall_id])  # type: ignore[list-item]
-        await policy.save(allow_upsert=True)
+        # add_relationships issues a RelationshipAdd mutation, which touches
+        # only the peers it names. `firewalls.extend()` + `save()` writes back
+        # the whole firewall list as it was read moments earlier, and one of
+        # these generators runs per firewall concurrently - so each run would
+        # clobber the firewalls its siblings attached in between, and a dropped
+        # firewall would render its config without the HTTPS-only rules.
+        await policy.add_relationships(relation_to_update="firewalls", related_nodes=[firewall_id])
         self.logger.info(f"- Attached {firewall_name} to {VIRTUALIZATION_POLICY_NAME}")
