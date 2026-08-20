@@ -12,9 +12,9 @@ spec:
         - fra1-pve-01
         - fra1-pve-02
 
-    - name: "PAR1-KVM-CLUSTER"
-      description: "KVM cluster in Paris"
+    - name: "FRA1-KVM-CLUSTER"
+      description: "KVM cluster in Frankfurt"
       cluster_type: kvm
       hosts:
-        - par1-kvm-01
-        - par1-kvm-02
+        - fra1-kvm-01
+        - fra1-kvm-02

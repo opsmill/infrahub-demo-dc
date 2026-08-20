@@ -47,10 +47,10 @@ spec:
       member_of_groups:
         - proxmox_vms
 
-    - name: "par1-vm-app01"
+    - name: "fra1-vm-app01"
       description: "Application server VM"
-      host: "par1-kvm-01"
-      cluster: "PAR1-KVM-CLUSTER"
+      host: "fra1-kvm-01"
+      cluster: "FRA1-KVM-CLUSTER"
       platform: [Generic, Linux]
       os_version: "Ubuntu 22.04"
       status: active
@@ -59,10 +59,10 @@ spec:
       disk: 100
       vmid: 103
 
-    - name: "par1-vm-app02"
+    - name: "fra1-vm-app02"
       description: "Application server VM"
-      host: "par1-kvm-01"
-      cluster: "PAR1-KVM-CLUSTER"
+      host: "fra1-kvm-01"
+      cluster: "FRA1-KVM-CLUSTER"
       platform: [Generic, Linux]
       os_version: "Ubuntu 22.04"
       status: active
@@ -71,10 +71,10 @@ spec:
       disk: 100
       vmid: 104
 
-    - name: "par1-vm-cache01"
+    - name: "fra1-vm-cache01"
       description: "Cache server VM"
-      host: "par1-kvm-02"
-      cluster: "PAR1-KVM-CLUSTER"
+      host: "fra1-kvm-02"
+      cluster: "FRA1-KVM-CLUSTER"
       platform: [Generic, Linux]
       os_version: "Ubuntu 22.04"
       status: provisioning

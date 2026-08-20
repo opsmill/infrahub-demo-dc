@@ -27,9 +27,9 @@ spec:
       member_of_groups:
         - virtualization_hosts
 
-    - name: "par1-kvm-01"
-      description: "KVM host in Paris"
-      location: "par-1"
+    - name: "fra1-kvm-01"
+      description: "KVM host in Frankfurt"
+      location: "fra-1"
       platform: [Generic, Linux]
       status: active
       vcpus: 32
@@ -38,9 +38,9 @@ spec:
       member_of_groups:
         - virtualization_hosts
 
-    - name: "par1-kvm-02"
-      description: "KVM host in Paris"
-      location: "par-1"
+    - name: "fra1-kvm-02"
+      description: "KVM host in Frankfurt"
+      location: "fra-1"
       platform: [Generic, Linux]
       status: active
       vcpus: 32
