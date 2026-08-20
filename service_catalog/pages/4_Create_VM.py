@@ -79,9 +79,11 @@ def initialize_vm_creation_state(form_data: Dict[str, Any]) -> None:
         "form_data": form_data,
         "branch_created": False,
         "vm_created": False,
+        "vm_id": None,
         "pc_created": False,
         "error": None,
         "pc_url": None,
+        "artifacts": [],
     }
 
 
@@ -98,6 +100,7 @@ def render_progress_tracker() -> None:
         "Creating virtual machine",
         "Processing",
         "Creating proposed change",
+        "Rendering artifacts",
         "Complete",
     ]
 
@@ -162,6 +165,7 @@ def execute_vm_creation_step(client: InfrahubClient) -> None:
                 st.write(f"VM created: {vm['name']['value']}")
                 status.update(label="Virtual machine created!", state="complete")
                 state["vm_created"] = True
+                state["vm_id"] = vm["id"]
                 state["step"] = 3
                 st.rerun()
 
@@ -192,7 +196,44 @@ def execute_vm_creation_step(client: InfrahubClient) -> None:
                 st.rerun()
 
         elif step == 5:
-            # Step 5: Complete - show success message
+            # Step 5: Render provisioning artifacts
+            definition_by_cluster_type = {
+                "proxmox": "proxmox_vm_config",
+                "kvm": "kvm_vm_config",
+                "hyperv": "hyperv_vm_config",
+                "vmware": "esxi_vm_config",
+            }
+            cluster_type = form_data.get("cluster_type")
+            provisioning_def = definition_by_cluster_type.get(cluster_type)
+            definition_names = ["vm_userdata"] + ([provisioning_def] if provisioning_def else [])
+
+            with st.status("Rendering provisioning artifacts...", expanded=True) as status:
+                artifacts: list = []
+                try:
+                    st.write("Waiting for the security generator to allocate an IP...")
+                    if not client.wait_for_vm_ip(state["vm_id"], branch_name):
+                        st.warning("No IP allocated yet - artifacts may render without one.")
+                    st.write(f"Generating: {', '.join(definition_names)}")
+                    artifacts = client.generate_and_wait_for_artifacts(
+                        state["vm_id"], definition_names, branch_name
+                    )
+                    for artifact in artifacts:
+                        artifact["content"] = client.get_artifact_content(artifact["id"], branch_name)
+                    status.update(label="Artifacts rendered", state="complete")
+                except Exception as e:
+                    artifacts = []
+                    status.update(label="Artifact rendering did not finish", state="error")
+                    st.warning(
+                        f"Artifacts were not ready in time - view them in the Infrahub UI "
+                        f"on branch {branch_name}. ({e})"
+                    )
+
+            state["artifacts"] = artifacts
+            state["step"] = 6
+            st.rerun()
+
+        elif step == 6:
+            # Step 6: Complete - show success message
             state["active"] = False
             st.markdown("---")
             display_success(f"Virtual Machine '{vm_name}' created successfully!")
@@ -207,6 +248,19 @@ def execute_vm_creation_step(client: InfrahubClient) -> None:
 
             Click the link above to review and merge your changes in Infrahub.
             """)
+
+            for artifact in state.get("artifacts", []):
+                language = "powershell" if form_data.get("cluster_type") == "hyperv" else (
+                    "yaml" if artifact["definition_name"] == "vm_userdata" else "bash"
+                )
+                with st.expander(f"Artifact: {artifact['name']}", expanded=False):
+                    st.code(artifact["content"], language=language)
+                    st.download_button(
+                        "Download",
+                        data=artifact["content"],
+                        file_name=f"{form_data['name']}-{artifact['definition_name']}.txt",
+                        key=f"dl-{artifact['id']}",
+                    )
 
     except (
         InfrahubConnectionError,

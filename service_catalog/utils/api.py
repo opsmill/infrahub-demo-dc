@@ -1,6 +1,8 @@
 """Infrahub API client for the Service Catalog."""
 
+import time
 from typing import Any, Dict, List, Optional, Set
+from urllib.parse import urlencode
 
 from infrahub_sdk import Config, InfrahubClientSync
 
@@ -1506,6 +1508,158 @@ class InfrahubClient:
             return {"by_cluster": by_cluster, "next_free": highest + 1}
         except Exception as e:
             raise InfrahubAPIError(f"Failed to fetch used VM IDs: {str(e)}")
+
+    def wait_for_vm_ip(self, vm_id: str, branch: str, timeout: int = 60) -> bool:
+        """Poll until the VM's generator-allocated primary_address exists.
+
+        The security generator assigns the IP asynchronously after creation;
+        rendering artifacts before it lands produces a script without an IP.
+
+        Args:
+            vm_id: VM node ID
+            branch: Branch the VM was created on
+            timeout: Seconds to wait before giving up
+
+        Returns:
+            True if the IP appeared within the timeout, False otherwise
+        """
+        query = """
+        query VmIp($ids: [ID!]) {
+            VirtualizationVirtualMachine(ids: $ids) {
+                edges { node { primary_address { node { id } } } }
+            }
+        }
+        """
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            result = self.execute_graphql(query, variables={"ids": [vm_id]}, branch=branch)
+            edges = result.get("VirtualizationVirtualMachine", {}).get("edges", [])
+            if edges and (edges[0].get("node", {}).get("primary_address") or {}).get("node"):
+                return True
+            time.sleep(2)
+        return False
+
+    def _post_artifact_generate(self, def_id: str, branch: str) -> None:
+        """POST /api/artifact/generate/<def-id> to queue a regen.
+
+        The SDK's ``InfrahubClientSync._post`` has no ``params`` argument, so
+        the branch is encoded directly into the URL's query string.
+
+        Args:
+            def_id: CoreArtifactDefinition ID to regenerate.
+            branch: Branch to generate on.
+
+        Raises:
+            InfrahubAPIError: If the POST does not return a 2xx status.
+        """
+        url = f"{self.base_url}/api/artifact/generate/{def_id}?{urlencode({'branch': branch})}"
+        response = self._client._post(url=url, payload={})
+        if response.status_code >= 300:
+            raise InfrahubAPIError(
+                f"Artifact generate POST failed for {def_id}: "
+                f"{response.status_code} {response.text}"
+            )
+
+    def generate_and_wait_for_artifacts(
+        self, vm_id: str, definition_names: List[str], branch: str, timeout: int = 90
+    ) -> List[Dict[str, Any]]:
+        """Trigger artifact regen for the given definitions and poll until done.
+
+        POST /api/artifact/generate is fire-and-forget (returns once QUEUED),
+        so this polls CoreArtifact until every definition has produced an
+        artifact for the VM, re-POSTing once to cover the visibility gap,
+        and raises on timeout instead of silently returning nothing.
+
+        Args:
+            vm_id: VM node ID the artifacts target
+            definition_names: CoreArtifactDefinition names to generate
+            branch: Branch to generate on
+            timeout: Seconds before raising
+
+        Returns:
+            List of dicts with id, name, definition_name, content_type
+
+        Raises:
+            InfrahubAPIError: If a definition name is unknown or regen times out
+        """
+        def_query = """
+        query ArtifactDefs($names: [String!]) {
+            CoreArtifactDefinition(name__values: $names) {
+                edges { node { id name { value } } }
+            }
+        }
+        """
+        result = self.execute_graphql(def_query, variables={"names": definition_names}, branch=branch)
+        def_ids = {
+            e["node"]["name"]["value"]: e["node"]["id"]
+            for e in result.get("CoreArtifactDefinition", {}).get("edges", [])
+        }
+        missing = set(definition_names) - set(def_ids)
+        if missing:
+            raise InfrahubAPIError(f"Unknown artifact definitions: {sorted(missing)}")
+
+        for def_id in def_ids.values():
+            self._post_artifact_generate(def_id, branch)
+
+        art_query = """
+        query VmArtifacts($ids: [ID!]) {
+            CoreArtifact(object__ids: $ids) {
+                edges {
+                    node {
+                        id
+                        name { value }
+                        content_type { value }
+                        definition { node { name { value } } }
+                    }
+                }
+            }
+        }
+        """
+        deadline = time.time() + timeout
+        reposted = False
+        while time.time() < deadline:
+            result = self.execute_graphql(art_query, variables={"ids": [vm_id]}, branch=branch)
+            artifacts = [
+                {
+                    "id": e["node"]["id"],
+                    "name": e["node"]["name"]["value"],
+                    "content_type": e["node"]["content_type"]["value"],
+                    "definition_name": e["node"]["definition"]["node"]["name"]["value"],
+                }
+                for e in result.get("CoreArtifact", {}).get("edges", [])
+                if e["node"].get("definition", {}).get("node")
+            ]
+            found = {a["definition_name"] for a in artifacts}
+            if set(definition_names) <= found:
+                return [a for a in artifacts if a["definition_name"] in definition_names]
+            if not reposted:
+                for def_id in def_ids.values():
+                    self._post_artifact_generate(def_id, branch)
+                reposted = True
+            time.sleep(2)
+        raise InfrahubAPIError(f"Artifact regen did not converge for {definition_names} within {timeout}s")
+
+    def get_artifact_content(self, artifact_id: str, branch: str) -> str:
+        """Fetch a rendered artifact's content.
+
+        Args:
+            artifact_id: CoreArtifact node ID
+            branch: Branch the artifact lives on
+
+        Returns:
+            The artifact body as text
+
+        Raises:
+            InfrahubAPIError: If the GET does not return a 2xx status.
+        """
+        url = f"{self.base_url}/api/artifact/{artifact_id}?{urlencode({'branch': branch})}"
+        response = self._client._get(url=url)
+        if response.status_code >= 300:
+            raise InfrahubAPIError(
+                f"Failed to fetch artifact content for {artifact_id}: "
+                f"{response.status_code} {response.text}"
+            )
+        return response.text
 
     def create_virtual_machine(self, branch: str, data: Dict[str, Any]) -> Dict[str, Any]:
         """Create a VirtualizationVirtualMachine object.
