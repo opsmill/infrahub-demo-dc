@@ -7,6 +7,7 @@ spec:
   data:
     - name: "fra1-pve-01"
       description: "Proxmox VE host in Frankfurt"
+      object_template: VIRTUALIZATION_HOST
       location: "fra-1"
       platform: [Generic, Linux]
       status: active
@@ -18,6 +19,7 @@ spec:
 
     - name: "fra1-pve-02"
       description: "Proxmox VE host in Frankfurt"
+      object_template: VIRTUALIZATION_HOST
       location: "fra-1"
       platform: [Generic, Linux]
       status: active
@@ -29,6 +31,7 @@ spec:
 
     - name: "fra1-kvm-01"
       description: "KVM host in Frankfurt"
+      object_template: VIRTUALIZATION_HOST
       location: "fra-1"
       platform: [Generic, Linux]
       status: active
@@ -40,6 +43,7 @@ spec:
 
     - name: "fra1-kvm-02"
       description: "KVM host in Frankfurt"
+      object_template: VIRTUALIZATION_HOST
       location: "fra-1"
       platform: [Generic, Linux]
       status: active

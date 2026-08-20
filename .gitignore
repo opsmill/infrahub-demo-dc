@@ -84,3 +84,7 @@ service_catalog/.streamlit/
 *.clab.yml.bak
 *.tar.xz
 .superset/config.json
+.claude/settings.local.json
+
+# Local git mirror used to test INFRAHUB_GIT_LOCAL from a git worktree
+.local-mirror/

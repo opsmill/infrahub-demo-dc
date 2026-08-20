@@ -41,3 +41,43 @@ infrahub_tests:
         spec:
           path: queries/config/spine.gql
           kind: graphql-query-smoke
+
+  - resource: GraphQLQuery
+    resource_name: virtualization_host_cabling
+    tests:
+      - name: syntax_check
+        spec:
+          path: queries/virtualization/host_cabling.gql
+          kind: graphql-query-smoke
+
+  - resource: GraphQLQuery
+    resource_name: virtualization_vm_security
+    tests:
+      - name: syntax_check
+        spec:
+          path: queries/virtualization/vm_security.gql
+          kind: graphql-query-smoke
+
+  - resource: GraphQLQuery
+    resource_name: dc_firewall_policy
+    tests:
+      - name: syntax_check
+        spec:
+          path: queries/virtualization/dc_firewall_policy.gql
+          kind: graphql-query-smoke
+
+  - resource: GraphQLQuery
+    resource_name: proxmox_vm_config
+    tests:
+      - name: syntax_check
+        spec:
+          path: queries/config/proxmox_vm.gql
+          kind: graphql-query-smoke
+
+  - resource: GraphQLQuery
+    resource_name: virtualization_vm_validation
+    tests:
+      - name: syntax_check
+        spec:
+          path: queries/validation/virtualization_vm.gql
+          kind: graphql-query-smoke

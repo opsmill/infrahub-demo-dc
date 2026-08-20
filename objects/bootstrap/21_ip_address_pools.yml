@@ -1,0 +1,22 @@
+---
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: CoreIPAddressPool
+  data:
+    - name: virtualization_vm_pool
+      description: Address pool for virtualization VM primary addresses
+      default_address_type: IpamIPAddress
+      ip_namespace: default
+      resources:
+        kind: IpamPrefix
+        data:
+          # member_type: address (with is_pool left false) makes this prefix
+          # eligible for individual address allocation - is_pool: true marks a
+          # prefix as a CoreIPPrefixPool source for sub-prefix carving instead,
+          # which breaks CoreIPAddressPool allocation (see 17_ip_prefix_pools.yml
+          # for the prefix-pool variant).
+          - prefix: 100.64.0.0/16
+            description: Virtualization VM primary addresses (RFC 6598 shared space)
+            status: active
+            member_type: address

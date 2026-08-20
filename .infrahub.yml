@@ -128,6 +128,12 @@ check_definitions:
     targets: loadbalancers
     parameters:
       device: name__value
+  - name: validate_virtualization_vm
+    class_name: CheckVirtualizationVM
+    file_path: checks/virtualization_vm.py
+    targets: virtualization_vms
+    parameters:
+      device: name__value
 
 python_transforms:
   - name: rack_elevation
@@ -196,7 +202,7 @@ generator_definitions:
       name: name__value
   - name: attach_dc_firewall_policy
     file_path: generators/generate_dc_firewall_policy.py
-    targets: juniper_firewall
+    targets: dc_firewall_policy_targets
     query: dc_firewall_policy
     class_name: DcFirewallPolicyGenerator
     parameters:
@@ -237,6 +243,8 @@ queries:
     file_path: queries/virtualization/vm_security.gql
   - name: dc_firewall_policy
     file_path: queries/virtualization/dc_firewall_policy.gql
+  - name: virtualization_vm_validation
+    file_path: queries/validation/virtualization_vm.gql
   - name: proxmox_vm_config
     file_path: queries/config/proxmox_vm.gql
 schemas:

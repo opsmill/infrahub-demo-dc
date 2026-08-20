@@ -8,7 +8,28 @@ query virtualization_host_cabling($name: String!) {
         }
         location {
           node {
+            id
             __typename
+            ... on LocationBuilding {
+              ancestors {
+                edges {
+                  node {
+                    id
+                    __typename
+                  }
+                }
+              }
+            }
+            ... on LocationRack {
+              ancestors {
+                edges {
+                  node {
+                    id
+                    __typename
+                  }
+                }
+              }
+            }
           }
         }
         interfaces {

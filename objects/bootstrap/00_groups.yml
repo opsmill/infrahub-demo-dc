@@ -82,7 +82,26 @@ spec:
       description: Racks
     - name: proxmox_vms
       description: Virtual machines hosted on a Proxmox VE cluster
+
+---
+# Generator target groups. generator_definitions.targets in .infrahub.yml
+# resolves strictly against CoreGeneratorGroup - a CoreStandardGroup of the
+# same name parses but never dispatches. Kept separate from the artifact
+# target groups above (e.g. proxmox_vms, juniper_firewall), since one group
+# cannot correctly be both.
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: CoreGeneratorGroup
+  data:
     - name: virtualization_hosts
       description: Physical hosts that trigger the virtualization cabling generator
     - name: virtualization_vms
       description: Virtual machines that trigger the virtualization VM security generator
+    - name: dc_firewall_policy_targets
+      description: >-
+        Target group for the attach_dc_firewall_policy generator. Dispatch
+        happens through the dc-firewall-on-create trigger rule, so membership
+        stays empty - the group exists so the generator definition resolves
+        against a CoreGeneratorGroup instead of the juniper_firewall artifact
+        group.

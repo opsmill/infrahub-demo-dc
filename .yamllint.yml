@@ -5,6 +5,7 @@ ignore: |
   /generated-configs
   /.git
   /.github
+  /.local-mirror
   /docs/node_modules
   /docs/pnpm-lock.yaml
   /.venv

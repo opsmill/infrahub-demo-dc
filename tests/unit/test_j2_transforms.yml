@@ -13,3 +13,22 @@ infrahub_tests:
         spec:
           kind: "jinja2-transform-unit-render"
           directory: simulators
+
+  - resource: Jinja2Transform
+    resource_name: proxmox_vm_config
+    tests:
+      - name: syntax_check
+        spec:
+          kind: jinja2-transform-smoke
+      - name: renders_allocated_ip_and_vmid
+        expect: PASS
+        spec:
+          kind: "jinja2-transform-unit-render"
+          directory: proxmox_vm
+          output: output.txt
+      - name: missing_vmid_fails_loudly
+        expect: PASS
+        spec:
+          kind: "jinja2-transform-unit-render"
+          directory: proxmox_vm_no_vmid
+          output: output.txt

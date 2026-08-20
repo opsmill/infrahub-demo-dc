@@ -1,0 +1,39 @@
+query virtualization_vm_validation($device: String!) {
+  VirtualizationVirtualMachine(name__value: $device) {
+    edges {
+      node {
+        name {
+          value
+        }
+        vmid {
+          value
+        }
+        cluster {
+          node {
+            id
+            name {
+              value
+            }
+          }
+        }
+        host {
+          node {
+            ... on VirtualizationPhysicalHost {
+              name {
+                value
+              }
+              cluster {
+                node {
+                  id
+                  name {
+                    value
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

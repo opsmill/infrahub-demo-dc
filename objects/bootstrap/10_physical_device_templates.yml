@@ -346,3 +346,23 @@ spec:
           - template_name: QFX5220-32CD_LEAF_ge-0/0/[2-3]
             name: ge-0/0/[2-3]
             role: customer
+
+---
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: TemplateVirtualizationPhysicalHost
+  data:
+    - template_name: VIRTUALIZATION_HOST
+      status: active
+      interfaces:
+        kind: TemplateInterfacePhysical
+        data:
+          - template_name: VIRTUALIZATION_HOST_eth0
+            name: eth0
+            role: access
+            status: free
+          - template_name: VIRTUALIZATION_HOST_eth1
+            name: eth1
+            role: access
+            status: free

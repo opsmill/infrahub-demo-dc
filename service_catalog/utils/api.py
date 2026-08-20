@@ -1465,7 +1465,7 @@ class InfrahubClient:
             data: Virtual machine data dictionary with structure:
                 - name: str
                 - host: str (ID, required)
-                - cluster: str (ID, optional - derived from host)
+                - cluster: str (ID, required - derived from host, mandatory in schema)
                 - description: str (optional)
                 - os_version: str (optional)
                 - status: str (active, provisioning, maintenance, drained)
@@ -1485,16 +1485,15 @@ class InfrahubClient:
         """
         try:
             cluster = data.get("cluster")
+            if not cluster:
+                raise InfrahubAPIError("cluster is required (VM.cluster is mandatory in the schema)")
             vmid = data.get("vmid")
             customer = data.get("customer")
 
-            # Build mutation dynamically to exclude cluster/vmid/customer
-            # when not provided, since passing e.g. cluster: { id: null } errors.
+            # vmid/customer are appended only when provided, since passing
+            # e.g. customer: { id: null } errors.
             optional_vars = []
             optional_fields = []
-            if cluster:
-                optional_vars.append("$cluster: String,")
-                optional_fields.append("cluster: { id: $cluster }")
             if vmid is not None:
                 optional_vars.append("$vmid: BigInt,")
                 optional_fields.append("vmid: { value: $vmid }")
@@ -1507,6 +1506,7 @@ class InfrahubClient:
                 $name: String!,
                 $description: String,
                 $host: String!,
+                $cluster: String!,
                 $os_version: String,
                 $status: String!,
                 $vcpus: BigInt,
@@ -1520,6 +1520,7 @@ class InfrahubClient:
                         name: {{ value: $name }}
                         description: {{ value: $description }}
                         host: {{ id: $host }}
+                        cluster: {{ id: $cluster }}
                         os_version: {{ value: $os_version }}
                         status: {{ value: $status }}
                         vcpus: {{ value: $vcpus }}
@@ -1551,8 +1552,7 @@ class InfrahubClient:
                 "disk": data.get("disk"),
                 "groups": groups,
             }
-            if cluster:
-                variables["cluster"] = cluster
+            variables["cluster"] = cluster
             if vmid is not None:
                 variables["vmid"] = vmid
             if customer:
@@ -1570,10 +1570,14 @@ class InfrahubClient:
             raise InfrahubAPIError(f"Failed to create virtual machine: {str(e)}")
 
     def _get_group_id(self, group_name: str, branch: str) -> str:
-        """Look up a CoreStandardGroup ID by name.
+        """Look up a group ID by name across all group kinds.
+
+        Queries the CoreGroup generic so both CoreStandardGroup (artifact
+        targets like proxmox_vms) and CoreGeneratorGroup (generator targets
+        like virtualization_vms) resolve.
 
         Args:
-            group_name: Name of the CoreStandardGroup.
+            group_name: Name of the group.
             branch: Branch to query.
 
         Returns:
@@ -1584,7 +1588,7 @@ class InfrahubClient:
         """
         query = """
         query GetGroup($name: String!) {
-            CoreStandardGroup(name__value: $name) {
+            CoreGroup(name__value: $name) {
                 edges {
                     node {
                         id
@@ -1594,7 +1598,7 @@ class InfrahubClient:
         }
         """
         result = self.execute_graphql(query, {"name": group_name}, branch)
-        edges = result.get("CoreStandardGroup", {}).get("edges", [])
+        edges = result.get("CoreGroup", {}).get("edges", [])
         if not edges:
             raise InfrahubAPIError(f"Group '{group_name}' not found")
         return edges[0]["node"]["id"]

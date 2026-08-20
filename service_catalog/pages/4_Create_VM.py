@@ -333,7 +333,7 @@ def main() -> None:
                 cluster = selected_host["cluster"]
                 st.caption(f"Cluster: {cluster['name']} ({cluster['cluster_type']})")
             elif selected_host:
-                st.caption("This host is not part of a cluster")
+                st.warning("This host is not part of a cluster - a VM requires a clustered host.")
 
             # Description
             description = st.text_input(
@@ -430,6 +430,8 @@ def main() -> None:
                 errors.append("VM Name is required")
             if not selected_host:
                 errors.append("Host is required")
+            elif not selected_host.get("cluster"):
+                errors.append("Selected host is not part of a cluster (VM.cluster is mandatory)")
 
             if errors:
                 display_error(

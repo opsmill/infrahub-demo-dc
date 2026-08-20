@@ -60,6 +60,14 @@ nodes:
         optional: true
         description: Hypervisor hosts that are members of this cluster.
         order_weight: 2000
+      - name: virtual_machines
+        label: Virtual Machines
+        peer: VirtualizationVirtualMachine
+        cardinality: many
+        kind: Attribute
+        optional: true
+        description: Virtual machines that belong to this cluster.
+        order_weight: 2100
 
   # --------------------  Physical Host  --------------------
   - name: PhysicalHost
@@ -77,6 +85,14 @@ nodes:
       - VirtualizationHostVirtualMachine
     uniqueness_constraints:
       - [name__value]
+    relationships:
+      - name: cluster
+        peer: VirtualizationCluster
+        cardinality: one
+        kind: Attribute
+        optional: true
+        description: Virtualization cluster this host is a member of.
+        order_weight: 1150
 
   # --------------------  Virtual Machine  --------------------
   - name: VirtualMachine
@@ -85,14 +101,15 @@ nodes:
     label: Virtual Machine
     icon: mdi:server
     include_in_menu: false
-    generate_template: true
     inherit_from:
       - CoreArtifactTarget
       - DcimGenericDevice
       - ComputeGenericUnit
     uniqueness_constraints:
       - [name__value]
-      - [vmid__value]
+      # A hypervisor VMID (e.g. Proxmox) is only unique within its cluster -
+      # two independent clusters may both legitimately use VMID 100.
+      - [cluster, vmid__value]
     attributes:
       - name: vmid
         label: VM ID
@@ -113,7 +130,9 @@ nodes:
         peer: VirtualizationCluster
         cardinality: one
         kind: Attribute
-        optional: true
+        # Mandatory: the [cluster, vmid__value] uniqueness constraint requires
+        # it, and every VM runs on a host that belongs to exactly one cluster.
+        optional: false
         description: Virtualization cluster this virtual machine belongs to.
         order_weight: 1200
       - name: customer
@@ -123,3 +142,16 @@ nodes:
         optional: true
         description: Customer that uses this virtual machine.
         order_weight: 1300
+
+extensions:
+  nodes:
+    - kind: OrganizationCustomer
+      relationships:
+        - name: virtual_machines
+          label: Virtual Machines
+          peer: VirtualizationVirtualMachine
+          cardinality: many
+          kind: Attribute
+          optional: true
+          description: Virtual machines used by this customer.
+          order_weight: 2600
