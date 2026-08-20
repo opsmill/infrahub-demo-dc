@@ -11,8 +11,8 @@ across sites:
    moved into the least-occupied one from its building-level default
    location and given a free rack unit. A no-op if no racks exist yet.
    The position matters beyond tidiness: the rack_elevation transform
-   skips any device without one, so a host placed in a rack but left
-   positionless never appears in the rack drawing.
+   skips any device without one, so a host placed in a rack but given no
+   rack unit never appears in the rack drawing.
 2. Cabling: dual-homes the host to two leaf switches in the same metro,
    picking whichever leafs currently have the most free "customer"-role
    interfaces available - so cabling naturally load-balances across

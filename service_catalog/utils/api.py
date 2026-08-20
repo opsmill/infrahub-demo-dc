@@ -688,8 +688,8 @@ class InfrahubClient:
             branch: Branch name to query (default: "main")
 
         Returns:
-            List of device dictionaries with id, name, position, height, role,
-            and device_type
+            List of device dictionaries with id, kind, name, position, height,
+            role, and device_type
 
         Raises:
             InfrahubConnectionError: If connection fails
@@ -703,6 +703,7 @@ class InfrahubClient:
                     edges {
                         node {
                             id
+                            __typename
                             position { value }
                             device_type {
                                 node {
@@ -748,6 +749,9 @@ class InfrahubClient:
 
                 device_dict = {
                     "id": node.get("id"),
+                    # The concrete kind, so a caller can link to the right
+                    # object page: a hypervisor host is not a DcimDevice.
+                    "kind": node.get("__typename"),
                     "name": {"value": node.get("name", {}).get("value")},
                     "position": {"value": node.get("position", {}).get("value")},
                     "height": {"value": device_height},

@@ -245,8 +245,14 @@ def _generate_device_html(
     # Calculate height in pixels (each unit is approximately 20px)
     height_px = span * 20
 
-    # Generate Infrahub URL for the device
-    device_url = f"{base_url}/objects/DcimDevice/{device_id}?branch={branch}" if device_id else "#"
+    # Generate Infrahub URL for the device.
+    #
+    # The kind has to come from the data: a rack holds DcimDevice switches and
+    # VirtualizationPhysicalHost hypervisors side by side, and Infrahub resolves
+    # an object page by kind, so a hardcoded DcimDevice sends every host to a
+    # page that cannot exist.
+    device_kind = device.get("kind") or "DcimDevice"
+    device_url = f"{base_url}/objects/{device_kind}/{device_id}?branch={branch}" if device_id else "#"
 
     # For 1U devices, only show main text. For 2U+, show main text and secondary info
     if span == 1:
