@@ -1,4 +1,4 @@
-query proxmox_vm_config($name: String!) {
+query vm_config($name: String!) {
   VirtualizationVirtualMachine(name__value: $name) {
     edges {
       node {
@@ -26,6 +26,9 @@ query proxmox_vm_config($name: String!) {
         disk {
           value
         }
+        ssh_public_key {
+          value
+        }
         host {
           node {
             ... on VirtualizationPhysicalHost {
@@ -49,6 +52,13 @@ query proxmox_vm_config($name: String!) {
           node {
             name {
               value
+            }
+            manufacturer {
+              node {
+                name {
+                  value
+                }
+              }
             }
           }
         }

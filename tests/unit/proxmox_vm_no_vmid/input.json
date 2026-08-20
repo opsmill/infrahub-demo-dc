@@ -12,6 +12,7 @@
             "vcpus": { "value": 2 },
             "memory": { "value": 8 },
             "disk": { "value": 40 },
+            "ssh_public_key": { "value": null },
             "host": { "node": { "name": { "value": "fra1-kvm-02" } } },
             "cluster": {
               "node": {
@@ -19,7 +20,7 @@
                 "cluster_type": { "value": "kvm" }
               }
             },
-            "platform": { "node": { "name": { "value": "Linux" } } },
+            "platform": { "node": { "name": { "value": "Linux" }, "manufacturer": { "node": { "name": { "value": "Generic" } } } } },
             "primary_address": { "node": null },
             "tags": { "edges": [] }
           }

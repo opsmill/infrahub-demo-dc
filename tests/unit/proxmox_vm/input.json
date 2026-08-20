@@ -12,6 +12,7 @@
             "vcpus": { "value": 4 },
             "memory": { "value": 8 },
             "disk": { "value": 80 },
+            "ssh_public_key": { "value": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA demo@opsmill" },
             "host": { "node": { "name": { "value": "fra1-pve-01" } } },
             "cluster": {
               "node": {
@@ -19,7 +20,7 @@
                 "cluster_type": { "value": "proxmox" }
               }
             },
-            "platform": { "node": { "name": { "value": "Linux" } } },
+            "platform": { "node": { "name": { "value": "Linux" }, "manufacturer": { "node": { "name": { "value": "Generic" } } } } },
             "primary_address": { "node": { "address": { "value": "100.64.0.1/16" } } },
             "tags": {
               "edges": [

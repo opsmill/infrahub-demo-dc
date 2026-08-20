@@ -67,11 +67,11 @@ infrahub_tests:
           kind: graphql-query-smoke
 
   - resource: GraphQLQuery
-    resource_name: proxmox_vm_config
+    resource_name: vm_config
     tests:
       - name: syntax_check
         spec:
-          path: queries/config/proxmox_vm.gql
+          path: queries/config/vm_config.gql
           kind: graphql-query-smoke
 
   - resource: GraphQLQuery

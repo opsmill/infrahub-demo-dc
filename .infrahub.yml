@@ -8,7 +8,7 @@ jinja2_transforms:
   # Proxmox
   - name: proxmox_vm_config
     description: Template to generate a Proxmox VE VM provisioning script
-    query: proxmox_vm_config
+    query: vm_config
     template_path: templates/configs/proxmox_vm.j2
 
 artifact_definitions:
@@ -245,8 +245,8 @@ queries:
     file_path: queries/virtualization/dc_firewall_policy.gql
   - name: virtualization_vm_validation
     file_path: queries/validation/virtualization_vm.gql
-  - name: proxmox_vm_config
-    file_path: queries/config/proxmox_vm.gql
+  - name: vm_config
+    file_path: queries/config/vm_config.gql
 schemas:
   - schemas/
 menus:
