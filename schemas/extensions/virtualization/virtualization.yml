@@ -116,3 +116,10 @@ nodes:
         optional: true
         description: Virtualization cluster this virtual machine belongs to.
         order_weight: 1200
+      - name: customer
+        peer: OrganizationCustomer
+        cardinality: one
+        kind: Attribute
+        optional: true
+        description: Customer that uses this virtual machine.
+        order_weight: 1300

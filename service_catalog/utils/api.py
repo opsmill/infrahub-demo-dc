@@ -1473,6 +1473,7 @@ class InfrahubClient:
                 - memory: int (optional, GB)
                 - disk: int (optional, GB)
                 - vmid: int (optional)
+                - customer: str (ID, optional)
                 - group_names: List[str] (CoreStandardGroup names, e.g. ["virtualization_vms"])
 
         Returns:
@@ -1485,9 +1486,10 @@ class InfrahubClient:
         try:
             cluster = data.get("cluster")
             vmid = data.get("vmid")
+            customer = data.get("customer")
 
-            # Build mutation dynamically to exclude cluster/vmid when not
-            # provided, since passing e.g. cluster: { id: null } errors.
+            # Build mutation dynamically to exclude cluster/vmid/customer
+            # when not provided, since passing e.g. cluster: { id: null } errors.
             optional_vars = []
             optional_fields = []
             if cluster:
@@ -1496,6 +1498,9 @@ class InfrahubClient:
             if vmid is not None:
                 optional_vars.append("$vmid: BigInt,")
                 optional_fields.append("vmid: { value: $vmid }")
+            if customer:
+                optional_vars.append("$customer: String,")
+                optional_fields.append("customer: { id: $customer }")
 
             mutation = f"""
             mutation CreateVirtualMachine(
@@ -1550,6 +1555,8 @@ class InfrahubClient:
                 variables["cluster"] = cluster
             if vmid is not None:
                 variables["vmid"] = vmid
+            if customer:
+                variables["customer"] = customer
 
             result = self.execute_graphql(mutation, variables, branch)
 

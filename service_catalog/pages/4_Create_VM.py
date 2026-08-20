@@ -150,6 +150,7 @@ def execute_vm_creation_step(client: InfrahubClient) -> None:
                 "memory": form_data.get("memory"),
                 "disk": form_data.get("disk"),
                 "vmid": form_data.get("vmid"),
+                "customer": form_data.get("customer"),
                 "group_names": group_names,
             }
 
@@ -282,6 +283,18 @@ def main() -> None:
                 )
                 st.stop()
 
+    # Fetch customers (cache in session state)
+    if "vm_customers" not in st.session_state:
+        with st.spinner("Loading customers..."):
+            try:
+                organizations = client.get_organizations()
+                st.session_state.vm_customers = [
+                    org for org in organizations if org.get("type") == "OrganizationCustomer"
+                ]
+            except Exception as e:
+                st.warning(f"Could not load customers: {e}")
+                st.session_state.vm_customers = []
+
     # VM Creation Form
     st.markdown("---")
 
@@ -335,6 +348,23 @@ def main() -> None:
                 value="Ubuntu 22.04",
                 disabled=vm_creation_active,
             )
+
+            # Customer (optional)
+            customer_options = ["None"] + [
+                c.get("display_label") or c.get("name", {}).get("value", "Unknown")
+                for c in st.session_state.vm_customers
+            ]
+            customer_map = {
+                (c.get("display_label") or c.get("name", {}).get("value", "Unknown")): c.get("id")
+                for c in st.session_state.vm_customers
+            }
+            customer_name = st.selectbox(
+                "Customer",
+                options=customer_options,
+                help="Customer that uses this VM (optional)",
+                disabled=vm_creation_active,
+            )
+            customer_id = customer_map.get(customer_name)
 
         with col2:
             # Status
@@ -422,6 +452,7 @@ def main() -> None:
                     "memory": memory,
                     "disk": disk,
                     "vmid": vmid,
+                    "customer": customer_id,
                 }
 
                 handle_vm_creation(client, form_data)

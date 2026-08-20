@@ -9,6 +9,7 @@ spec:
       description: "Web server VM"
       host: "fra1-pve-01"
       cluster: "FRA1-PROXMOX-CLUSTER"
+      customer: "OpsMill"
       platform: [Generic, Linux]
       os_version: "Ubuntu 22.04"
       status: active
@@ -24,6 +25,7 @@ spec:
       description: "Database server VM"
       host: "fra1-pve-01"
       cluster: "FRA1-PROXMOX-CLUSTER"
+      customer: "OpsMill"
       platform: [Generic, Linux]
       os_version: "Ubuntu 22.04"
       status: active
@@ -39,6 +41,7 @@ spec:
       description: "Web server VM"
       host: "fra1-pve-02"
       cluster: "FRA1-PROXMOX-CLUSTER"
+      customer: "Customer 2"
       platform: [Generic, Linux]
       os_version: "Ubuntu 22.04"
       status: active
@@ -54,6 +57,7 @@ spec:
       description: "Application server VM"
       host: "fra1-kvm-01"
       cluster: "FRA1-KVM-CLUSTER"
+      customer: "Customer 3"
       platform: [Generic, Linux]
       os_version: "Ubuntu 22.04"
       status: active
@@ -68,6 +72,7 @@ spec:
       description: "Application server VM"
       host: "fra1-kvm-01"
       cluster: "FRA1-KVM-CLUSTER"
+      customer: "Customer 3"
       platform: [Generic, Linux]
       os_version: "Ubuntu 22.04"
       status: active
@@ -82,6 +87,7 @@ spec:
       description: "Cache server VM"
       host: "fra1-kvm-02"
       cluster: "FRA1-KVM-CLUSTER"
+      customer: "Customer 4"
       platform: [Generic, Linux]
       os_version: "Ubuntu 22.04"
       status: provisioning
