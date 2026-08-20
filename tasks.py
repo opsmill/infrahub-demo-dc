@@ -202,7 +202,14 @@ def _load_virtualization_objects(context: Context, branch: str) -> None:
     each host's own cable_virtualization_host generator only finds leaf
     switches to cable to if they already exist - so this must run *after*
     the DC topology's generator has finished creating them.
+
+    The HTTPS-only security policy/address group must exist *before* any
+    VM is loaded, since VM creation immediately triggers
+    secure_virtualization_vm, which hard-fails if that data is missing.
     """
+    console.print(f"\n[cyan]→[/cyan] Loading virtualization security policy to branch: [bold]{branch}[/bold]")
+    context.run(f"uv run infrahubctl object load objects/security/16_virtualization_vm_security.yml --branch {branch}")
+
     console.print(f"\n[cyan]→[/cyan] Loading virtualization objects to branch: [bold]{branch}[/bold]")
     context.run(f"uv run infrahubctl object load objects/virtualization/ --branch {branch}")
 
