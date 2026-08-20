@@ -60,6 +60,14 @@ spec:
       ansible_network_os: linux
       containerlab_os: linux
 
+    - name: Windows
+      manufacturer: Generic
+      nornir_platform: windows
+      napalm_driver: windows
+      netmiko_device_type: windows
+      ansible_network_os: windows
+      containerlab_os: windows
+
     - name: IOLAN
       manufacturer: Perle
       nornir_platform: iolan

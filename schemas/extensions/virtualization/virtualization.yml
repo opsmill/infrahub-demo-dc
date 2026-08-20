@@ -117,6 +117,12 @@ nodes:
         kind: Number
         optional: true
         order_weight: 1050
+      - name: ssh_public_key
+        label: SSH Public Key
+        description: Public key installed into the guest by cloud-init / cloudbase-init.
+        kind: Text
+        optional: true
+        order_weight: 1075
     relationships:
       - name: host
         peer: VirtualizationHostVirtualMachine
