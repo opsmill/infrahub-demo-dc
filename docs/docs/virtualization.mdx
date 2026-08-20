@@ -114,8 +114,8 @@ The guest OS still changes a few settings inside each script:
 
 `vm_userdata` (content type `application/yaml`) targets the `vm_userdata_targets` group - every VM, regardless of hypervisor. It renders a `#cloud-config` document:
 
-- Windows guests get a cloudbase-init cloud-config: hostname, an `Admin` user in the `Administrators` group, and the SSH key if one is set
-- Everything else gets a cloud-init cloud-config: hostname, an `admin` user with passwordless sudo, and the SSH key if one is set
+- Windows guests get a cloudbase-init `cloud-config`: hostname, an `Admin` user in the `Administrators` group, and the SSH key if one is set
+- Everything else gets a cloud-init `cloud-config`: hostname, an `admin` user with passwordless sudo, and the SSH key if one is set
 
 The SSH key comes from the VM's `ssh_public_key` attribute. No password is ever stored in Infrahub - set the first-boot password at deploy time instead (console access, or a cloudbase-init inject for Windows). Every per-hypervisor script includes `vm_userdata` directly, so the two stay in sync.
 
