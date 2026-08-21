@@ -82,13 +82,17 @@ interfaces {
 {%- if vlans %}
     ## Integrated Routing and Bridging (IRB) for L3 VLANs
     irb {
+{#-     Gateway address comes from the segment's prefix in Infrahub, not from a
+        convention built on the VLAN ID. A segment without a prefix renders no unit. -#}
 {%-     for vlan in vlans %}
+{%-         if vlan.gateway %}
         unit {{ vlan.vlan_id }} {
             description "{{ vlan.name }} Gateway";
             family inet {
-                address 192.168.{{ vlan.vlan_id }}.1/24;
+                address {{ vlan.gateway }};
             }
         }
+{%-         endif %}
 {%-     endfor %}
     }
 {%- endif %}

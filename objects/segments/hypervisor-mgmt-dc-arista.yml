@@ -1,0 +1,39 @@
+---
+# The hypervisor management network as a fabric segment, for the Arista DC.
+#
+# This is what makes a host address real rather than decorative: an l3_gateway
+# segment gives the leaf pair an anycast gateway for the prefix (rendered from
+# the prefix itself, see transforms/common.get_anycast_gateway), and the
+# create_segment generator binds the segment to every customer-role interface on
+# the fabric's leaves, which is what the host NICs are cabled to. The leaf config
+# then carries the VLAN on those ports and the SVI for the subnet.
+#
+# `deployment` is mandatory and names one DC, so a segment exists per design. Add
+# a sibling file for another design and load it from _run_dc_demo in tasks.py;
+# without one, hosts in that DC are cabled but get no fabric address.
+#
+# The prefix is referenced, not created here: it is defined once in
+# objects/bootstrap/21_ip_address_pools.yml so the segment and the address pool
+# share one prefix object.
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: ServiceNetworkSegment
+  data:
+    - customer_name: Hypervisor-Management
+      environment: production
+      segment_type: l3_gateway
+      tenant_isolation: shared_controlled
+      vlan_id: 900
+      external_routing: false
+      status: active
+      owner: OpsMill
+      deployment: dc-arista
+      # IpamPrefix human_friendly_id is [prefix__value, ip_namespace__name__value],
+      # so the reference needs both components, not just the prefix.
+      prefix: [172.25.9.0/24, default]
+      # Required, not decorative: create_segment targets the network_segments
+      # group, and the segment-on-create trigger rule refuses to run a generator
+      # against a node that is not a member of its target group.
+      member_of_groups:
+        - network_segments

@@ -6,6 +6,7 @@ from nested data structures returned by Infrahub APIs.
 """
 
 import html
+import ipaddress
 import re
 from collections import defaultdict
 from typing import Any
@@ -82,7 +83,7 @@ def get_bgp_profile(device_services: list[dict[str, Any]]) -> list[dict[str, Any
     peer_groups = defaultdict(list)
     for service in device_services:
         if service.get("typename") == "ServiceBGP":
-            peer_group_name = service.get("peer_group", {}).get("name", "unknown")
+            peer_group_name = (service.get("peer_group") or {}).get("name", "unknown")
             peer_groups[peer_group_name].append(service)
 
     grouped = []
@@ -118,14 +119,14 @@ def get_ospf(device_services: list[dict[str, Any]]) -> list[dict[str, Any]]:
     for service in device_services:
         if service.get("typename") == "ServiceOSPF":
             # Extract router_id address and strip CIDR notation if present
-            router_id = service.get("router_id", {}).get("address", "")
+            router_id = (service.get("router_id") or {}).get("address", "")
             if router_id and "/" in router_id:
                 router_id = router_id.split("/")[0]
 
             ospf_config = {
                 "process_id": service.get("process_id", 1),
                 "router_id": router_id,
-                "area": service.get("area", {}).get("area"),
+                "area": (service.get("area") or {}).get("area"),
                 "reference_bandwidth": service.get("reference_bandwidth", 10000),
             }
             ospf_configs.append(ospf_config)
@@ -133,13 +134,44 @@ def get_ospf(device_services: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return ospf_configs
 
 
+def get_anycast_gateway(prefix: str | None) -> str | None:
+    """
+    Return the first usable address of a prefix, as the segment's gateway.
+
+    An L3 segment's gateway is configured identically on every leaf of the pair
+    (an anycast gateway), and the convention is the first usable address of the
+    segment's prefix. Deriving it here rather than in the template keeps the
+    address arithmetic out of Jinja, and keeps the rendered config tied to the
+    prefix actually recorded in Infrahub.
+
+    Args:
+        prefix: The segment's prefix in CIDR form, or None when it has none.
+
+    Returns:
+        The gateway as "address/prefixlen", or None when the prefix is missing
+        or unparseable. A /31 or /32 yields its own first address, since
+        `hosts()` treats those as usable rather than as network addresses.
+    """
+    if not prefix:
+        return None
+    try:
+        network = ipaddress.ip_network(prefix, strict=False)
+    except ValueError:
+        return None
+    # `hosts()` returns a generator for a normal prefix but a plain list for a
+    # /31 or /32, so it has to be wrapped in iter() before taking the first.
+    first = next(iter(network.hosts()), None)
+    return f"{first}/{network.prefixlen}" if first is not None else None
+
+
 def get_vlans(data: list) -> list[dict[str, Any]]:
     """
     Extracts VLAN information from the input data.
 
-    Returns a list of dicts with vlan_id, name, vni, rd, segment_type, and external_routing.
-    VNI is computed as VLAN ID + 10000, RD is the VLAN ID as a string.
-    Unique per vlan_id.
+    Returns a list of dicts with vlan_id, name, vni, rd, segment_type,
+    external_routing, prefix, and gateway. VNI is computed as VLAN ID + 10000,
+    RD is the VLAN ID as a string, and the gateway is the first usable address
+    of the segment's prefix. Unique per vlan_id.
     """
     vlans: dict[int, dict[str, Any]] = {}
     for interface in data:
@@ -147,6 +179,7 @@ def get_vlans(data: list) -> list[dict[str, Any]]:
             if segment.get("typename") == "ServiceNetworkSegment":
                 vlan_id = segment.get("vlan_id")
                 if vlan_id is not None and vlan_id not in vlans:
+                    prefix = (segment.get("prefix") or {}).get("prefix")
                     vlans[vlan_id] = {
                         "vlan_id": vlan_id,
                         "name": segment.get("name") or segment.get("customer_name") or f"VLAN_{vlan_id}",
@@ -154,6 +187,8 @@ def get_vlans(data: list) -> list[dict[str, Any]]:
                         "rd": str(vlan_id),
                         "segment_type": segment.get("segment_type", "l2_only"),
                         "external_routing": segment.get("external_routing", False),
+                        "prefix": prefix,
+                        "gateway": get_anycast_gateway(prefix),
                     }
     return list(vlans.values())
 

@@ -18,6 +18,13 @@ across sites:
    interfaces available - so cabling naturally load-balances across
    leafs and adapts to whatever ports earlier hosts have already
    consumed.
+3. Addressing: gives the host a management address from the fabric's
+   hypervisor-management segment, once it is cabled. The address belongs
+   here rather than in a generator of its own because it is a property of
+   the connection: the prefix is the one the leaf pair renders an anycast
+   gateway for, so the address is only reachable through the ports cabled
+   above. A DC with no hypervisor segment loaded leaves the host
+   unaddressed rather than inventing a subnet.
 
 The host's eth0/eth1 NICs come from whichever sized
 VIRTUALIZATION_HOST_* object template it was created from
@@ -34,6 +41,7 @@ from typing import Any
 
 from infrahub_sdk.exceptions import GraphQLError  # type: ignore[import-not-found]
 from infrahub_sdk.generator import InfrahubGenerator  # type: ignore[import-not-found]
+from infrahub_sdk.protocols import CoreIPAddressPool  # type: ignore[import-not-found]
 
 from .common import extract_single_node, safe_sort_interface_list
 from .schema_protocols import (
@@ -44,6 +52,11 @@ from .schema_protocols import (
 )
 
 HOST_INTERFACE_NAMES = ["eth0", "eth1"]
+
+# Declared in objects/bootstrap/21_ip_address_pools.yml over the same prefix the
+# hypervisor-management segment uses, so an allocated address sits behind the
+# gateway the leaf pair renders.
+HOST_IP_POOL_NAME = "virtualization_host_pool"
 
 METRO_RACKS_QUERY = """
 query MetroRacks($metro_ids: [ID]) {
@@ -268,6 +281,56 @@ class VirtualizationHostCablingGenerator(InfrahubGenerator):
 
             if not cabled:
                 self.logger.warning(f"No leaf switches with free ports left for {host_name}:{nic_name}")
+
+        await self._assign_management_address(host_name, host_id, host.get("primary_address"))
+
+    async def _assign_management_address(
+        self, host_name: str, host_id: str, primary_address: dict[str, Any] | None
+    ) -> None:
+        """Give the host an address from the hypervisor-management segment.
+
+        Idempotent: a host that already has a primary address keeps it, so
+        re-running the generator never reallocates. A missing pool is not an
+        error - a DC without the hypervisor segment loaded simply leaves its
+        hosts unaddressed, which is better than inventing a subnet the fabric
+        does not route.
+
+        Args:
+            host_name: Host name, for logging
+            host_id: Host ID
+            primary_address: The host's existing primary address from the query,
+                or None when it has none.
+        """
+        if primary_address:
+            self.logger.info(f"- {host_name} already has management address {primary_address.get('address')}")
+            return
+
+        pool = await self.client.get(
+            kind=CoreIPAddressPool,
+            branch=self.branch,
+            name__value=HOST_IP_POOL_NAME,
+            raise_when_missing=False,
+        )
+        if pool is None:
+            self.logger.info(
+                f"- No {HOST_IP_POOL_NAME} in this branch, leaving {host_name} without a management address"
+            )
+            return
+
+        address: Any = await self.client.allocate_next_ip_address(
+            resource_pool=pool,
+            identifier=f"{host_name}-mgmt",
+            data={"description": f"{host_name} hypervisor management address"},
+            branch=self.branch,
+        )
+        if address is None:
+            self.logger.warning(f"- {HOST_IP_POOL_NAME} had no free address for {host_name}")
+            return
+
+        host_node = await self.client.get(kind=VirtualizationPhysicalHost, branch=self.branch, id=host_id)
+        host_node.primary_address = address.id  # type: ignore[assignment]
+        await host_node.save(allow_upsert=True)
+        self.logger.info(f"- Allocated {address.address.value} to {host_name} from {HOST_IP_POOL_NAME}")
 
     @staticmethod
     def _resolve_metro_id(location: dict) -> str | None:

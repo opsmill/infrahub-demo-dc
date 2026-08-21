@@ -44,12 +44,16 @@ class Leaf(InfrahubTransform):
         if bgp_profiles:
             # Get common BGP settings from first profile
             first_profile = bgp_profiles[0]
-            # Extract router_id address and strip CIDR notation if present
-            router_id = first_profile.get("router_id", {}).get("address", "")
+            # `or {}` rather than a get() default throughout: clean_data leaves an
+            # unset relationship as an explicit None, so the key exists and the
+            # default never applies. `.get("local_as", {}).get(...)` then raises
+            # AttributeError on None and fails the whole artifact, which is how a
+            # session missing its local ASN took out every leaf config.
+            router_id = (first_profile.get("router_id") or {}).get("address", "")
             if router_id and "/" in router_id:
                 router_id = router_id.split("/")[0]
             bgp = {
-                "local_as": first_profile.get("local_as", {}).get("asn", ""),
+                "local_as": (first_profile.get("local_as") or {}).get("asn", ""),
                 "router_id": router_id,
                 "neighbors": [],
             }
@@ -58,8 +62,8 @@ class Leaf(InfrahubTransform):
                 for session in profile.get("sessions", []):
                     neighbor = {
                         "name": session.get("name", ""),
-                        "remote_ip": session.get("remote_ip", {}).get("address", ""),
-                        "remote_as": session.get("remote_as", {}).get("asn", ""),
+                        "remote_ip": (session.get("remote_ip") or {}).get("address", ""),
+                        "remote_as": (session.get("remote_as") or {}).get("asn", ""),
                     }
                     bgp["neighbors"].append(neighbor)
 

@@ -101,6 +101,9 @@ respect-gitignore = true
 [tool.pytest.ini_options]
 addopts = "--strict-markers"
 asyncio_mode = "auto"
+# The repository root, so a unit test can import the transform and generator helpers
+# it exercises (`from transforms.common import ...`) the same way Infrahub imports them.
+pythonpath = ["."]
 testpaths = ["tests"]
 asyncio_default_fixture_loop_scope = "class"
 filterwarnings = [

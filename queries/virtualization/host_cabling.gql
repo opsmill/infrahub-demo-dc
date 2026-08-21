@@ -13,6 +13,13 @@ query virtualization_host_cabling($name: String!) {
             }
           }
         }
+        primary_address {
+          node {
+            address {
+              value
+            }
+          }
+        }
         location {
           node {
             id

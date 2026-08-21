@@ -13,7 +13,7 @@ The virtualization schema tracks:
 - **Physical hosts** - rack-mounted servers that run a hypervisor and appear in the DCIM model like any other device, created from a sized object template that carries the server model, its capacity and its ports
 - **Virtual machines** - VMs with compute sizing (vCPUs, memory, disk), a hypervisor VM ID, and an optional customer link
 
-Everything around a VM is automated. When you load a host, a generator places it in a rack and cables it to the fabric. When you load a VM, another generator assigns it a primary IP address and puts it behind an HTTPS-only firewall policy. A validation check keeps the data consistent in every proposed change.
+Everything around a VM is automated. When you load a host, a generator places it in a rack, cables it to the fabric, and gives it a management address out of the fabric's own hypervisor-management network. When you load a VM, another generator assigns it a primary IP address and puts it behind an HTTPS-only firewall policy. A validation check keeps the data consistent in every proposed change.
 
 ## Prerequisites
 
@@ -35,10 +35,10 @@ Each task runs the same pipeline:
 
 1. Creates a branch and loads the DC topology design
 2. Waits for the DC generator to build the fabric
-3. Loads the virtualization security policy, then the clusters, hosts, and VMs
+3. Loads the hypervisor-management segment and the virtualization security policy, then the clusters, hosts, and VMs
 4. Creates a proposed change for review
 
-The order matters, and the task handles it for you. Host cabling needs the leaf switches that the DC generator creates, so the virtualization objects load only after the generator finishes. The security policy loads before the first VM, because VM creation immediately triggers the security generator, which expects the policy to exist.
+The order matters, and the task handles it for you. Host cabling needs the leaf switches that the DC generator creates, so the virtualization objects load only after the generator finishes. The hypervisor-management segment loads before the first host, because host creation immediately triggers the cabling generator, which allocates the host's address from that network. The security policy loads before the first VM, for the same reason: VM creation triggers the security generator, which expects the policy to exist.
 
 ### Sample data
 
@@ -105,16 +105,17 @@ other place the family name appears.
 
 Four generators react to the loaded data. You don't run any of them by hand.
 
-### Rack placement and fabric cabling
+### Rack placement, fabric cabling and addressing
 
 The `cable_virtualization_host` generator runs whenever a physical host is created. For each host, scoped to the host's own metro:
 
 1. **Placement** - if racks exist in the metro (from whichever DC design was generated there), the host moves into the emptiest one and takes a free rack unit, stacking downward from the top the same way the DC generator places switches. The rack unit matters beyond tidiness: the `rack_elevation` artifact skips any device without a position, so a host placed in a rack but given no rack unit never appears in the rack drawing. Occupancy is counted in rack units rather than devices, so a rack holding one tall chassis does not read as emptier than a rack of 1U switches
 2. **Cabling** - the host's `eth0` and `eth1` interfaces are dual-homed to the two leaf switches with the most free `customer`-role ports, so cabling load-balances across leafs
+3. **Addressing** - the host takes a management address from the `virtualization_host_pool` address pool, which sits on the prefix of the [hypervisor-management segment](#the-hypervisor-management-network) the leaves render a gateway for. The address belongs to this generator rather than one of its own because it is a property of the connection: it is only reachable through the ports cabled in the step above
 
 The host's NICs come from the sized `VIRTUALIZATION_HOST_SMALL` / `_MEDIUM` / `_LARGE` / `_XLARGE` object templates in the bootstrap data, not from the generator. Each template also carries the server model, its capacity, and an out-of-band management NIC; only `eth0` and `eth1` are cabled to the fabric. The generator is idempotent: a placed host stays in its rack, cabled interfaces are left alone, and a leaf port is never handed out twice.
 
-### Automatic addressing and HTTPS-only security
+### Virtual machine addressing and HTTPS-only security
 
 The `secure_virtualization_vm` generator runs whenever a VM is created:
 
@@ -130,12 +131,75 @@ The static rules in `virtualization-vms-policy` reference that group, so every n
 
 A third generator attaches `virtualization-vms-policy` to every firewall with the `dc_firewall` role as soon as the firewall is created, regardless of which DC design created it. The HTTPS-only rules then render in that firewall's `juniper_firewall_config` artifact. See the [security management tutorial](./security-management.mdx) for how policy data becomes firewall configuration.
 
+## The hypervisor management network
+
+A host address is only worth recording if a packet can reach it, so the hosts are
+addressed out of the fabric rather than out of a pool of their own. The
+management network is an ordinary `ServiceNetworkSegment`, the same kind the demo
+uses for tenant networks, defined in
+`objects/segments/hypervisor-mgmt-dc-arista.yml`:
+
+| Field | Value |
+| ----- | ----- |
+| `customer_name` | `Hypervisor-Management` |
+| `vlan_id` | 900 |
+| `segment_type` | `l3_gateway` |
+| `prefix` | `172.25.9.0/24` |
+| `deployment` | `dc-arista` |
+
+Loading it triggers the existing `create_segment` generator, which binds the
+segment to every `customer`-role interface on the deployment's leaf switches. Those are the ports the hosts are cabled to, so one segment
+covers every host in the DC without naming any of them. On the Arista DC that is
+192 interfaces across four leaves.
+
+The leaf configuration then carries three things for the segment, in the
+`leaf_config` artifact of any leaf in the deployment:
+
+```text
+vlan 900
+   name Hypervisor-Management
+interface Ethernet1
+   switchport access vlan 900
+interface Vlan900
+   description Hypervisor-Management Gateway
+   ip address virtual 172.25.9.1/24
+vxlan vlan 900 vni 10900
+```
+
+The gateway address comes from the segment's prefix. Before this the templates
+built it from the VLAN ID, as `192.168.<vlan_id>.1/24`, which is fine while VLAN
+IDs stay under 256 and produces an address that does not exist at all above
+that: VLAN 900 would have rendered `192.168.900.1/24`. `get_anycast_gateway` in
+`transforms/common.py` now derives the first usable address of the recorded
+prefix instead, and a segment with no prefix renders a comment rather than an
+invented address.
+
+Three details are worth knowing if you extend this:
+
+**The gateway is a real object, not just rendered text.** `172.25.9.1/24` exists
+as an `IpamIPAddress` in the bootstrap data. Allocation takes the next free
+address in the prefix, and an address that exists is not free, so materialising
+the gateway is what stops the pool handing `.1` to a host. Hosts start at
+`172.25.9.2`.
+
+**One segment names one deployment.** `ServiceNetworkSegment.deployment` is
+mandatory and points at a single DC, so the segment lives in a per-design file
+(`objects/segments/hypervisor-mgmt-dc-arista.yml`). To address hosts in another
+design, copy that file, change `deployment`, and give it its own prefix and VLAN.
+A design with no segment file leaves its hosts cabled but unaddressed, which the
+demo task says out loud rather than inventing a subnet the fabric does not route.
+
+**The generator never reallocates.** A host that already has a primary address
+keeps it, so re-running the generator is safe, and a host addressed by hand is
+left alone.
+
 ## Exploring the virtualization objects
 
 After the demo task finishes, switch to the demo branch (for example `add-dc3`) in the web interface:
 
 1. Navigate to **Virtualization Cluster** to see the four Frankfurt clusters and their member hosts
-2. Open a **Physical Host** such as `fra1-pve-01` and check its rack location and cabled interfaces
+2. Open a **Physical Host** such as `fra1-pve-01` and check its rack location, its cabled interfaces, and the
+   management address the generator allocated from `172.25.9.0/24`
 3. Open a **Virtual Machine** such as `fra1-vm-web01` and check its host, cluster, customer, and the primary IP address the generator assigned
 
 To confirm the security wiring, open the `virtualization-vms` address group and verify it contains one address per VM.

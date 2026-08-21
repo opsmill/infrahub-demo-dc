@@ -195,7 +195,7 @@ def bootstrap_py(context: Context, branch: str = "main") -> None:
     context.run(f"uv run python scripts/bootstrap.py --branch {branch}", pty=True)
 
 
-def _load_virtualization_objects(context: Context, branch: str) -> None:
+def _load_virtualization_objects(context: Context, branch: str, deployment: str | None = None) -> None:
     """Load virtualization objects (clusters, physical hosts, VMs) onto the given branch.
 
     Shared by all demo-dc-* tasks. Standalone and design-independent, but
@@ -206,7 +206,27 @@ def _load_virtualization_objects(context: Context, branch: str) -> None:
     The HTTPS-only security policy/address group must exist *before* any
     VM is loaded, since VM creation immediately triggers
     secure_virtualization_vm, which hard-fails if that data is missing.
+
+    The hypervisor-management segment loads first when one exists for this
+    deployment, since it is what gives the hosts a fabric address: a
+    ServiceNetworkSegment names exactly one deployment, so there is a file per
+    DC design and a design without one leaves its hosts unaddressed.
+
+    Args:
+        context: Invoke context
+        branch: Branch to load onto
+        deployment: Name of the DC deployment, used to find its segment file
     """
+    if deployment:
+        segment_file = MAIN_DIRECTORY_PATH / "objects" / "segments" / f"hypervisor-mgmt-{deployment}.yml"
+        if segment_file.exists():
+            console.print(f"\n[cyan]→[/cyan] Loading hypervisor management segment for [bold]{deployment}[/bold]")
+            context.run(f"uv run infrahubctl object load {segment_file} --branch {branch}")
+        else:
+            console.print(
+                f"\n[yellow]→[/yellow] No hypervisor segment for [bold]{deployment}[/bold]"
+                " - hosts will be cabled but not addressed"
+            )
     console.print(f"\n[cyan]→[/cyan] Loading virtualization security policy to branch: [bold]{branch}[/bold]")
     context.run(f"uv run infrahubctl object load objects/security/16_virtualization_vm_security.yml --branch {branch}")
 
@@ -237,7 +257,7 @@ def _wait_for_generator(description: str, wait_seconds: int) -> None:
             progress.update(progress_task, advance=1)
 
 
-def _run_dc_demo(context: Context, title: str, dc_file: str, branch: str) -> None:
+def _run_dc_demo(context: Context, title: str, dc_file: str, branch: str, deployment: str | None = None) -> None:
     """Run the full DC demo pipeline on a fresh branch.
 
     Owns the ordering so individual demo tasks stay thin: create the branch,
@@ -269,7 +289,7 @@ def _run_dc_demo(context: Context, title: str, dc_file: str, branch: str) -> Non
     _wait_for_generator("⏳ Generator processing", wait_seconds=60)
     console.print("[green]✓[/green] Generator processing complete")
 
-    _load_virtualization_objects(context, branch)
+    _load_virtualization_objects(context, branch, deployment=deployment)
 
     console.print(
         f"\n[bright_magenta]→[/bright_magenta] Creating proposed change for branch '[bold]{branch}[/bold]'..."
@@ -287,6 +307,7 @@ def demo_dc_arista(context: Context, branch: str = "add-dc3") -> None:
         title="Arista Data Center Demo",
         dc_file="objects/dc/dc-arista-s.yml",
         branch=branch,
+        deployment="dc-arista",
     )
 
 
@@ -298,6 +319,7 @@ def demo_dc_juniper(context: Context, branch: str = "add-dc5") -> None:
         title="Juniper Data Center Demo",
         dc_file="objects/dc/dc-juniper-s.yml",
         branch=branch,
+        deployment="dc-juniper",
     )
 
 
@@ -309,6 +331,7 @@ def demo_dc_cisco(context: Context, branch: str = "add-dc2") -> None:
         title="Cisco Data Center Demo",
         dc_file="objects/dc/dc-cisco-s.yml",
         branch=branch,
+        deployment="dc-cisco",
     )
 
 
