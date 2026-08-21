@@ -32,6 +32,15 @@ infrahub_tests:
           kind: "jinja2-transform-unit-render"
           directory: proxmox_vm_no_vmid
           output: output.txt
+      # vcpus/memory/disk/os_version are optional in the schema, so a VM
+      # written without a size profile must render a loud error script, not
+      # crash the render or emit a script that misprovisions at deploy time.
+      - name: missing_specs_fail_loudly
+        expect: PASS
+        spec:
+          kind: "jinja2-transform-unit-render"
+          directory: proxmox_vm_no_specs
+          output: output.txt
 
   - resource: Jinja2Transform
     resource_name: kvm_vm_config
@@ -51,6 +60,12 @@ infrahub_tests:
           kind: "jinja2-transform-unit-render"
           directory: kvm_vm_provisioning
           output: output.txt
+      - name: missing_specs_fail_loudly
+        expect: PASS
+        spec:
+          kind: "jinja2-transform-unit-render"
+          directory: kvm_vm_no_specs
+          output: output.txt
 
   - resource: Jinja2Transform
     resource_name: hyperv_vm_config
@@ -64,6 +79,12 @@ infrahub_tests:
           kind: "jinja2-transform-unit-render"
           directory: hyperv_vm
           output: output.txt
+      - name: missing_specs_fail_loudly
+        expect: PASS
+        spec:
+          kind: "jinja2-transform-unit-render"
+          directory: hyperv_vm_no_specs
+          output: output.txt
 
   - resource: Jinja2Transform
     resource_name: esxi_vm_config
@@ -76,6 +97,12 @@ infrahub_tests:
         spec:
           kind: "jinja2-transform-unit-render"
           directory: esxi_vm
+          output: output.txt
+      - name: missing_specs_fail_loudly
+        expect: PASS
+        spec:
+          kind: "jinja2-transform-unit-render"
+          directory: esxi_vm_no_specs
           output: output.txt
 
   - resource: Jinja2Transform

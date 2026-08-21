@@ -31,10 +31,8 @@ query vm_config($name: String!) {
         }
         host {
           node {
-            ... on VirtualizationPhysicalHost {
-              name {
-                value
-              }
+            name {
+              value
             }
           }
         }

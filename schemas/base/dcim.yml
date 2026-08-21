@@ -17,6 +17,11 @@ generics:
       - name: name
         kind: Text
         unique: true
+        # Hostname-safe characters only. Device names are interpolated into
+        # rendered configurations, and the VM provisioning scripts run as
+        # root, so anything that could close a shell quote is rejected here
+        # rather than trusted to every template.
+        regex: "^[a-zA-Z0-9._-]+$"
         order_weight: 1000
       - name: description
         kind: Text

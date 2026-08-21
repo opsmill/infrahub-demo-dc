@@ -54,13 +54,23 @@ class VMArtifactGroupsGenerator(InfrahubGenerator):
             self.logger.warning(f"- {vm_name}: hypervisor type {hypervisor_type.get('name')!r} names no artifact group")
 
         # The groups are independent of each other, so both are fetched at once
-        # rather than one after the other.
+        # rather than one after the other. raise_when_missing=False: a
+        # hypervisor type naming a stale group must cost that one membership a
+        # warning, not fail the generator for every VM of the family.
         groups = await asyncio.gather(
             *(
-                self.client.get(kind=CoreStandardGroup, branch=self.branch, name__value=group_name)
+                self.client.get(
+                    kind=CoreStandardGroup,
+                    branch=self.branch,
+                    name__value=group_name,
+                    raise_when_missing=False,
+                )
                 for group_name in group_names
             )
         )
+        for group_name, group in zip(group_names, groups):
+            if group is None:
+                self.logger.warning(f"- {vm_name}: group {group_name!r} does not exist, skipping that membership")
         # add_relationships issues a RelationshipAdd mutation, which touches
         # only the peers it names. `members.extend()` + `save()` writes back the
         # whole member list as it was read moments earlier, and one of these
@@ -68,7 +78,12 @@ class VMArtifactGroupsGenerator(InfrahubGenerator):
         # members its siblings added in between, and a group like
         # vm_userdata_targets would end up with a fraction of the VMs.
         await asyncio.gather(
-            *(group.add_relationships(relation_to_update="members", related_nodes=[vm_id]) for group in groups)
+            *(
+                group.add_relationships(relation_to_update="members", related_nodes=[vm_id])
+                for group in groups
+                if group is not None
+            )
         )
-        for group_name in group_names:
-            self.logger.info(f"- Added {vm_name} to {group_name}")
+        for group_name, group in zip(group_names, groups):
+            if group is not None:
+                self.logger.info(f"- Added {vm_name} to {group_name}")

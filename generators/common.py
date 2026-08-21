@@ -123,8 +123,11 @@ def clean_data(data: Any) -> Any:
         dict_result = {}
         for key, value in data.items():
             if isinstance(value, dict):
-                # Extract the actual value from GraphQL attribute structure
-                if value.get("value"):
+                # Extract the actual value from GraphQL attribute structure.
+                # Key presence, not truthiness: {"value": 0}, False and "" are
+                # set values, and a truthiness test turned all of them into
+                # None (checks/common.py has always tested presence).
+                if "value" in value:
                     dict_result[key] = value["value"]
                 # Unwrap relationship nodes
                 elif value.get("node"):
@@ -132,10 +135,9 @@ def clean_data(data: Any) -> Any:
                 # Flatten edges arrays
                 elif value.get("edges"):
                     dict_result[key] = clean_data(value["edges"])
-                elif not value.get("value"):
-                    dict_result[key] = None
                 else:
-                    dict_result[key] = clean_data(value)
+                    # An unset cardinality-one relationship or empty edges list
+                    dict_result[key] = None
             # Remove double underscores from GraphQL aliases
             elif "__" in key:
                 dict_result[key.replace("__", "")] = value

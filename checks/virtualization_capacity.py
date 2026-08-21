@@ -109,13 +109,25 @@ class CheckVirtualizationCapacity(InfrahubCheck):
             limit = capacity * percent // 100
             used = allocated(vms, field, counts_when_off)
 
+            # Unset capacity cannot fail the check, but it must not pass
+            # silently either: say why nothing is being validated, or the
+            # missing data neither blocks the change nor shows up anywhere.
+            if not capacity:
+                self.log_info(
+                    message=(
+                        f"WARNING: {host_name} has no {unit} capacity recorded, so "
+                        f"{vm_name}'s allocation is not validated against it"
+                    )
+                )
+                continue
+
             self.log_info(
                 message=(
                     f"{host_name}: {used}/{limit} {unit} allocated "
                     f"({as_percent(used, limit)} of the limit, {capacity} physical at {percent}%)"
                 )
             )
-            if capacity and used > limit:
+            if used > limit:
                 self.log_error(
                     message=(
                         f"{host_name} is oversubscribed after {vm_name}: {used} {unit} allocated "
@@ -148,6 +160,16 @@ class CheckVirtualizationCapacity(InfrahubCheck):
             survivable = (total - max(capacities)) * percent // 100
             used = allocated(vms, field, counts_when_off)
 
+            # Same as the host level: an unvalidated resource has to say so.
+            if not total:
+                self.log_info(
+                    message=(
+                        f"WARNING: no host in {cluster_name} has any {unit} capacity recorded, "
+                        f"so {vm_name}'s allocation is not validated against the cluster"
+                    )
+                )
+                continue
+
             # A single-host cluster has no host to lose, so the N+1 figure would
             # always read as zero available and say nothing.
             host_count = f"{len(hosts)} host{'s' if len(hosts) != 1 else ''}"
@@ -162,7 +184,7 @@ class CheckVirtualizationCapacity(InfrahubCheck):
                     f"({as_percent(used, limit)}){headroom}"
                 )
             )
-            if total and used > limit:
+            if used > limit:
                 self.log_error(
                     message=(
                         f"{cluster_name} is oversubscribed after {vm_name}: {used} {unit} allocated "

@@ -19,7 +19,7 @@ users:
 # password at deploy time (cloudbase-init inject or console).
 CLOUDINIT
 )"
-METADATA_B64="$(base64 <<METADATA | tr -d '\n'
+METADATA_B64="$(base64 <<'METADATA' | tr -d '\n'
 instance-id: fra1-vm-win01
 local-hostname: fra1-vm-win01
 METADATA

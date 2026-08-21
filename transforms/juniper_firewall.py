@@ -63,11 +63,15 @@ class JuniperFirewall(InfrahubTransform):
                 source_addresses: list[str] = []
                 destination_addresses: list[str] = []
                 applications: list[str] = []
+                # `or` fallbacks, not .get() defaults: an unset attribute comes
+                # back as {"value": None}, so the key exists and a .get()
+                # default never applies - a None index then breaks the sort at
+                # the bottom for every rule in the zone pair.
                 rule_data: dict[str, Any] = {
-                    "index": rule.get("index", {}).get("value", 0),
-                    "name": rule.get("name", {}).get("value", "unnamed-rule"),
-                    "action": rule.get("action", {}).get("value", "deny"),
-                    "log": rule.get("log", {}).get("value", False),
+                    "index": (rule.get("index") or {}).get("value") or 0,
+                    "name": (rule.get("name") or {}).get("value") or "unnamed-rule",
+                    "action": (rule.get("action") or {}).get("value") or "deny",
+                    "log": (rule.get("log") or {}).get("value") or False,
                     "source_zone": None,
                     "destination_zone": None,
                     "source_addresses": source_addresses,
@@ -76,10 +80,10 @@ class JuniperFirewall(InfrahubTransform):
                 }
 
                 # Extract zones
-                if rule.get("source_zone", {}).get("node"):
+                if (rule.get("source_zone") or {}).get("node"):
                     rule_data["source_zone"] = rule["source_zone"]["node"]["name"]["value"]
 
-                if rule.get("destination_zone", {}).get("node"):
+                if (rule.get("destination_zone") or {}).get("node"):
                     rule_data["destination_zone"] = rule["destination_zone"]["node"]["name"]["value"]
 
                 # Extract source addresses from address groups
@@ -90,7 +94,13 @@ class JuniperFirewall(InfrahubTransform):
                     for ip_edge in addr_group.get("ip_addresses", {}).get("edges", []):
                         ip = ip_edge["node"]
                         addr_name = ip["name"]["value"]
-                        addr_value = ip["ipam_ip_address"]["node"]["address"]["value"]
+                        addr_value = (((ip.get("ipam_ip_address") or {}).get("node") or {}).get("address") or {}).get(
+                            "value"
+                        )
+                        if not addr_value:
+                            # No IPAM address behind the entry - skip it rather
+                            # than crash the whole artifact.
+                            continue
 
                         source_addresses.append(addr_name)
 
@@ -104,7 +114,13 @@ class JuniperFirewall(InfrahubTransform):
                     for prefix_edge in addr_group.get("prefixes", {}).get("edges", []):
                         prefix = prefix_edge["node"]
                         addr_name = prefix["name"]["value"]
-                        addr_value = prefix["ipam_prefix"]["node"]["prefix"]["value"]
+                        addr_value = (((prefix.get("ipam_prefix") or {}).get("node") or {}).get("prefix") or {}).get(
+                            "value"
+                        )
+                        if not addr_value:
+                            # No IPAM prefix behind the entry - skip it rather
+                            # than crash the whole artifact.
+                            continue
 
                         source_addresses.append(addr_name)
 
@@ -118,7 +134,11 @@ class JuniperFirewall(InfrahubTransform):
                     for fqdn_edge in addr_group.get("fqdns", {}).get("edges", []):
                         fqdn = fqdn_edge["node"]
                         addr_name = fqdn["name"]["value"]
-                        addr_value = fqdn["fqdn"]["value"]
+                        addr_value = (fqdn.get("fqdn") or {}).get("value")
+                        if not addr_value:
+                            # An FQDN entry with no name to resolve - skip it
+                            # rather than crash the whole artifact.
+                            continue
 
                         source_addresses.append(addr_name)
 
@@ -136,7 +156,13 @@ class JuniperFirewall(InfrahubTransform):
                     for ip_edge in addr_group.get("ip_addresses", {}).get("edges", []):
                         ip = ip_edge["node"]
                         addr_name = ip["name"]["value"]
-                        addr_value = ip["ipam_ip_address"]["node"]["address"]["value"]
+                        addr_value = (((ip.get("ipam_ip_address") or {}).get("node") or {}).get("address") or {}).get(
+                            "value"
+                        )
+                        if not addr_value:
+                            # No IPAM address behind the entry - skip it rather
+                            # than crash the whole artifact.
+                            continue
 
                         destination_addresses.append(addr_name)
 
@@ -150,7 +176,13 @@ class JuniperFirewall(InfrahubTransform):
                     for prefix_edge in addr_group.get("prefixes", {}).get("edges", []):
                         prefix = prefix_edge["node"]
                         addr_name = prefix["name"]["value"]
-                        addr_value = prefix["ipam_prefix"]["node"]["prefix"]["value"]
+                        addr_value = (((prefix.get("ipam_prefix") or {}).get("node") or {}).get("prefix") or {}).get(
+                            "value"
+                        )
+                        if not addr_value:
+                            # No IPAM prefix behind the entry - skip it rather
+                            # than crash the whole artifact.
+                            continue
 
                         destination_addresses.append(addr_name)
 
@@ -164,7 +196,11 @@ class JuniperFirewall(InfrahubTransform):
                     for fqdn_edge in addr_group.get("fqdns", {}).get("edges", []):
                         fqdn = fqdn_edge["node"]
                         addr_name = fqdn["name"]["value"]
-                        addr_value = fqdn["fqdn"]["value"]
+                        addr_value = (fqdn.get("fqdn") or {}).get("value")
+                        if not addr_value:
+                            # An FQDN entry with no name to resolve - skip it
+                            # rather than crash the whole artifact.
+                            continue
 
                         destination_addresses.append(addr_name)
 
@@ -190,8 +226,8 @@ class JuniperFirewall(InfrahubTransform):
                             template_data["applications"][svc_name] = {
                                 "name": svc_name,
                                 "type": "SecurityService",
-                                "protocol": svc["protocol"]["value"],
-                                "port": svc["port"]["value"],
+                                "protocol": (svc.get("protocol") or {}).get("value"),
+                                "port": (svc.get("port") or {}).get("value"),
                             }
 
                 # Organize rules by zone pairs

@@ -32,7 +32,7 @@ runcmd:
   - systemctl enable --now qemu-guest-agent
 CLOUDINIT
 
-cat > "$WORKDIR/meta-data" <<METADATA
+cat > "$WORKDIR/meta-data" <<'METADATA'
 instance-id: fra1-vm-cache01
 local-hostname: fra1-vm-cache01
 METADATA

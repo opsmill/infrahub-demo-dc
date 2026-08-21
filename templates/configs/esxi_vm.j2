@@ -19,12 +19,23 @@
 {{ vm_macros.banner(vm) }}
 set -euo pipefail
 
+{% if vm.vcpus.value is none or vm.memory.value is none or vm.disk.value is none or vm.os_version.value is none %}
+# This VM has no complete size or OS recorded in Infrahub. vcpus, memory,
+# disk and os_version are optional in the schema (a size profile normally
+# sets the first three), so a VM written directly through the SDK or API can
+# be missing them - refuse to render a script that would fail or
+# misprovision at deploy time.
+echo "ERROR: {{ vm.name.value }} needs vcpus, memory, disk and os_version set in Infrahub" >&2
+exit 1
+{% else %}
 # Cloud-init user-data rendered by Infrahub (see the vm-userdata artifact).
 USERDATA_B64="$(base64 <<'CLOUDINIT' | tr -d '\n'
 {% include "templates/configs/partials/vm_userdata.j2" %}
 CLOUDINIT
 )"
-METADATA_B64="$(base64 <<METADATA | tr -d '\n'
+{# Quoted delimiter: nothing in the rendered metadata may be expanded by the
+   shell, or a crafted VM name would execute inside this script. #}
+METADATA_B64="$(base64 <<'METADATA' | tr -d '\n'
 instance-id: {{ vm.name.value }}
 local-hostname: {{ vm.name.value }}
 METADATA
@@ -46,4 +57,5 @@ govc vm.change -vm "{{ vm.name.value }}" \
 govc vm.power -on "{{ vm.name.value }}"
 {% else %}
 # Status is "{{ vm.status.value }}" - VM created but left powered off.
+{% endif %}
 {% endif %}

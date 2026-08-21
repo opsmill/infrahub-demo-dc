@@ -62,31 +62,35 @@ class VirtualizationVMSecurityGenerator(InfrahubGenerator):
 
         # The query already returns the primary address' id and value, the only
         # two things needed below, so an existing address needs no extra fetch.
-        primary_address = vm.get("primary_address")
-        if primary_address:
-            ip_id = primary_address["id"]
-            ip_address = primary_address["address"]
-            self.logger.info(f"- {vm_name} already has primary address {ip_address}")
+        # The save sits in the `finally` so no failure between the fetch above
+        # and here can drop the VM out of the tracking group - the same shape
+        # as generate() in generate_virtualization_cabling.py.
+        try:
+            primary_address = vm.get("primary_address")
+            if primary_address:
+                ip_id = primary_address["id"]
+                ip_address = primary_address["address"]
+                self.logger.info(f"- {vm_name} already has primary address {ip_address}")
+            else:
+                # Declared in objects/bootstrap/21_ip_address_pools.yml - a missing
+                # pool means bootstrap has not run, which is a hard error.
+                ip_pool = await self.client.get(
+                    kind=CoreIPAddressPool,
+                    branch=self.branch,
+                    name__value=IP_POOL_NAME,
+                )
+                ip_node: Any = await self.client.allocate_next_ip_address(
+                    resource_pool=ip_pool,
+                    identifier=f"{vm_name}-primary",
+                    data={"description": f"{vm_name} primary address"},
+                    branch=self.branch,
+                )
+                vm_node.primary_address = ip_node.id  # type: ignore[assignment]
+                ip_id = ip_node.id
+                ip_address = ip_node.address.value
+                self.logger.info(f"- Allocated {ip_address} to {vm_name}")
+        finally:
             await vm_node.save(allow_upsert=True)
-        else:
-            # Declared in objects/bootstrap/21_ip_address_pools.yml - a missing
-            # pool means bootstrap has not run, which is a hard error.
-            ip_pool = await self.client.get(
-                kind=CoreIPAddressPool,
-                branch=self.branch,
-                name__value=IP_POOL_NAME,
-            )
-            ip_node: Any = await self.client.allocate_next_ip_address(
-                resource_pool=ip_pool,
-                identifier=f"{vm_name}-primary",
-                data={"description": f"{vm_name} primary address"},
-                branch=self.branch,
-            )
-            vm_node.primary_address = ip_node.id  # type: ignore[assignment]
-            await vm_node.save(allow_upsert=True)
-            ip_id = ip_node.id
-            ip_address = ip_node.address.value
-            self.logger.info(f"- Allocated {ip_address} to {vm_name}")
 
         # Keyed on the IPAM address, not the VM name: renaming a VM must reuse
         # the SecurityIPAddress already registered for its IP instead of

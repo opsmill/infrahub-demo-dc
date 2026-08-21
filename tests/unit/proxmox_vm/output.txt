@@ -43,8 +43,8 @@ qm set 100 \
 
 qm disk resize 100 scsi0 80G
 
-qm set 100 --description "Web server VM - Ubuntu 22.04"
+qm set 100 --description 'Web server VM - Ubuntu 22.04'
 
-qm set 100 --tags "web,production"
+qm set 100 --tags 'web,production'
 
 qm start 100

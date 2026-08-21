@@ -13,6 +13,15 @@
 {{ vm_macros.banner(vm) }}
 $ErrorActionPreference = "Stop"
 
+{% if vm.vcpus.value is none or vm.memory.value is none or vm.disk.value is none or vm.os_version.value is none %}
+# This VM has no complete size or OS recorded in Infrahub. vcpus, memory,
+# disk and os_version are optional in the schema (a size profile normally
+# sets the first three), so a VM written directly through the SDK or API can
+# be missing them - refuse to render a script that would fail or
+# misprovision at deploy time (an unset memory renders `-MemoryStartupBytes
+# NoneGB`, which only errors once the script runs).
+throw "ERROR: {{ vm.name.value }} needs vcpus, memory, disk and os_version set in Infrahub"
+{% else %}
 $TemplateVhdx = "C:\HyperV\Templates\{{ tpl }}.vhdx"
 $VmRoot = "C:\HyperV\VMs\{{ vm.name.value }}"
 if (-not (Test-Path $TemplateVhdx)) {
@@ -24,10 +33,12 @@ New-Item -ItemType Directory -Force -Path $VmRoot | Out-Null
 $UserData = @'
 {% include "templates/configs/partials/vm_userdata.j2" %}
 '@
-$MetaData = @"
+{# Literal (single-quoted) here-string: an expandable @"..."@ would let a
+   crafted VM name run `$(...)` inside this elevated script. #}
+$MetaData = @'
 instance-id: {{ vm.name.value }}
 local-hostname: {{ vm.name.value }}
-"@
+'@
 
 $SeedDir = Join-Path $VmRoot "seed"
 New-Item -ItemType Directory -Force -Path $SeedDir | Out-Null
@@ -54,4 +65,5 @@ Add-VMDvdDrive -VMName "{{ vm.name.value }}" -Path (Join-Path $VmRoot "seed.iso"
 Start-VM -Name "{{ vm.name.value }}"
 {% else %}
 # Status is "{{ vm.status.value }}" - VM created but left powered off.
+{% endif %}
 {% endif %}

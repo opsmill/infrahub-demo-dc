@@ -15,10 +15,10 @@ query virtualization_vm_validation($device: String!) {
         }
         host {
           node {
+            name {
+              value
+            }
             ... on VirtualizationPhysicalHost {
-              name {
-                value
-              }
               cluster {
                 node {
                   id

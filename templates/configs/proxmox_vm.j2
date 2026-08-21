@@ -22,6 +22,14 @@ set -euo pipefail
 # regenerate this artifact.
 echo "ERROR: {{ vm.name.value }} has no VMID assigned in Infrahub" >&2
 exit 1
+{% elif vm.vcpus.value is none or vm.memory.value is none or vm.disk.value is none or vm.os_version.value is none %}
+# This VM has no complete size or OS recorded in Infrahub. vcpus, memory,
+# disk and os_version are optional in the schema (a size profile normally
+# sets the first three), so a VM written directly through the SDK or API can
+# be missing them - refuse to render a script that would fail or
+# misprovision at deploy time.
+echo "ERROR: {{ vm.name.value }} needs vcpus, memory, disk and os_version set in Infrahub" >&2
+exit 1
 {% else %}
 TEMPLATE_VMID="$(qm list | awk -v t="{{ tpl }}" '$2 == t {print $1}')"
 if [ -z "$TEMPLATE_VMID" ]; then
@@ -50,10 +58,13 @@ qm set {{ vm.vmid.value }} \
 
 qm disk resize {{ vm.vmid.value }} scsi0 {{ vm.disk.value }}G
 
-qm set {{ vm.vmid.value }} --description "{{ vm.description.value or vm.name.value }}{% if vm.os_version.value %} - {{ vm.os_version.value }}{% endif %}"
+{# Single-quoted with quote-escaping: the description is free text, and a
+   double-quoted interpolation would let `"; rm ...` in it escape into this
+   root-run script. #}
+qm set {{ vm.vmid.value }} --description '{{ (vm.description.value or vm.name.value) | replace("'", "'\\''") }} - {{ vm.os_version.value | replace("'", "'\\''") }}'
 
 {% if vm.tags.edges %}
-qm set {{ vm.vmid.value }} --tags "{{ vm.tags.edges | map(attribute="node.name.value") | join(",") }}"
+qm set {{ vm.vmid.value }} --tags '{{ vm.tags.edges | map(attribute="node.name.value") | join(",") | replace("'", "'\\''") }}'
 
 {% endif %}
 {% if vm.status.value == "active" %}

@@ -113,6 +113,14 @@ spec:
             order_weight: 3000
             kind: VirtualizationVirtualMachine
 
+          # Last: reference data the others point at, not day-to-day objects.
+          - name: HypervisorType
+            namespace: Virtualization
+            label: "Hypervisor Types"
+            icon: "mdi:cog-box"
+            order_weight: 4000
+            kind: VirtualizationHypervisorType
+
     # ===================== LOAD BALANCING =====================
 
     - namespace: Loadbalancing

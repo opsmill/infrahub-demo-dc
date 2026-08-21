@@ -49,10 +49,13 @@ a leaf port is never handed out to more than one host.
 That is not the same as "skip the write". A generator run is the desired
 state for its target - Infrahub deletes anything the previous run saved
 that this run does not - so every object this generator owns (the host,
-its cabled NICs, the leaf ports they land on, and the cables between
-them) is re-saved on every run even when nothing about it changed.
-Skipping those writes is what deleted host NICs, and then the hosts
-themselves, from a stack this generator had cabled on an earlier run.
+its cabled NICs, and the cables to the leafs) is re-saved on every run
+even when nothing about it changed. Skipping those writes is what deleted
+host NICs, and then the hosts themselves, from a stack this generator had
+cabled on an earlier run. The leaf ports are the mirror image: they belong
+to the DC generator, so they are never written or saved here - claiming
+them is what once let a recable delete a leaf's physical interface as an
+unclaimed member.
 """
 
 from typing import Any
@@ -283,6 +286,12 @@ class VirtualizationHostCablingGenerator(InfrahubGenerator):
                 f"single-homed to {ranked_leafs[0].name.value} instead of dual-homed"
             )
 
+        # Only the leafs this host is actually cabled to. _deployment_ids over
+        # every leaf in the metro let a host's management address come from a
+        # sibling DC's segment when one metro holds two deployments.
+        cabled_leafs: dict[str, Any] = {}
+        leafs_by_id = {leaf.id: leaf for leaf in leafs}
+
         attached_nics = 0
         for index, nic_name in enumerate(HOST_INTERFACE_NAMES):
             existing = existing_interfaces.get(nic_name)
@@ -297,7 +306,9 @@ class VirtualizationHostCablingGenerator(InfrahubGenerator):
                 continue
             if existing.get("connector"):
                 self.logger.info(f"- {host_name}:{nic_name} already cabled, keeping it")
-                await self._retain_cabling(existing["id"], (existing["connector"] or {}).get("id"))
+                far_device_id = await self._retain_cabling(existing["id"], (existing["connector"] or {}).get("id"))
+                if far_device_id and far_device_id in leafs_by_id:
+                    cabled_leafs[far_device_id] = leafs_by_id[far_device_id]
                 attached_nics += 1
                 continue
 
@@ -323,8 +334,6 @@ class VirtualizationHostCablingGenerator(InfrahubGenerator):
 
                 host_iface.status.value = "active"
                 host_iface.description.value = f"Uplink to {leaf.name.value} {leaf_iface.name.value}"
-                leaf_iface.status.value = "active"
-                leaf_iface.description.value = f"Downlink to {host_name} {nic_name}"
 
                 try:
                     cable = await self.client.create(
@@ -344,13 +353,17 @@ class VirtualizationHostCablingGenerator(InfrahubGenerator):
                     )
                     continue
 
+                # The leaf port is never written or saved here. The cable's
+                # connected_endpoints already joins both sides, and the port
+                # belongs to the DC generator: saving it would enrol it in this
+                # generator's tracking group, and a later run that picks a
+                # different port (after a recable) would then delete the leaf's
+                # physical interface as an unclaimed member.
                 host_iface.connector = cable.id  # type: ignore[assignment]
-                leaf_iface.connector = cable.id  # type: ignore[assignment]
-
                 await host_iface.save(allow_upsert=True)
-                await leaf_iface.save(allow_upsert=True)
 
                 self.logger.info(f"- Cabled {host_name}:{nic_name} -> {leaf.name.value}:{leaf_iface.name.value}")
+                cabled_leafs[leaf.id] = leaf
                 cabled = True
                 attached_nics += 1
 
@@ -368,7 +381,7 @@ class VirtualizationHostCablingGenerator(InfrahubGenerator):
             host_name=host_name,
             host_node=host_node,
             primary_address=host.get("primary_address"),
-            deployment_ids=self._deployment_ids(leafs),
+            deployment_ids=self._deployment_ids(list(cabled_leafs.values())),
         )
 
     @staticmethod
@@ -385,22 +398,29 @@ class VirtualizationHostCablingGenerator(InfrahubGenerator):
         """
         await node.save(allow_upsert=True)
 
-    async def _retain_cabling(self, host_interface_id: str, cable_id: str | None) -> None:
-        """Keep an existing cable, and both ports it joins, in the tracking group.
+    async def _retain_cabling(self, host_interface_id: str, cable_id: str | None) -> str | None:
+        """Keep an existing cable and the host NIC it joins in the tracking group.
 
-        The cable and the leaf port were created and saved by the run that did
-        the cabling, so they are this generator's to keep alive. Without this,
-        the run that finds a host already cabled hands Infrahub a desired state
-        with no cable in it, and the fabric loses the connection.
+        The cable and the host NIC were saved by the run that did the cabling,
+        so they are this generator's to keep alive. Without this, the run that
+        finds a host already cabled hands Infrahub a desired state with no
+        cable in it, and the fabric loses the connection. The leaf port on the
+        far end is deliberately not re-saved: it belongs to the DC generator,
+        and claiming it here is what once let a recable delete a leaf's
+        physical interface.
 
         Args:
             host_interface_id: The host NIC that is already cabled.
             cable_id: The cable attached to it, from the query payload.
+
+        Returns:
+            The id of the device on the far end of the cable (the leaf), or
+            None when it cannot be resolved.
         """
         if cable_id is None:
             host_interface = await self.client.get(kind=InterfacePhysical, branch=self.branch, id=host_interface_id)
             await self._keep_tracked(host_interface)
-            return
+            return None
 
         # The cable's endpoints are both ports it joins - the host NIC and the
         # leaf port - so fetching it prefetched covers the NIC too, with no
@@ -413,20 +433,33 @@ class VirtualizationHostCablingGenerator(InfrahubGenerator):
             include=["connected_endpoints"],
         )
         await self._keep_tracked(cable)
+        far_device_id = None
         for endpoint in cable.connected_endpoints.peers:
-            await self._keep_tracked(endpoint.peer)
+            if endpoint.peer.id == host_interface_id:
+                await self._keep_tracked(endpoint.peer)
+            else:
+                # The endpoint protocol is the DcimEndpoint generic; the peer
+                # here is always an InterfacePhysical, which carries `device`.
+                try:
+                    far_device_id = endpoint.peer.device.id  # type: ignore[attr-defined]
+                except (AttributeError, ValueError):
+                    far_device_id = None
+        return far_device_id
 
     @staticmethod
     def _deployment_ids(leafs: list[Any]) -> list[str]:
-        """Collect the deployments the host's leaf switches belong to.
+        """Collect the deployments the host's cabled leaf switches belong to.
 
         The DC generator stamps `topology` on every switch it creates, which is
         what ties a leaf to its deployment - and a segment names exactly one
-        deployment. Going host -> leafs -> deployment is what lets the segment
-        be found without the generator knowing any DC design by name.
+        deployment. Going host -> cabled leafs -> deployment is what lets the
+        segment be found without the generator knowing any DC design by name,
+        and scoping it to the cabled leafs (not every leaf in the metro) is
+        what guarantees the address comes from the prefix those leafs actually
+        render a gateway for.
 
         Args:
-            leafs: Leaf switches in the host's metro.
+            leafs: Leaf switches the host is cabled to.
 
         Returns:
             Unique deployment IDs, empty when no leaf carries one.

@@ -19,10 +19,28 @@ query virtualization_capacity($device: String!) {
         }
         host {
           node {
-            ... on VirtualizationPhysicalHost {
-              name {
-                value
+            name {
+              value
+            }
+            virtual_machines {
+              edges {
+                node {
+                  vcpus {
+                    value
+                  }
+                  memory {
+                    value
+                  }
+                  disk {
+                    value
+                  }
+                  status {
+                    value
+                  }
+                }
               }
+            }
+            ... on VirtualizationPhysicalHost {
               vcpus {
                 value
               }
@@ -31,24 +49,6 @@ query virtualization_capacity($device: String!) {
               }
               disk {
                 value
-              }
-              virtual_machines {
-                edges {
-                  node {
-                    vcpus {
-                      value
-                    }
-                    memory {
-                      value
-                    }
-                    disk {
-                      value
-                    }
-                    status {
-                      value
-                    }
-                  }
-                }
               }
             }
           }

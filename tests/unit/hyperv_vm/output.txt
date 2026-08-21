@@ -24,10 +24,10 @@ users:
 # NOTE: no password is stored in Infrahub. Set the first-boot Administrator
 # password at deploy time (cloudbase-init inject or console).
 '@
-$MetaData = @"
+$MetaData = @'
 instance-id: fra1-vm-win02
 local-hostname: fra1-vm-win02
-"@
+'@
 
 $SeedDir = Join-Path $VmRoot "seed"
 New-Item -ItemType Directory -Force -Path $SeedDir | Out-Null

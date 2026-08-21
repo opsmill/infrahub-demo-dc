@@ -13,6 +13,15 @@
 {{ vm_macros.banner(vm) }}
 set -euo pipefail
 
+{% if vm.vcpus.value is none or vm.memory.value is none or vm.disk.value is none or vm.os_version.value is none %}
+# This VM has no complete size or OS recorded in Infrahub. vcpus, memory,
+# disk and os_version are optional in the schema (a size profile normally
+# sets the first three), so a VM written directly through the SDK or API can
+# be missing them - refuse to render a script that would fail or
+# misprovision at deploy time.
+echo "ERROR: {{ vm.name.value }} needs vcpus, memory, disk and os_version set in Infrahub" >&2
+exit 1
+{% else %}
 IMAGES=/var/lib/libvirt/images
 if [ ! -f "$IMAGES/{{ tpl }}.qcow2" ]; then
   echo "ERROR: template image $IMAGES/{{ tpl }}.qcow2 not found" >&2
@@ -27,7 +36,9 @@ cat > "$WORKDIR/user-data" <<'CLOUDINIT'
 {% include "templates/configs/partials/vm_userdata.j2" %}
 CLOUDINIT
 
-cat > "$WORKDIR/meta-data" <<METADATA
+{# Quoted delimiter: nothing in the rendered metadata may be expanded by the
+   shell, or a crafted VM name would execute inside this root-run script. #}
+cat > "$WORKDIR/meta-data" <<'METADATA'
 instance-id: {{ vm.name.value }}
 local-hostname: {{ vm.name.value }}
 METADATA
@@ -51,4 +62,5 @@ virt-install \
 {% if vm.status.value != "active" %}
 # Status is "{{ vm.status.value }}" - shut the VM down after first-boot import.
 virsh shutdown "{{ vm.name.value }}" || true
+{% endif %}
 {% endif %}
