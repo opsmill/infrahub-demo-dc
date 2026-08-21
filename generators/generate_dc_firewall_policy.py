@@ -20,7 +20,7 @@ peer that is already attached.
 from infrahub_sdk.generator import InfrahubGenerator  # type: ignore[import-not-found]
 
 from .common import extract_single_node
-from .schema_protocols import SecurityPolicy
+from .schema_protocols import SecurityFirewall, SecurityPolicy
 
 VIRTUALIZATION_POLICY_NAME = "virtualization-vms-policy"
 
@@ -44,16 +44,31 @@ class DcFirewallPolicyGenerator(InfrahubGenerator):
         firewall_name = firewall.get("name", "unknown")
         firewall_id = firewall["id"]
 
-        policy = await self.client.get(
-            kind=SecurityPolicy,
+        # Re-saved on every run, whatever else happens below: a generator run is
+        # the desired state for its target, so a firewall the previous run saved
+        # and this one does not is deleted by Infrahub - and with it, since they
+        # are its components, the interfaces create_dc is still building. That
+        # deletion is not a quiet one: create_dc crashes mid-run with
+        # NODE_NOT_FOUND on the next InterfacePhysicalUpsert, leaving a fabric
+        # with devices but no cables.
+        firewall_node = await self.client.get(
+            kind=SecurityFirewall,
             branch=self.branch,
-            name__value=VIRTUALIZATION_POLICY_NAME,
+            id=firewall_id,
         )
-        # add_relationships issues a RelationshipAdd mutation, which touches
-        # only the peers it names. `firewalls.extend()` + `save()` writes back
-        # the whole firewall list as it was read moments earlier, and one of
-        # these generators runs per firewall concurrently - so each run would
-        # clobber the firewalls its siblings attached in between, and a dropped
-        # firewall would render its config without the HTTPS-only rules.
-        await policy.add_relationships(relation_to_update="firewalls", related_nodes=[firewall_id])
-        self.logger.info(f"- Attached {firewall_name} to {VIRTUALIZATION_POLICY_NAME}")
+        try:
+            policy = await self.client.get(
+                kind=SecurityPolicy,
+                branch=self.branch,
+                name__value=VIRTUALIZATION_POLICY_NAME,
+            )
+            # add_relationships issues a RelationshipAdd mutation, which touches
+            # only the peers it names. `firewalls.extend()` + `save()` writes back
+            # the whole firewall list as it was read moments earlier, and one of
+            # these generators runs per firewall concurrently - so each run would
+            # clobber the firewalls its siblings attached in between, and a dropped
+            # firewall would render its config without the HTTPS-only rules.
+            await policy.add_relationships(relation_to_update="firewalls", related_nodes=[firewall_id])
+            self.logger.info(f"- Attached {firewall_name} to {VIRTUALIZATION_POLICY_NAME}")
+        finally:
+            await firewall_node.save(allow_upsert=True)
