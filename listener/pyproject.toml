@@ -1,0 +1,35 @@
+[project]
+name = "webhook-listener"
+version = "0.1.0"
+description = "FastAPI webhook listener that applies Infrahub-rendered VyOS configs via Ansible"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.27",
+    "httpx>=0.27",
+    "pydantic>=2.0",
+    "ansible-core>=2.15",
+    "paramiko>=3.0",
+    "scp>=0.15.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "respx>=0.21",
+]
+
+[project.scripts]
+webhook-listener = "webhook_listener.main:run"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/webhook_listener"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"

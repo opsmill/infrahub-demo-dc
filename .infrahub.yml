@@ -90,6 +90,12 @@ artifact_definitions:
     parameters:
       name: name__value
 
+  # Webhook firewall demo's CoreArtifactDefinition is registered
+  # programmatically by scripts/webhook_demo/seed_webhook_demo.py, AFTER
+  # the `vyos-demo-firewalls` CoreStandardGroup exists. Registering it via
+  # .infrahub.yml would fail during repo import because the target group
+  # hasn't been created yet.
+
 check_definitions:
   - name: validate_spine
     class_name: CheckSpine
@@ -178,6 +184,14 @@ python_transforms:
       files:
         - templates/configs/juniper_firewall.j2
 
+  # Webhook firewall demo transforms.
+  - name: vyos_firewall_config
+    class_name: VyosFirewallConfig
+    file_path: transforms/webhook_demo/vyos_firewall_config.py
+  - name: webhook_firewall_deploy
+    class_name: WebhookFirewallDeploy
+    file_path: transforms/webhook_demo/webhook_firewall_deploy.py
+
 generator_definitions:
   # All three generators subclass `TopologyCreator` from `generators/common.py`, which in turn imports
   # `generators/schema_protocols.py`. Neither is reachable from the entry point Infrahub reads.
@@ -244,6 +258,11 @@ queries:
     file_path: queries/segment/segment.gql
   - name: rack_elevation_query
     file_path: queries/visualization/rack_elevation.gql
+  # Webhook firewall demo queries.
+  - name: vyos_firewall_config
+    file_path: queries/webhook_demo/vyos_firewall_config.gql
+  - name: webhook_firewall_deploy
+    file_path: queries/webhook_demo/webhook_firewall_deploy.gql
 schemas:
   - schemas/
 menus:

@@ -1,0 +1,85 @@
+{
+  "DcimFirewall": {
+    "edges": [
+      {
+        "node": {
+          "id": "0190a8f1-1111-7777-aaaa-333344445555",
+          "hfid": ["fw1"],
+          "name": { "value": "fw1" },
+          "description": { "value": "demo firewall" },
+          "os_version": { "value": "1.5-stream" },
+          "status": { "value": "active" },
+          "primary_address": { "node": null },
+          "interfaces": { "edges": [] },
+          "rules": {
+            "edges": [
+              {
+                "node": {
+                  "id": "0190a8f1-aaaa-7777-aaaa-100010001000",
+                  "hfid": ["10"],
+                  "__typename": "FirewallRules",
+                  "rule_id": { "value": 10 },
+                  "status": { "value": "active" },
+                  "source_domain": { "node": { "name": { "value": "corp" } } },
+                  "destination_domain": { "node": { "name": { "value": "dmz" } } },
+                  "destination_services": {
+                    "edges": [
+                      {
+                        "node": {
+                          "__typename": "FirewallService",
+                          "name": { "value": "https" }
+                        }
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "node": {
+                  "id": "0190a8f1-aaaa-7777-aaaa-200020002000",
+                  "hfid": ["20"],
+                  "__typename": "FirewallRules",
+                  "rule_id": { "value": 20 },
+                  "status": { "value": "active" },
+                  "source_domain": { "node": { "name": { "value": "corp" } } },
+                  "destination_domain": { "node": { "name": { "value": "dmz" } } },
+                  "destination_services": {
+                    "edges": [
+                      {
+                        "node": {
+                          "__typename": "FirewallService",
+                          "name": { "value": "http" }
+                        }
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "node": {
+                  "id": "0190a8f1-aaaa-7777-aaaa-300030003000",
+                  "hfid": ["30"],
+                  "__typename": "FirewallRules",
+                  "rule_id": { "value": 30 },
+                  "status": { "value": "active" },
+                  "source_domain": { "node": { "name": { "value": "ops" } } },
+                  "destination_domain": { "node": { "name": { "value": "mgmt" } } },
+                  "destination_services": {
+                    "edges": [
+                      {
+                        "node": {
+                          "__typename": "FirewallService",
+                          "name": { "value": "ssh" }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    ]
+  }
+}

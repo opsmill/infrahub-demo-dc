@@ -1,0 +1,21 @@
+query webhook_firewall_deploy($node_id: ID!) {
+  CoreArtifact(ids: [$node_id]) {
+    edges {
+      node {
+        id
+        name { value }
+        storage_id { value }
+        checksum { value }
+        object {
+          node {
+            ... on SecurityFirewall {
+              id
+              hfid
+              name { value }
+            }
+          }
+        }
+      }
+    }
+  }
+}
