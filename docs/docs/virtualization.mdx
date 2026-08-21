@@ -133,7 +133,11 @@ family is four steps:
    `CoreStandardGroup`.
 2. Add that group to `objects/bootstrap/00_groups.yml`.
 3. Write the provisioning template under `templates/configs/`, including the
-   shared `partials/vm_userdata.j2`.
+   shared `partials/vm_userdata.j2`. Follow the conventions the four existing
+   templates share: guard unset `vcpus`/`memory`/`disk`/`os_version` with an
+   error block instead of doing arithmetic on them, and keep interpolations
+   shell-safe (quoted heredoc delimiters, single-quoted free text) - see
+   [the scripts fail closed](#the-scripts-fail-closed).
 4. Register the transform and the artifact definition in `.infrahub.yml`.
 
 Nothing else changes. The generator that assigns artifact groups, the validation
@@ -306,6 +310,24 @@ The guest OS still changes a few settings inside each script:
 | KVM/libvirt | `--os-variant ubuntu22.04` | `--os-variant win2k22` |
 | Hyper-V | Secure Boot disabled (template signing varies) | Secure Boot left on |
 | VMware ESXi | cloud-init's VMware guestinfo datasource | cloudbase-init's `VMwareGuestInfoService` |
+
+### The scripts fail closed
+
+`vcpus`, `memory`, `disk` and `os_version` are optional in the schema - the
+size profiles normally set the first three, but nothing forces a VM written
+straight through the SDK or API to carry them. A script that did arithmetic on
+an unset value would either fail to render or, worse, render something that
+only breaks at deploy time (`-MemoryStartupBytes NoneGB`). So every
+provisioning template checks first and renders a short script that prints an
+error and exits non-zero instead. The same applies to a Proxmox VM without a
+VMID. The artifact always renders; what changes is whether running it
+provisions a VM or tells you what to fix.
+
+The scripts also run as root on the hypervisor, so nothing free-form may reach
+the shell unquoted. The schema holds device names to hostname-safe characters
+(`^[a-zA-Z0-9._-]+$`), metadata heredocs use quoted delimiters (`<<'METADATA'`),
+the Hyper-V metadata here-string is literal (`@'...'@`), and free text such as
+the Proxmox description is single-quoted with quote escaping.
 
 ### The `vm_userdata` artifact
 
