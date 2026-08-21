@@ -193,8 +193,7 @@ INFRAHUB_GIT_LOCAL="true"  # Use local repo instead of GitHub
    `check_definitions`, whose model forbids unknown keys
 7. **Wrong box style in Rich** - Use `box.SIMPLE` for terminal compatibility
 8. **Long dropdown choice descriptions** - Keep every `choices[].description` under ~45
-   characters. Longer ones push the Infrahub UI's option popover out of its container and clip
-   the labels ([opsmill/infrahub#10366](https://github.com/opsmill/infrahub/issues/10366))
+   characters so the option list stays readable in the web UI's form fields
 9. **Whitespace-stripping Jinja comments in rendered templates** - Use plain `{# ... #}` for
    inline comments in `templates/`. The `{#- ... -#}` form strips the surrounding newlines and
    glues the adjacent rendered lines together (the repo renders with `trim_blocks`/
