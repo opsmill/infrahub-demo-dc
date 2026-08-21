@@ -32,6 +32,8 @@ evolvability
 Fortinet
 FQDNs
 guestinfo
+heredoc
+heredocs
 hostname
 Hostname
 http
