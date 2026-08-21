@@ -288,7 +288,10 @@ class TopologyCreator:
                 if data.get("store_key"):
                     self.client.store.set(key=data.get("store_key"), node=obj, branch=self.branch)
             except GraphQLError as exc:
-                self.log.debug(f"- Creation failed due to {exc}")
+                # At error, not debug: a swallowed creation failure leaves a run
+                # that looks successful while the fabric is missing objects, and
+                # nothing in the task log says why.
+                self.log.error(f"- Creation of {kind} failed due to {exc}")
         try:
             async for node, _ in batch.execute():
                 object_reference = " ".join(node.hfid) if node.hfid else node.display_label
@@ -298,7 +301,7 @@ class TopologyCreator:
                     else f"- Created [{node.get_kind()}]"
                 )
         except ValidationError as exc:
-            self.log.debug(f"- Creation failed due to {exc}")
+            self.log.error(f"- Batch creation of {kind} failed due to {exc}")
 
     async def _create(self, kind: str, data: dict) -> None:
         """
@@ -1258,7 +1261,7 @@ class TopologyCreator:
                     self.log.info(f"- Created [{node.get_kind()}] from {hfid_str}")
 
         except ValidationError as exc:
-            self.log.debug(f"- Creation failed due to {exc}")
+            self.log.error(f"- Connection creation failed due to {exc}")
 
     async def create_loopback(
         self,
