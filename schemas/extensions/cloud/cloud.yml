@@ -416,7 +416,7 @@ nodes:
         choices:
           - name: public
             label: Public
-            description: Subnet with direct internet access via internet gateway
+            description: Internet-facing subnet via internet gateway.
             color: "#ffd27f"
           - name: private
             label: Private

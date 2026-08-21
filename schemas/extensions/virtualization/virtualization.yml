@@ -231,11 +231,11 @@ nodes:
         choices:
           - name: hypervisor
             label: Hypervisor
-            description: Server running a hypervisor that hosts virtual machines.
+            description: Runs a hypervisor that hosts VMs.
             color: "#7ec8a0"
           - name: compute
             label: Compute
-            description: Server running a workload directly on the hardware, without a hypervisor.
+            description: Runs a workload directly on the hardware.
             color: "#9fb8d4"
     relationships:
       # The host's hypervisor family, and with it the OS it runs: the

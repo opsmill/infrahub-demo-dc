@@ -65,7 +65,7 @@ generics:
             color: "#E6E6FA"  # lavender
           - name: "all"
             label: All
-            description: "Policy applies to both IPv4 and IPv6 addresses."
+            description: "Applies to IPv4 and IPv6 addresses."
             color: "#E6E6FA"  # lavender
         default_value: "all"
         order_weight: 1150

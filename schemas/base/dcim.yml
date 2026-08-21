@@ -186,7 +186,7 @@ generics:
             color: "#FAD7A0" # pastel orange
           - name: outage
             label: Outage
-            description: "Interface is currently experiencing an outage."
+            description: "Interface currently in outage."
             color: "#F4CCCC" # pastel red
         default_value: "free"
         order_weight: 1200
@@ -221,11 +221,11 @@ generics:
             color: "#E3DAC9" # pastel cream
           - name: peering
             label: Peering Interface
-            description: "Interface dedicated to peering with other networks."
+            description: "Interface for peering with other networks."
             color: "#C4B7E6" # pastel purple
           - name: upstream
             label: Upstream Interface
-            description: "Interface dedicated to upstream traffic between networks."
+            description: "Interface for upstream traffic."
             color: "#B2D4E6" # pastel sky blue
           - name: loopback
             label: Loopback
@@ -233,11 +233,11 @@ generics:
             color: "#E2D4C6"
           - name: loopback-vtep
             label: Loopback VTEP
-            description: "Interface dedicated to loopback vtep connections."
+            description: "Loopback interface for VTEP connections."
             color: "#E2D4C6"
           - name: unnumbered
             label: Unnumbered
-            description: "Interface dedicated to IP unnumbered connections for BGP and OSPF protocols."
+            description: "IP unnumbered interface for BGP and OSPF."
             color: "#C4B7E6"
           - name: ospf
             label: OSPF
@@ -249,15 +249,15 @@ generics:
             color: "#C432E6"
           - name: console
             label: Console
-            description: "Interface dedicated to console connection management."
+            description: "Interface for console management."
             color: "#E2D4C6"
           - name: uplink
             label: Uplink
-            description: "Interface dedicated to connect with aggregation switch."
+            description: "Uplink to the aggregation switch."
             color: "#E2D4C6"
           - name: leaf
             label: Leaf
-            description: "Interface dedicated to upstream to leaf between networks."
+            description: "Interface facing a leaf switch."
             color: "#B2D4C6"
         order_weight: 1250
     relationships:
@@ -500,7 +500,7 @@ nodes:
             color: "#e6e6fa"
           - name: border_leaf
             label: Border Leaf Switch
-            description: Border Leaf providing external connectivity in a Fabric.
+            description: Border leaf providing external connectivity.
             color: "#dda0dd"
           - name: tor
             label: Tor Switch
