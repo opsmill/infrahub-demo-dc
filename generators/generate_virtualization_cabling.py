@@ -8,11 +8,13 @@ across sites:
 
 1. Placement: if a LocationRack exists in the host's metro (from
    whichever DC design has been generated there, if any), the host is
-   moved into the least-occupied one from its building-level default
-   location and given a free rack unit. A no-op if no racks exist yet.
-   The position matters beyond tidiness: the rack_elevation transform
-   skips any device without one, so a host placed in a rack but given no
-   rack unit never appears in the rack drawing.
+   moved out of its building-level default location into a rack and
+   given a rack unit. A no-op if no racks exist yet. Which rack and
+   which unit are derived from the host's own name rather than from how
+   full the racks currently are - see _assign_rack for why. The position
+   matters beyond tidiness: the rack_elevation transform skips any
+   device without one, so a host placed in a rack but given no rack unit
+   never appears in the rack drawing.
 2. Cabling: dual-homes the host to two leaf switches in the same metro,
    picking whichever leafs currently have the most free "customer"-role
    interfaces available - so cabling naturally load-balances across
@@ -137,6 +139,14 @@ query RackOccupancy($rack_ids: [ID]) {
 """
 
 DEFAULT_RACK_HEIGHT = 42
+
+# Hosts are placed on a fixed grid counted up from the bottom of the rack: the
+# first host of a rack takes U1, the next U3, and so on. The stride has to be at
+# least as tall as the tallest host, or a 2U host at U1 would overlap the next
+# host at U2; _assign_rack warns if it meets a taller one. Counting up from the
+# bottom keeps hosts clear of the fabric, which the DC generator stacks
+# downwards from U42 in TopologyCreator.assign_devices_to_racks.
+RACK_UNIT_STRIDE = 2
 
 
 class VirtualizationHostCablingGenerator(InfrahubGenerator):
@@ -571,10 +581,21 @@ class VirtualizationHostCablingGenerator(InfrahubGenerator):
         rack_ids: list[str],
         host_height: int,
     ) -> None:
-        """Move the host into the emptiest rack of its own metro, if any exist.
+        """Place the host in a rack of its own metro, if any exist.
 
         A host already in a rack keeps its place. Nothing is saved here -
         generate() saves the host on every exit path.
+
+        Rack and rack unit are a function of the host's own name, not of how
+        full the racks are when this runs. One generator instance runs per host,
+        and loading a file of hosts fires all of them at once across the task
+        workers, so an occupancy-derived choice makes every host read the racks
+        before any sibling has saved: all of them then pick the same "emptiest"
+        rack and the same free unit, and the elevation draws six hosts stacked
+        on one another. Sorting the metro's hosts by name and taking this host's
+        own index gives each concurrent run a different answer from the same
+        input, which is how the DC generator places the fabric too - there
+        `leaf-01` owns Rack-1 by its name rather than by what it finds.
 
         Args:
             host_name: Host name, for logging
@@ -592,25 +613,36 @@ class VirtualizationHostCablingGenerator(InfrahubGenerator):
             self.logger.warning(f"- No rack occupancy returned for {host_name}, leaving it where it is")
             return
 
-        # Occupancy is measured in rack units rather than device count, so a
-        # rack holding one 24U chassis does not read as emptier than a rack
-        # holding three 1U switches. Ties break on name to keep placement
-        # deterministic across runs.
-        #
-        # There is no conflict-retry here: two concurrent host-creation runs can
-        # both read the same emptiest rack and pick the same free unit in it.
-        # The worst case is two devices drawn at one position rather than an
-        # error, so a guard is not worth the complexity.
-        target = min(racks, key=lambda rack: (rack["used_units"], rack["name"]))
-        if target["positions"]:
-            position = min(target["positions"]) - host_height
-        else:
-            position = target["rack_height"] - (host_height - 1)
-        if position < 1:
-            position = None
+        slot = await self._placement_slot(host_name)
+        if slot is None:
+            self.logger.warning(f"- {host_name} not found among the hosts to place, leaving it where it is")
+            return
+
+        # Ordered by name so every concurrent run indexes the same list. Racks
+        # spread across slots and units stack within them, so consecutive hosts
+        # fill rack 1 U1, rack 2 U1, ... and only come back to rack 1 at U3 once
+        # every rack holds one.
+        racks.sort(key=lambda rack: rack["name"])
+        target = racks[slot % len(racks)]
+        position = 1 + (slot // len(racks)) * RACK_UNIT_STRIDE
+
+        if host_height > RACK_UNIT_STRIDE:
+            self.logger.warning(
+                f"- {host_name} is {host_height}U, taller than the {RACK_UNIT_STRIDE}U placement grid"
+                " - it may overlap the host above it"
+            )
+
+        # The slot keeps hosts off each other, but not off the fabric the DC
+        # generator already racked, nor off a host placed by an earlier run
+        # whose name sorts later than this one's. Step up the grid until the
+        # host's whole footprint is clear.
+        while position + host_height - 1 <= target["rack_height"] and not target["occupied_units"].isdisjoint(
+            range(position, position + host_height)
+        ):
+            position += RACK_UNIT_STRIDE
 
         host_node.location = target["id"]  # type: ignore[assignment]
-        if position is None:
+        if position + host_height - 1 > target["rack_height"]:
             self.logger.warning(
                 f"- Placed {host_name} in rack {target['name']} without a position "
                 f"({host_height}U does not fit) - it will not show in the rack elevation"
@@ -618,6 +650,32 @@ class VirtualizationHostCablingGenerator(InfrahubGenerator):
         else:
             host_node.position = position  # type: ignore[assignment]
             self.logger.info(f"- Placed {host_name} in rack {target['name']} at U{position}")
+
+    async def _placement_slot(self, host_name: str) -> int | None:
+        """Return this host's index among all hosts, ordered by name.
+
+        The index is what makes placement deterministic: it depends on the set
+        of hosts, which every concurrent run of this generator sees identically,
+        rather than on how far those runs have progressed.
+
+        Hosts of other metros are counted too. They cost nothing but a wider
+        spread, since the slot is only ever resolved against the racks of the
+        host's own metro, and leaving them in keeps the index independent of
+        which location each host has reached.
+
+        Args:
+            host_name: Name of the host being placed
+
+        Returns:
+            The host's 0-based index, or None if it is not found.
+        """
+        hosts = await self.client.filters(
+            kind=VirtualizationPhysicalHost,
+            branch=self.branch,
+            include=["name"],
+        )
+        names = sorted(host.name.value for host in hosts)
+        return names.index(host_name) if host_name in names else None
 
     async def _rack_occupancy(self, rack_ids: list[str]) -> list[dict[str, Any]]:
         """Summarise how full each candidate rack is, in one round trip.
@@ -631,10 +689,10 @@ class VirtualizationHostCablingGenerator(InfrahubGenerator):
             rack_ids: IDs of the racks in the host's metro
 
         Returns:
-            One dict per rack with its id, name, used_units, the positions its
-            devices already occupy, and its rack_height. The caller stacks
-            downward from the top of the rack, the convention the DC generator
-            uses in TopologyCreator.assign_devices_to_racks.
+            One dict per rack with its id, name, rack_height, and the set of
+            rack units its devices already occupy - a device's whole footprint,
+            not just the unit it is anchored at, so a 2U device at U41 reports
+            both U41 and U42.
         """
         result = await self.client.execute_graphql(
             query=RACK_OCCUPANCY_QUERY,
@@ -646,23 +704,23 @@ class VirtualizationHostCablingGenerator(InfrahubGenerator):
         for edge in result.get("LocationRack", {}).get("edges", []):
             node = edge["node"]
             rack_height = (node.get("height") or {}).get("value") or DEFAULT_RACK_HEIGHT
-            positions, used_units = [], 0
+            occupied_units: set[int] = set()
             for device_edge in node.get("devices", {}).get("edges", []):
                 device = device_edge["node"]
                 device_height = (((device.get("device_type") or {}).get("node") or {}).get("height") or {}).get(
                     "value"
                 ) or 1
-                used_units += device_height
                 position = (device.get("position") or {}).get("value")
+                # A device with no position is not drawn in the elevation, so it
+                # holds no unit anything could collide with.
                 if position is not None:
-                    positions.append(position)
+                    occupied_units.update(range(position, position + device_height))
             racks.append(
                 {
                     "id": node["id"],
                     "name": node["name"]["value"],
-                    "used_units": used_units,
-                    "positions": positions,
                     "rack_height": rack_height,
+                    "occupied_units": occupied_units,
                 }
             )
         return racks
