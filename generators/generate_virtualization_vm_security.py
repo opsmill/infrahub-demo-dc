@@ -51,6 +51,15 @@ class VirtualizationVMSecurityGenerator(InfrahubGenerator):
         vm_name = vm.get("name", "unknown")
         vm_id = vm["id"]
 
+        # Re-saved on every run, even when nothing about it changes: a generator
+        # run is the desired state for its target, so a VM the previous run saved
+        # and this one does not is deleted by Infrahub.
+        vm_node = await self.client.get(
+            kind=VirtualizationVirtualMachine,
+            branch=self.branch,
+            id=vm_id,
+        )
+
         # The query already returns the primary address' id and value, the only
         # two things needed below, so an existing address needs no extra fetch.
         primary_address = vm.get("primary_address")
@@ -58,6 +67,7 @@ class VirtualizationVMSecurityGenerator(InfrahubGenerator):
             ip_id = primary_address["id"]
             ip_address = primary_address["address"]
             self.logger.info(f"- {vm_name} already has primary address {ip_address}")
+            await vm_node.save(allow_upsert=True)
         else:
             # Declared in objects/bootstrap/21_ip_address_pools.yml - a missing
             # pool means bootstrap has not run, which is a hard error.
@@ -71,11 +81,6 @@ class VirtualizationVMSecurityGenerator(InfrahubGenerator):
                 identifier=f"{vm_name}-primary",
                 data={"description": f"{vm_name} primary address"},
                 branch=self.branch,
-            )
-            vm_node = await self.client.get(
-                kind=VirtualizationVirtualMachine,
-                branch=self.branch,
-                id=vm_id,
             )
             vm_node.primary_address = ip_node.id  # type: ignore[assignment]
             await vm_node.save(allow_upsert=True)
@@ -93,6 +98,9 @@ class VirtualizationVMSecurityGenerator(InfrahubGenerator):
         )
         if security_ips:
             security_ip = security_ips[0]
+            # Saved rather than just read, for the same reason as the VM above:
+            # this generator created it, so it has to keep claiming it.
+            await security_ip.save(allow_upsert=True)
         else:
             security_ip = await self.client.create(
                 kind=SecurityIPAddress,

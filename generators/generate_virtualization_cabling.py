@@ -19,12 +19,20 @@ across sites:
    leafs and adapts to whatever ports earlier hosts have already
    consumed.
 3. Addressing: gives the host a management address from the fabric's
-   hypervisor-management segment, once it is cabled. The address belongs
-   here rather than in a generator of its own because it is a property of
-   the connection: the prefix is the one the leaf pair renders an anycast
-   gateway for, so the address is only reachable through the ports cabled
-   above. A DC with no hypervisor segment loaded leaves the host
-   unaddressed rather than inventing a subnet.
+   hypervisor-management segment, once it is attached to the fabric. The
+   address belongs here rather than in a generator of its own because it
+   is a property of the connection: the prefix is the one the leaf pair
+   renders an anycast gateway for, so the address is only reachable
+   through the ports cabled above.
+
+   Two conditions gate it, and both are about reachability rather than
+   tidiness. The host must have at least one cabled NIC, and the
+   deployment its leafs belong to must carry a segment over the address
+   pool's prefix. Checking the pool alone is not enough: the pool is
+   bootstrap data on the default branch, so it is visible from every
+   branch, while the segment is loaded per DC design. Without the segment
+   check a branch with no segment would hand out addresses for a subnet
+   no leaf routes.
 
 The host's eth0/eth1 NICs come from whichever sized
 VIRTUALIZATION_HOST_* object template it was created from
@@ -32,9 +40,17 @@ VIRTUALIZATION_HOST_* object template it was created from
 generator. A larger template carries further NICs; only eth0/eth1 are
 cabled here.
 
-Idempotent: a host already placed in a rack is left alone, already-cabled
-host interfaces are left alone, and a leaf port is never handed out to
-more than one host.
+Idempotent, in the specific sense Infrahub means: a host already placed
+in a rack keeps its rack unit, an already-cabled NIC keeps its cable, and
+a leaf port is never handed out to more than one host.
+
+That is not the same as "skip the write". A generator run is the desired
+state for its target - Infrahub deletes anything the previous run saved
+that this run does not - so every object this generator owns (the host,
+its cabled NICs, the leaf ports they land on, and the cables between
+them) is re-saved on every run even when nothing about it changed.
+Skipping those writes is what deleted host NICs, and then the hosts
+themselves, from a stack this generator had cabled on an earlier run.
 """
 
 from typing import Any
@@ -48,6 +64,7 @@ from .schema_protocols import (
     DcimCable,
     DcimDevice,
     InterfacePhysical,
+    ServiceNetworkSegment,
     VirtualizationPhysicalHost,
 )
 
@@ -55,8 +72,13 @@ HOST_INTERFACE_NAMES = ["eth0", "eth1"]
 
 # Declared in objects/bootstrap/21_ip_address_pools.yml over the same prefix the
 # hypervisor-management segment uses, so an allocated address sits behind the
-# gateway the leaf pair renders.
+# gateway the leaf pair renders. The pool is the starting point for finding that
+# segment: its prefix is what the segment must be carrying.
 HOST_IP_POOL_NAME = "virtualization_host_pool"
+
+# Segment types that render a gateway for their prefix (see the leaf templates).
+# A host address in an l2_only segment would have nothing to route it.
+ROUTED_SEGMENT_TYPES = ("l3_gateway", "l3_vrf")
 
 METRO_RACKS_QUERY = """
 query MetroRacks($metro_ids: [ID]) {
@@ -133,6 +155,12 @@ class VirtualizationHostCablingGenerator(InfrahubGenerator):
 
         host_name = host.get("name", "unknown")
         host_id = host["id"]
+        # Fetched once and re-saved below whatever else happens: the host is the
+        # generator's own target, so dropping it out of the tracking group means
+        # Infrahub deletes it - together with its interfaces and its VMs, which
+        # are components of it - on the next run. One fetch also saves the
+        # placement and addressing steps a round trip each.
+        host_node = await self.client.get(kind=VirtualizationPhysicalHost, branch=self.branch, id=host_id)
         # clean_data() collapses an empty relationship's {edges: []} to None
         # rather than [] (it checks truthiness), so `or []` covers both a
         # missing key and a present-but-None one - a brand new host with no
@@ -143,6 +171,7 @@ class VirtualizationHostCablingGenerator(InfrahubGenerator):
         metro_id = self._resolve_metro_id(current_location)
         if metro_id is None:
             self.logger.warning(f"{host_name} has no metro in its location hierarchy, skipping placement and cabling")
+            await self._keep_tracked(host_node)
             return
 
         # Every rack and leaf candidate below is restricted to this set, so a
@@ -154,10 +183,11 @@ class VirtualizationHostCablingGenerator(InfrahubGenerator):
                 f"No racks exist in {host_name}'s metro yet, leaving it at its "
                 "building-level location and skipping cabling"
             )
+            await self._keep_tracked(host_node)
             return
 
         host_height = (host.get("device_type") or {}).get("height") or 1
-        await self._assign_rack(host_name, host_id, current_location.get("typename"), rack_ids, host_height)
+        await self._assign_rack(host_name, host_node, current_location.get("typename"), rack_ids, host_height)
 
         leafs = await self.client.filters(
             kind=DcimDevice,
@@ -167,6 +197,7 @@ class VirtualizationHostCablingGenerator(InfrahubGenerator):
         )
         if not leafs:
             self.logger.info(f"No leaf switches exist in {host_name}'s metro yet, skipping cabling")
+            await self._keep_tracked(host_node)
             return
 
         # Rank leafs by how many free "customer" ports each currently has,
@@ -209,9 +240,12 @@ class VirtualizationHostCablingGenerator(InfrahubGenerator):
             reverse=True,
         )
         if not ranked_leafs:
-            self.logger.warning(f"No free customer ports on any leaf switch, skipping cabling for {host_name}")
-            return
+            # Not a return: a host cabled by an earlier run is still attached to
+            # the fabric and still needs its address, and the loop below reports
+            # each NIC it could not cable.
+            self.logger.warning(f"No free customer ports on any leaf switch, cannot cable {host_name}")
 
+        attached_nics = 0
         for index, nic_name in enumerate(HOST_INTERFACE_NAMES):
             existing = existing_interfaces.get(nic_name)
             if existing is None:
@@ -224,7 +258,9 @@ class VirtualizationHostCablingGenerator(InfrahubGenerator):
                 )
                 continue
             if existing.get("connector"):
-                self.logger.info(f"- {host_name}:{nic_name} already cabled, skipping")
+                self.logger.info(f"- {host_name}:{nic_name} already cabled, keeping it")
+                await self._retain_cabling(existing["id"], (existing["connector"] or {}).get("id"))
+                attached_nics += 1
                 continue
 
             host_iface = await self.client.get(
@@ -278,31 +314,149 @@ class VirtualizationHostCablingGenerator(InfrahubGenerator):
 
                 self.logger.info(f"- Cabled {host_name}:{nic_name} -> {leaf.name.value}:{leaf_iface.name.value}")
                 cabled = True
+                attached_nics += 1
 
             if not cabled:
                 self.logger.warning(f"No leaf switches with free ports left for {host_name}:{nic_name}")
 
-        await self._assign_management_address(host_name, host_id, host.get("primary_address"))
+        if not attached_nics:
+            self.logger.info(
+                f"{host_name} is not attached to the fabric, so it gets no management address "
+                "(an address it cannot reach is worse than none)"
+            )
+            await self._keep_tracked(host_node)
+            return
+
+        await self._assign_management_address(
+            host_name=host_name,
+            host_node=host_node,
+            primary_address=host.get("primary_address"),
+            deployment_ids=self._deployment_ids(leafs),
+        )
+
+    async def _keep_tracked(self, *nodes: Any) -> None:
+        """Re-save objects this generator already owns, so Infrahub keeps them.
+
+        A generator run is the desired state for its target: Infrahub deletes
+        whatever the previous run saved and this run does not. "Nothing changed,
+        skip the write" is therefore not a no-op, it is a delete one run later.
+
+        Args:
+            nodes: Nodes to re-save. A save with no changed attribute is a
+                cheap way to say "still mine".
+        """
+        for node in nodes:
+            await node.save(allow_upsert=True)
+
+    async def _retain_cabling(self, host_interface_id: str, cable_id: str | None) -> None:
+        """Keep an existing cable, and both ports it joins, in the tracking group.
+
+        The cable and the leaf port were created and saved by the run that did
+        the cabling, so they are this generator's to keep alive. Without this,
+        the run that finds a host already cabled hands Infrahub a desired state
+        with no cable in it, and the fabric loses the connection.
+
+        Args:
+            host_interface_id: The host NIC that is already cabled.
+            cable_id: The cable attached to it, from the query payload.
+        """
+        host_interface = await self.client.get(kind=InterfacePhysical, branch=self.branch, id=host_interface_id)
+        await self._keep_tracked(host_interface)
+
+        if cable_id is None:
+            return
+        cable = await self.client.get(
+            kind=DcimCable,
+            branch=self.branch,
+            id=cable_id,
+            prefetch_relationships=True,
+            include=["connected_endpoints"],
+        )
+        await self._keep_tracked(cable)
+        for endpoint in cable.connected_endpoints.peers:
+            if endpoint.id != host_interface_id:
+                await self._keep_tracked(endpoint.peer)
+
+    @staticmethod
+    def _deployment_ids(leafs: list[Any]) -> list[str]:
+        """Collect the deployments the host's leaf switches belong to.
+
+        The DC generator stamps `topology` on every switch it creates, which is
+        what ties a leaf to its deployment - and a segment names exactly one
+        deployment. Going host -> leafs -> deployment is what lets the segment
+        be found without the generator knowing any DC design by name.
+
+        Args:
+            leafs: Leaf switches in the host's metro.
+
+        Returns:
+            Unique deployment IDs, empty when no leaf carries one.
+        """
+        ids = []
+        for leaf in leafs:
+            try:
+                deployment_id = leaf.topology.id
+            except (AttributeError, ValueError):
+                continue
+            if deployment_id and deployment_id not in ids:
+                ids.append(deployment_id)
+        return ids
+
+    async def _find_management_segment(self, deployment_ids: list[str], prefix_ids: list[str]) -> Any | None:
+        """Find the routed segment that carries one of the pool's prefixes.
+
+        Args:
+            deployment_ids: Deployments the host's leafs belong to.
+            prefix_ids: Prefix IDs backing the host address pool.
+
+        Returns:
+            The matching segment, or None when this fabric has none.
+        """
+        if not deployment_ids or not prefix_ids:
+            return None
+
+        segments = await self.client.filters(
+            kind=ServiceNetworkSegment,
+            branch=self.branch,
+            deployment__ids=deployment_ids,
+            prefix__ids=prefix_ids,
+        )
+        return next(
+            (segment for segment in segments if segment.segment_type.value in ROUTED_SEGMENT_TYPES),
+            None,
+        )
 
     async def _assign_management_address(
-        self, host_name: str, host_id: str, primary_address: dict[str, Any] | None
+        self,
+        host_name: str,
+        host_node: Any,
+        primary_address: dict[str, Any] | None,
+        deployment_ids: list[str],
     ) -> None:
-        """Give the host an address from the hypervisor-management segment.
+        """Give the host an address from its fabric's hypervisor-management segment.
 
         Idempotent: a host that already has a primary address keeps it, so
-        re-running the generator never reallocates. A missing pool is not an
-        error - a DC without the hypervisor segment loaded simply leaves its
-        hosts unaddressed, which is better than inventing a subnet the fabric
-        does not route.
+        re-running the generator never reallocates.
+
+        Neither a missing pool nor a missing segment is an error. Both mean the
+        same thing - this fabric has nowhere to put a hypervisor address - and
+        leaving the host unaddressed beats inventing a subnet no leaf routes.
+        The segment is what makes the address reachable, so it is the condition
+        that matters: the pool is bootstrap data visible from every branch,
+        while the segment is loaded per DC design.
 
         Args:
             host_name: Host name, for logging
-            host_id: Host ID
+            host_node: The host node, saved on every path so the tracking group
+                keeps it.
             primary_address: The host's existing primary address from the query,
                 or None when it has none.
+            deployment_ids: Deployments the host's leaf switches belong to, used
+                to find the segment that serves this fabric.
         """
         if primary_address:
             self.logger.info(f"- {host_name} already has management address {primary_address.get('address')}")
+            await self._keep_tracked(host_node)
             return
 
         pool = await self.client.get(
@@ -310,12 +464,27 @@ class VirtualizationHostCablingGenerator(InfrahubGenerator):
             branch=self.branch,
             name__value=HOST_IP_POOL_NAME,
             raise_when_missing=False,
+            prefetch_relationships=True,
+            include=["resources"],
         )
         if pool is None:
             self.logger.info(
                 f"- No {HOST_IP_POOL_NAME} in this branch, leaving {host_name} without a management address"
             )
+            await self._keep_tracked(host_node)
             return
+
+        prefix_ids = [resource.id for resource in pool.resources.peers if resource.id]
+        segment = await self._find_management_segment(deployment_ids, prefix_ids)
+        if segment is None:
+            self.logger.info(
+                f"- No routed segment over the {HOST_IP_POOL_NAME} prefix in {host_name}'s deployment, "
+                "leaving it without a management address - load a hypervisor-management segment "
+                "(objects/segments/) for this DC design to have one allocated"
+            )
+            await self._keep_tracked(host_node)
+            return
+        self.logger.info(f"- {host_name} is served by segment {segment.name.value} (VLAN {segment.vlan_id.value})")
 
         address: Any = await self.client.allocate_next_ip_address(
             resource_pool=pool,
@@ -325,11 +494,11 @@ class VirtualizationHostCablingGenerator(InfrahubGenerator):
         )
         if address is None:
             self.logger.warning(f"- {HOST_IP_POOL_NAME} had no free address for {host_name}")
+            await self._keep_tracked(host_node)
             return
 
-        host_node = await self.client.get(kind=VirtualizationPhysicalHost, branch=self.branch, id=host_id)
         host_node.primary_address = address.id  # type: ignore[assignment]
-        await host_node.save(allow_upsert=True)
+        await self._keep_tracked(host_node)
         self.logger.info(f"- Allocated {address.address.value} to {host_name} from {HOST_IP_POOL_NAME}")
 
     @staticmethod
@@ -374,27 +543,32 @@ class VirtualizationHostCablingGenerator(InfrahubGenerator):
     async def _assign_rack(
         self,
         host_name: str,
-        host_id: str,
+        host_node: Any,
         current_location_typename: str | None,
         rack_ids: list[str],
         host_height: int,
     ) -> None:
         """Move the host into the emptiest rack of its own metro, if any exist.
 
+        A host already in a rack keeps its place, but is still saved: the
+        tracking group has to keep holding it (see `_keep_tracked`).
+
         Args:
             host_name: Host name, for logging
-            host_id: Host ID
+            host_node: The host node to place, saved on every path
             current_location_typename: __typename of the host's current location
             rack_ids: IDs of the racks in the host's metro (never empty)
             host_height: Height of the host in rack units, from its device type
         """
         if current_location_typename == "LocationRack":
-            self.logger.info(f"- {host_name} already placed in a rack, skipping")
+            self.logger.info(f"- {host_name} already placed in a rack, keeping it there")
+            await self._keep_tracked(host_node)
             return
 
         racks = await self._rack_occupancy(rack_ids)
         if not racks:
             self.logger.warning(f"- No rack occupancy returned for {host_name}, leaving it where it is")
+            await self._keep_tracked(host_node)
             return
 
         # Occupancy is measured in rack units rather than device count, so a
@@ -414,7 +588,6 @@ class VirtualizationHostCablingGenerator(InfrahubGenerator):
         if position < 1:
             position = None
 
-        host_node = await self.client.get(kind=VirtualizationPhysicalHost, branch=self.branch, id=host_id)
         host_node.location = target["id"]  # type: ignore[assignment]
         if position is None:
             self.logger.warning(
@@ -424,7 +597,7 @@ class VirtualizationHostCablingGenerator(InfrahubGenerator):
         else:
             host_node.position = position  # type: ignore[assignment]
             self.logger.info(f"- Placed {host_name} in rack {target['name']} at U{position}")
-        await host_node.save(allow_upsert=True)
+        await self._keep_tracked(host_node)
 
     async def _rack_occupancy(self, rack_ids: list[str]) -> list[dict[str, Any]]:
         """Summarise how full each candidate rack is, in one round trip.

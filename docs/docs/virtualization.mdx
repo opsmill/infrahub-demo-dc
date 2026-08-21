@@ -174,7 +174,45 @@ that: VLAN 900 would have rendered `192.168.900.1/24`. `get_anycast_gateway` in
 prefix instead, and a segment with no prefix renders a comment rather than an
 invented address.
 
-Three details are worth knowing if you extend this:
+### Automatic address allocation
+
+No object file gives a host an address. The `cable_virtualization_host` generator
+does it, in the same run that racks and cables the host, and it allocates from
+the `virtualization_host_pool` address pool over the segment's prefix:
+
+```text
+- Placed fra1-pve-01 in rack dc-arista-Rack-1 at U39
+- Cabled fra1-pve-01:eth0 -> dc-arista-leaf-01:Ethernet7
+- Cabled fra1-pve-01:eth1 -> dc-arista-leaf-02:Ethernet7
+- fra1-pve-01 is served by segment dc-arista - OpsMill - production - Hypervisor-Management (VLAN 900)
+- Allocated 172.25.9.2/24 to fra1-pve-01 from virtualization_host_pool
+```
+
+The address lands on the host's `primary_address`, which is where this demo keeps
+a device's management address: the switches the DC generator creates hold theirs
+the same way, with interface-bound addresses reserved for loopbacks. So a
+hypervisor host shows its address on the host object, not on `eth0`.
+
+**Two conditions gate the allocation, and both are about reachability.**
+
+The host must have at least one cabled NIC. An address on a host with no path to
+the fabric would be a number in a database rather than something you can reach,
+so a host that could not be cabled is left unaddressed and says so.
+
+The deployment its leafs belong to must carry a routed segment over the pool's
+prefix. Checking only that the pool exists is not enough, and this is the subtle
+part: the pool is bootstrap data on the default branch, so it is visible from
+*every* branch, while segments are loaded per DC design. A branch with the pool
+but no segment would otherwise hand out addresses for a subnet no leaf routes.
+The generator therefore walks host → its leafs → their deployment → that
+deployment's segments, and allocates only when one of them carries the pool's
+prefix and renders a gateway (`l3_gateway` or `l3_vrf`).
+
+**The generator never reallocates.** A host that already has a primary address
+keeps it, and the allocation identifier is the host name, so even a host whose
+address was removed gets the same one back from the pool.
+
+Three further details are worth knowing if you extend this:
 
 **The gateway is a real object, not just rendered text.** `172.25.9.1/24` exists
 as an `IpamIPAddress` in the bootstrap data. Allocation takes the next free
@@ -186,12 +224,15 @@ the gateway is what stops the pool handing `.1` to a host. Hosts start at
 mandatory and points at a single DC, so the segment lives in a per-design file
 (`objects/segments/hypervisor-mgmt-dc-arista.yml`). To address hosts in another
 design, copy that file, change `deployment`, and give it its own prefix and VLAN.
-A design with no segment file leaves its hosts cabled but unaddressed, which the
-demo task says out loud rather than inventing a subnet the fabric does not route.
+A design with no segment file leaves its hosts cabled but unaddressed, which both
+the demo task and the generator say out loud rather than inventing a subnet the
+fabric does not route.
 
-**The generator never reallocates.** A host that already has a primary address
-keeps it, so re-running the generator is safe, and a host addressed by hand is
-left alone.
+**`topology` is what ties a host's fabric together.** The DC generator stamps
+that relationship on every switch it creates, which is how the generator gets
+from a leaf to its deployment and so to the right segment. Hosts inherit the same
+field from the generic device model but do not need it set: their fabric is found
+through the leafs they are cabled to.
 
 ## Exploring the virtualization objects
 
