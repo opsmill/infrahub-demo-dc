@@ -14,10 +14,10 @@ from utils import (
     INFRAHUB_API_TOKEN,
     INFRAHUB_UI_URL,
     InfrahubClient,
+    cached_fetch,
     display_error,
     display_success,
     render_progress_tracker,
-    wait_for_processing,
 )
 from utils.api import (
     InfrahubAPIError,
@@ -41,24 +41,6 @@ VM_CREATION_STEPS = [
     "Rendering artifacts",
     "Complete",
 ]
-
-
-def get_hypervisor(cluster_type: Any) -> Dict[str, Any]:
-    """Return the hypervisor type row for `cluster_type`.
-
-    Rows come from VirtualizationHypervisorType, cached in session state by
-    main(). Falls back to an empty dict so a cluster type without a row still
-    renders, it just gets no provisioning artifact.
-
-    Args:
-        cluster_type: Value of the cluster's cluster_type attribute
-
-    Returns:
-        The row as a dict, or an empty dict when there is none.
-    """
-    if not cluster_type:
-        return {}
-    return dict(st.session_state.get("vm_hypervisor_types", {}).get(cluster_type) or {})
 
 
 def initialize_vm_creation_state(form_data: Dict[str, Any]) -> None:
@@ -132,14 +114,21 @@ def execute_vm_creation_step(client: InfrahubClient) -> None:
                 st.rerun()
 
         elif step == 3:
-            # Step 3: give the secure_virtualization_vm generator time to
+            # Step 3: wait for the secure_virtualization_vm generator to
             # allocate an IP and register it in the HTTPS-only address group, so
             # the proposed change created next carries the complete diff.
+            #
+            # Polled rather than slept through: the allocated address is the
+            # condition being waited for, so the step ends when it lands instead
+            # of holding the Streamlit run for a fixed interval every time.
             with st.status("Processing...", expanded=True) as status:
                 st.write("Waiting for Infrahub to assign an IP and apply the HTTPS-only security policy...")
-                wait_for_processing(15)
-                st.write("Processing complete")
-                status.update(label="Processing complete!", state="complete")
+                if client.wait_for_vm_ip(state["vm_id"], branch_name, timeout=30):
+                    st.write("Processing complete")
+                    status.update(label="Processing complete!", state="complete")
+                else:
+                    st.write("No IP allocated yet - continuing anyway.")
+                    status.update(label="Processing timed out", state="error")
                 state["step"] = 4
                 st.rerun()
 
@@ -160,14 +149,12 @@ def execute_vm_creation_step(client: InfrahubClient) -> None:
 
         elif step == 5:
             # Step 5: Render provisioning artifacts
-            provisioning_def = get_hypervisor(form_data.get("cluster_type")).get("artifact_definition")
+            provisioning_def = form_data.get("hypervisor", {}).get("artifact_definition")
             definition_names = ["vm_userdata"] + ([provisioning_def] if provisioning_def else [])
 
             with st.status("Rendering provisioning artifacts...", expanded=True) as status:
                 try:
-                    st.write("Waiting for the security generator to allocate an IP...")
-                    if not client.wait_for_vm_ip(state["vm_id"], branch_name):
-                        st.warning("No IP allocated yet - artifacts may render without one.")
+                    # The IP was already waited for in step 3.
                     st.write(f"Generating: {', '.join(definition_names)}")
                     artifacts = client.generate_and_wait_for_artifacts(state["vm_id"], definition_names, branch_name)
                     for artifact in artifacts:
@@ -210,7 +197,7 @@ def execute_vm_creation_step(client: InfrahubClient) -> None:
                 language = (
                     "yaml"
                     if artifact["definition_name"] == "vm_userdata"
-                    else (get_hypervisor(form_data.get("cluster_type")).get("script_language") or "bash")
+                    else (form_data.get("hypervisor", {}).get("script_language") or "bash")
                 )
                 with st.expander(f"Artifact: {artifact['name']}", expanded=False):
                     st.code(artifact["content"], language=language)
@@ -284,47 +271,21 @@ def main() -> None:
         ui_url=INFRAHUB_UI_URL,
     )
 
-    # Fetch physical hosts (cache in session state)
-    if "physical_hosts" not in st.session_state:
-        with st.spinner("Loading physical hosts..."):
-            try:
-                st.session_state.physical_hosts = client.get_physical_hosts()
-            except Exception as e:
-                display_error(
-                    "Unable to load physical hosts",
-                    f"Failed to fetch VirtualizationPhysicalHost objects from Infrahub.\n\n{str(e)}",
-                )
-                st.stop()
-
-    # Fetch customers (cache in session state)
-    if "vm_customers" not in st.session_state:
-        with st.spinner("Loading customers..."):
-            try:
-                organizations = client.get_organizations()
-                st.session_state.vm_customers = [
-                    org for org in organizations if org.get("type") == "OrganizationCustomer"
-                ]
-            except Exception as e:
-                st.warning(f"Could not load customers: {e}")
-                st.session_state.vm_customers = []
-
-    # Fetch the hypervisor types (cache in session state)
-    if "vm_hypervisor_types" not in st.session_state:
-        with st.spinner("Loading hypervisor types..."):
-            try:
-                st.session_state.vm_hypervisor_types = client.get_hypervisor_types()
-            except Exception as e:
-                st.warning(f"Could not load hypervisor types: {e}")
-                st.session_state.vm_hypervisor_types = {}
-
-    # Fetch VM IDs already in use (cache in session state)
-    if "vm_used_vmids" not in st.session_state:
-        with st.spinner("Loading used VM IDs..."):
-            try:
-                st.session_state.vm_used_vmids = client.get_used_vmids()
-            except Exception as e:
-                st.warning(f"Could not load used VM IDs: {e}")
-                st.session_state.vm_used_vmids = {"by_cluster": {}, "next_free": 100}
+    # Reference data the form is built from, fetched once per session. Hosts
+    # are fatal: without them there is nothing to create a VM on.
+    cached_fetch("physical_hosts", "physical hosts", client.get_physical_hosts, fatal=True)
+    cached_fetch(
+        "vm_customers",
+        "customers",
+        lambda: [org for org in client.get_organizations() if org.get("type") == "OrganizationCustomer"],
+        fallback=[],
+    )
+    cached_fetch(
+        "vm_used_vmids",
+        "used VM IDs",
+        client.get_used_vmids,
+        fallback={"by_cluster": {}, "next_free": 100},
+    )
 
     # VM Creation Form
     st.markdown("---")
@@ -332,7 +293,7 @@ def main() -> None:
 
     # Host and Guest OS selection are rendered outside st.form: widgets
     # inside a Streamlit form do not rerender until submit, but both the
-    # host -> cluster_type -> VM ID field and the Guest OS -> OS version
+    # host -> hypervisor family -> VM ID field and the Guest OS -> OS version
     # options need to update live as the user changes these two selections.
     host_options = [h["name"] for h in st.session_state.physical_hosts]
     host_map = {h["name"]: h for h in st.session_state.physical_hosts}
@@ -350,15 +311,18 @@ def main() -> None:
         )
         selected_host = host_map.get(host_name)
 
+    # The cluster's hypervisor family, carried on the host by
+    # get_physical_hosts(). Empty when the host has no cluster, or its cluster
+    # no hypervisor_type - either way the form degrades to no VM ID field and
+    # no provisioning artifact rather than guessing.
+    hypervisor: Dict[str, Any] = {}
     if selected_host and selected_host.get("cluster"):
         cluster = selected_host["cluster"]
-        st.caption(f"Cluster: {cluster['name']} ({cluster['cluster_type']})")
+        hypervisor = cluster.get("hypervisor") or {}
+        family = hypervisor.get("label") or hypervisor.get("name") or "unknown hypervisor"
+        st.caption(f"Cluster: {cluster['name']} ({family})")
     elif selected_host:
         st.warning("This host is not part of a cluster - a VM requires a clustered host.")
-
-    cluster_type = None
-    if selected_host and selected_host.get("cluster"):
-        cluster_type = selected_host["cluster"].get("cluster_type")
 
     # Guest OS family drives the platform relationship and the cloud-image
     # naming convention (tpl-<os_version slug>).
@@ -461,12 +425,14 @@ def main() -> None:
                 disabled=vm_creation_active,
             )
 
-            # VMID: only some hypervisors key VMs by a numeric ID - required
-            # for Proxmox, optional for KVM, unused (name/UUID-based) elsewhere.
+            # VMID: only some hypervisors key VMs by a numeric ID. Which ones,
+            # and whether it is mandatory, is vmid_requirement on the
+            # hypervisor family (objects/bootstrap/07_hypervisor_types.yml).
+            vmid_requirement = hypervisor.get("vmid_requirement") or "unused"
             vmid = None
-            if cluster_type in ("proxmox", "kvm"):
+            if vmid_requirement in ("required", "optional"):
                 suggested_vmid = st.session_state.vm_used_vmids["next_free"]
-                required_marker = "*" if cluster_type == "proxmox" else "(optional)"
+                required_marker = "*" if vmid_requirement == "required" else "(optional)"
                 vmid = st.number_input(
                     f"VM ID {required_marker}",
                     min_value=100,
@@ -501,8 +467,9 @@ def main() -> None:
             elif not selected_host.get("cluster"):
                 errors.append("Selected host is not part of a cluster (VM.cluster is mandatory)")
 
-            if cluster_type == "proxmox" and vmid is None:
-                errors.append("VM ID is required for Proxmox clusters")
+            if vmid_requirement == "required" and vmid is None:
+                family = hypervisor.get("label") or hypervisor.get("name") or "this hypervisor"
+                errors.append(f"VM ID is required for {family} clusters")
             if vmid is not None and selected_host and selected_host.get("cluster"):
                 cluster_id = selected_host["cluster"]["id"]
                 used_vmids = st.session_state.vm_used_vmids["by_cluster"].get(cluster_id, set())
@@ -525,7 +492,7 @@ def main() -> None:
                     "host": selected_host["id"],
                     "host_name": host_name,
                     "cluster": cluster["id"] if cluster else None,
-                    "cluster_type": cluster["cluster_type"] if cluster else None,
+                    "hypervisor": (cluster.get("hypervisor") or {}) if cluster else {},
                     "description": description,
                     "os_version": os_version,
                     "platform": ["Generic", guest_os],

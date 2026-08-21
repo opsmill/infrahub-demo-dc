@@ -43,11 +43,11 @@
                 "name": {
                   "value": "FRA1-ESXI-CLUSTER"
                 },
-                "cluster_type": {
-                  "value": "vmware"
-                },
                 "hypervisor_type": {
                   "node": {
+                    "name": {
+                      "value": "vmware"
+                    },
                     "image_prefix": {
                       "value": "tpl-"
                     }
@@ -59,13 +59,6 @@
               "node": {
                 "name": {
                   "value": "Windows"
-                },
-                "manufacturer": {
-                  "node": {
-                    "name": {
-                      "value": "Generic"
-                    }
-                  }
                 }
               }
             },

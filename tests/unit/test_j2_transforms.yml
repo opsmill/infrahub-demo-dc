@@ -84,15 +84,18 @@ infrahub_tests:
       - name: syntax_check
         spec:
           kind: jinja2-transform-smoke
+      # The partial renders from the same vm_config payload as the provisioning
+      # templates, so these reuse their input rather than carrying a second
+      # copy of it that has to be migrated alongside on every query change.
       - name: linux_cloud_init
         expect: PASS
         spec:
           kind: "jinja2-transform-unit-render"
-          directory: vm_userdata_linux
-          output: output.txt
+          directory: proxmox_vm
+          output: userdata_output.txt
       - name: windows_cloudbase_init
         expect: PASS
         spec:
           kind: "jinja2-transform-unit-render"
-          directory: vm_userdata_windows
-          output: output.txt
+          directory: esxi_vm
+          output: userdata_output.txt

@@ -8,7 +8,7 @@ say), or when a host that runs its workload directly on the hardware is made a
 cluster member at all.
 
 Both sides pointing at one VirtualizationHypervisorType is what makes this an
-identity comparison rather than a platform-to-cluster_type compatibility matrix.
+identity comparison rather than a platform-to-family compatibility matrix.
 """
 
 from typing import Any
@@ -37,7 +37,7 @@ class CheckVirtualizationHost(InfrahubCheck):
             return
 
         host_type = host.get("hypervisor_type") or {}
-        cluster_type = cluster.get("hypervisor_type") or {}
+        cluster_type_node = cluster.get("hypervisor_type") or {}
 
         if host.get("role") == "compute":
             self.log_error(
@@ -49,12 +49,12 @@ class CheckVirtualizationHost(InfrahubCheck):
 
         if not host_type.get("id"):
             self.log_error(message=f"{host_name}: no hypervisor type set, but it is a member of {cluster_name}")
-        elif not cluster_type.get("id"):
+        elif not cluster_type_node.get("id"):
             self.log_error(message=f"{host_name}: cluster {cluster_name} has no hypervisor type set")
-        elif host_type["id"] != cluster_type["id"]:
+        elif host_type["id"] != cluster_type_node["id"]:
             self.log_error(
                 message=(
                     f"{host_name}: runs {host_type.get('name', 'none')} but its cluster "
-                    f"{cluster_name} is {cluster_type.get('name', 'none')}"
+                    f"{cluster_name} is {cluster_type_node.get('name', 'none')}"
                 )
             )

@@ -154,13 +154,31 @@ class VirtualizationHostCablingGenerator(InfrahubGenerator):
             return
 
         host_name = host.get("name", "unknown")
-        host_id = host["id"]
-        # Fetched once and re-saved below whatever else happens: the host is the
-        # generator's own target, so dropping it out of the tracking group means
-        # Infrahub deletes it - together with its interfaces and its VMs, which
-        # are components of it - on the next run. One fetch also saves the
-        # placement and addressing steps a round trip each.
-        host_node = await self.client.get(kind=VirtualizationPhysicalHost, branch=self.branch, id=host_id)
+        # Fetched once and re-saved in the `finally` below whatever else
+        # happens: the host is the generator's own target, so dropping it out of
+        # the tracking group means Infrahub deletes it - together with its
+        # interfaces and its VMs, which are components of it - on the next run.
+        # A single save on the way out is what makes that unconditional; the
+        # steps in between only set fields on host_node. One fetch also saves
+        # the placement and addressing steps a round trip each.
+        host_node = await self.client.get(kind=VirtualizationPhysicalHost, branch=self.branch, id=host["id"])
+        try:
+            await self._place_and_cable(host, host_name, host_node)
+        finally:
+            await host_node.save(allow_upsert=True)
+
+    async def _place_and_cable(self, host: dict[str, Any], host_name: str, host_node: Any) -> None:
+        """Rack, cable and address the host, setting fields on `host_node`.
+
+        Never saves `host_node` - generate() does that on every exit path,
+        including an exception, so no early return here can drop the host out of
+        the tracking group.
+
+        Args:
+            host: The cleaned host node from the query.
+            host_name: Host name, for logging.
+            host_node: The host, fetched by generate().
+        """
         # clean_data() collapses an empty relationship's {edges: []} to None
         # rather than [] (it checks truthiness), so `or []` covers both a
         # missing key and a present-but-None one - a brand new host with no
@@ -171,7 +189,6 @@ class VirtualizationHostCablingGenerator(InfrahubGenerator):
         metro_id = self._resolve_metro_id(current_location)
         if metro_id is None:
             self.logger.warning(f"{host_name} has no metro in its location hierarchy, skipping placement and cabling")
-            await self._keep_tracked(host_node)
             return
 
         # Every rack and leaf candidate below is restricted to this set, so a
@@ -183,7 +200,6 @@ class VirtualizationHostCablingGenerator(InfrahubGenerator):
                 f"No racks exist in {host_name}'s metro yet, leaving it at its "
                 "building-level location and skipping cabling"
             )
-            await self._keep_tracked(host_node)
             return
 
         host_height = (host.get("device_type") or {}).get("height") or 1
@@ -197,7 +213,6 @@ class VirtualizationHostCablingGenerator(InfrahubGenerator):
         )
         if not leafs:
             self.logger.info(f"No leaf switches exist in {host_name}'s metro yet, skipping cabling")
-            await self._keep_tracked(host_node)
             return
 
         # Rank leafs by how many free "customer" ports each currently has,
@@ -211,32 +226,36 @@ class VirtualizationHostCablingGenerator(InfrahubGenerator):
         #
         # One filters() call for all leafs at once - a per-leaf loop here is
         # an N+1 round-trip per host creation.
+        # No prefetch_relationships: only the connector's and device's ids are
+        # needed, and a cardinality-one relationship always carries its peer id
+        # in the response. Prefetching would splice the whole peer device and
+        # cable into the selection set once per interface, for two ids.
         interfaces = await self.client.filters(
             kind=InterfacePhysical,
             branch=self.branch,
             device__ids=[leaf.id for leaf in leafs],
             role__value="customer",
-            prefetch_relationships=True,
         )
-        free_by_leaf: dict[str, dict[str, Any]] = {leaf.id: {} for leaf in leafs}
+        by_name: dict[str, dict[str, Any]] = {leaf.id: {} for leaf in leafs}
         for interface in interfaces:
-            try:
-                already_cabled = bool(interface.connector.peer)
-            except ValueError:
-                already_cabled = False
-            if not already_cabled:
-                device_id = interface.device.peer.id
-                if device_id in free_by_leaf:
-                    free_by_leaf[device_id][interface.name.value] = interface
+            # connector.id is None when nothing is cabled to the port.
+            if interface.connector.id:
+                continue
+            device_id = interface.device.id
+            if device_id in by_name:
+                by_name[device_id][interface.name.value] = interface
 
-        leaf_free_ports: dict[str, list[Any]] = {}
-        for leaf in leafs:
-            by_name = free_by_leaf[leaf.id]
-            leaf_free_ports[leaf.name.value] = [by_name[name] for name in safe_sort_interface_list(list(by_name))]
+        # Keyed by leaf id, not name: two leafs in different DCs of the same
+        # metro can share a name, and merging their ports would hand one leaf's
+        # port out as the other's.
+        free_ports: dict[str, list[Any]] = {
+            leaf_id: [ports[name] for name in safe_sort_interface_list(list(ports))]
+            for leaf_id, ports in by_name.items()
+        }
 
         ranked_leafs = sorted(
-            (leaf for leaf in leafs if leaf_free_ports[leaf.name.value]),
-            key=lambda leaf: len(leaf_free_ports[leaf.name.value]),
+            (leaf for leaf in leafs if free_ports[leaf.id]),
+            key=lambda leaf: len(free_ports[leaf.id]),
             reverse=True,
         )
         if not ranked_leafs:
@@ -276,12 +295,12 @@ class VirtualizationHostCablingGenerator(InfrahubGenerator):
             cabled = False
             while not cabled and ranked_leafs:
                 leaf = ranked_leafs[index % len(ranked_leafs)]
-                pool = leaf_free_ports[leaf.name.value]
+                pool = free_ports[leaf.id]
                 leaf_iface = pool.pop(0)
                 if not pool:
                     # Dropping an exhausted leaf here is what keeps every leaf
                     # left in ranked_leafs backed by at least one free port.
-                    ranked_leafs = [item for item in ranked_leafs if item.name.value != leaf.name.value]
+                    ranked_leafs = [item for item in ranked_leafs if item.id != leaf.id]
 
                 host_iface.status.value = "active"
                 host_iface.description.value = f"Uplink to {leaf.name.value} {leaf_iface.name.value}"
@@ -324,7 +343,6 @@ class VirtualizationHostCablingGenerator(InfrahubGenerator):
                 f"{host_name} is not attached to the fabric, so it gets no management address "
                 "(an address it cannot reach is worse than none)"
             )
-            await self._keep_tracked(host_node)
             return
 
         await self._assign_management_address(
@@ -334,19 +352,19 @@ class VirtualizationHostCablingGenerator(InfrahubGenerator):
             deployment_ids=self._deployment_ids(leafs),
         )
 
-    async def _keep_tracked(self, *nodes: Any) -> None:
-        """Re-save objects this generator already owns, so Infrahub keeps them.
+    @staticmethod
+    async def _keep_tracked(node: Any) -> None:
+        """Re-save an object this generator already owns, so Infrahub keeps it.
 
         A generator run is the desired state for its target: Infrahub deletes
         whatever the previous run saved and this run does not. "Nothing changed,
         skip the write" is therefore not a no-op, it is a delete one run later.
 
         Args:
-            nodes: Nodes to re-save. A save with no changed attribute is a
-                cheap way to say "still mine".
+            node: Node to re-save. A save with no changed attribute is a cheap
+                way to say "still mine".
         """
-        for node in nodes:
-            await node.save(allow_upsert=True)
+        await node.save(allow_upsert=True)
 
     async def _retain_cabling(self, host_interface_id: str, cable_id: str | None) -> None:
         """Keep an existing cable, and both ports it joins, in the tracking group.
@@ -360,11 +378,14 @@ class VirtualizationHostCablingGenerator(InfrahubGenerator):
             host_interface_id: The host NIC that is already cabled.
             cable_id: The cable attached to it, from the query payload.
         """
-        host_interface = await self.client.get(kind=InterfacePhysical, branch=self.branch, id=host_interface_id)
-        await self._keep_tracked(host_interface)
-
         if cable_id is None:
+            host_interface = await self.client.get(kind=InterfacePhysical, branch=self.branch, id=host_interface_id)
+            await self._keep_tracked(host_interface)
             return
+
+        # The cable's endpoints are both ports it joins - the host NIC and the
+        # leaf port - so fetching it prefetched covers the NIC too, with no
+        # separate read for it.
         cable = await self.client.get(
             kind=DcimCable,
             branch=self.branch,
@@ -374,8 +395,7 @@ class VirtualizationHostCablingGenerator(InfrahubGenerator):
         )
         await self._keep_tracked(cable)
         for endpoint in cable.connected_endpoints.peers:
-            if endpoint.id != host_interface_id:
-                await self._keep_tracked(endpoint.peer)
+            await self._keep_tracked(endpoint.peer)
 
     @staticmethod
     def _deployment_ids(leafs: list[Any]) -> list[str]:
@@ -447,8 +467,7 @@ class VirtualizationHostCablingGenerator(InfrahubGenerator):
 
         Args:
             host_name: Host name, for logging
-            host_node: The host node, saved on every path so the tracking group
-                keeps it.
+            host_node: The host node. Only mutated here; generate() saves it.
             primary_address: The host's existing primary address from the query,
                 or None when it has none.
             deployment_ids: Deployments the host's leaf switches belong to, used
@@ -456,7 +475,6 @@ class VirtualizationHostCablingGenerator(InfrahubGenerator):
         """
         if primary_address:
             self.logger.info(f"- {host_name} already has management address {primary_address.get('address')}")
-            await self._keep_tracked(host_node)
             return
 
         pool = await self.client.get(
@@ -471,7 +489,6 @@ class VirtualizationHostCablingGenerator(InfrahubGenerator):
             self.logger.info(
                 f"- No {HOST_IP_POOL_NAME} in this branch, leaving {host_name} without a management address"
             )
-            await self._keep_tracked(host_node)
             return
 
         prefix_ids = [resource.id for resource in pool.resources.peers if resource.id]
@@ -482,7 +499,6 @@ class VirtualizationHostCablingGenerator(InfrahubGenerator):
                 "leaving it without a management address - load a hypervisor-management segment "
                 "(objects/segments/) for this DC design to have one allocated"
             )
-            await self._keep_tracked(host_node)
             return
         self.logger.info(f"- {host_name} is served by segment {segment.name.value} (VLAN {segment.vlan_id.value})")
 
@@ -494,11 +510,9 @@ class VirtualizationHostCablingGenerator(InfrahubGenerator):
         )
         if address is None:
             self.logger.warning(f"- {HOST_IP_POOL_NAME} had no free address for {host_name}")
-            await self._keep_tracked(host_node)
             return
 
         host_node.primary_address = address.id  # type: ignore[assignment]
-        await self._keep_tracked(host_node)
         self.logger.info(f"- Allocated {address.address.value} to {host_name} from {HOST_IP_POOL_NAME}")
 
     @staticmethod
@@ -550,25 +564,23 @@ class VirtualizationHostCablingGenerator(InfrahubGenerator):
     ) -> None:
         """Move the host into the emptiest rack of its own metro, if any exist.
 
-        A host already in a rack keeps its place, but is still saved: the
-        tracking group has to keep holding it (see `_keep_tracked`).
+        A host already in a rack keeps its place. Nothing is saved here -
+        generate() saves the host on every exit path.
 
         Args:
             host_name: Host name, for logging
-            host_node: The host node to place, saved on every path
+            host_node: The host node to place
             current_location_typename: __typename of the host's current location
             rack_ids: IDs of the racks in the host's metro (never empty)
             host_height: Height of the host in rack units, from its device type
         """
         if current_location_typename == "LocationRack":
             self.logger.info(f"- {host_name} already placed in a rack, keeping it there")
-            await self._keep_tracked(host_node)
             return
 
         racks = await self._rack_occupancy(rack_ids)
         if not racks:
             self.logger.warning(f"- No rack occupancy returned for {host_name}, leaving it where it is")
-            await self._keep_tracked(host_node)
             return
 
         # Occupancy is measured in rack units rather than device count, so a
@@ -597,7 +609,6 @@ class VirtualizationHostCablingGenerator(InfrahubGenerator):
         else:
             host_node.position = position  # type: ignore[assignment]
             self.logger.info(f"- Placed {host_name} in rack {target['name']} at U{position}")
-        await self._keep_tracked(host_node)
 
     async def _rack_occupancy(self, rack_ids: list[str]) -> list[dict[str, Any]]:
         """Summarise how full each candidate rack is, in one round trip.

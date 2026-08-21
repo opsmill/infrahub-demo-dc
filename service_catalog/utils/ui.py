@@ -2,6 +2,7 @@
 
 import os
 import time
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -122,6 +123,46 @@ def wait_for_processing(duration: int) -> None:
     time.sleep(1)
     progress_bar.empty()
     time_display.empty()
+
+
+def cached_fetch(
+    key: str,
+    label: str,
+    fetch: Callable[[], Any],
+    fallback: Any = None,
+    fatal: bool = False,
+) -> Any:
+    """Fetch a form's reference data once per session, and cache it.
+
+    Streamlit reruns the whole page script on every widget interaction, so an
+    uncached fetch here is a round trip per keystroke. The result is held in
+    session state under `key` and returned unchanged on later runs.
+
+    Args:
+        key: Session-state key to cache under.
+        label: What is being loaded, used in the spinner and any message.
+        fetch: Callable returning the data.
+        fallback: Value to cache when the fetch fails and `fatal` is False.
+        fatal: When True, a failed fetch stops the page instead of falling back
+            - use it for data the form cannot be filled in without.
+
+    Returns:
+        The cached value.
+    """
+    if key in st.session_state:
+        return st.session_state[key]
+
+    with st.spinner(f"Loading {label}..."):
+        try:
+            st.session_state[key] = fetch()
+        except Exception as exc:  # noqa: BLE001 - any failure degrades the same way
+            if fatal:
+                display_error(f"Unable to load {label}", str(exc))
+                st.stop()
+            st.warning(f"Could not load {label}: {exc}")
+            st.session_state[key] = fallback
+
+    return st.session_state[key]
 
 
 def render_progress_tracker(state_key: str, steps: List[str]) -> None:

@@ -24,7 +24,7 @@ nodes:
       - [name__value]
     attributes:
       - name: name
-        description: Key shared with VirtualizationCluster.cluster_type.
+        description: Short key for the hypervisor family, e.g. proxmox.
         kind: Text
         unique: true
         order_weight: 1000
@@ -59,6 +59,29 @@ nodes:
         kind: Text
         optional: true
         order_weight: 1400
+      # Whether this family keys its VMs by a numeric ID. Held here rather than
+      # as a list of hypervisor names in the Create VM form, so a new family
+      # states its own rule instead of falling into whatever the form's else
+      # branch happens to do.
+      - name: vmid_requirement
+        label: VM ID Requirement
+        description: Whether a VM of this family needs a numeric VM ID.
+        kind: Dropdown
+        optional: true
+        order_weight: 1450
+        choices:
+          - name: required
+            label: Required
+            description: Provisioning fails without a VM ID.
+            color: "#e57000"
+          - name: optional
+            label: Optional
+            description: A VM ID may be set but is not needed.
+            color: "#7ec8a0"
+          - name: unused
+            label: Unused
+            description: VMs are identified by name or UUID instead.
+            color: "#808080"
       # How far this family is allowed to allocate beyond physical capacity,
       # as a percentage: 400 is 4:1, 100 is no overcommit. A percentage rather
       # than a ratio because Number is integer-only, so 1.5:1 has no spelling
@@ -142,33 +165,10 @@ nodes:
         kind: Text
         optional: true
         order_weight: 1100
-      - name: cluster_type
-        label: Cluster Type
-        kind: Dropdown
-        optional: true
-        order_weight: 1200
-        choices:
-          - name: vmware
-            label: VMware vSphere
-            description: VMware vSphere/ESXi cluster.
-            color: "#7fbfff"
-          - name: kvm
-            label: KVM
-            description: KVM/QEMU cluster.
-            color: "#ff9900"
-          - name: proxmox
-            label: Proxmox VE
-            description: Proxmox Virtual Environment cluster.
-            color: "#e57000"
-          - name: hyperv
-            label: Hyper-V
-            description: Microsoft Hyper-V cluster.
-            color: "#0078d4"
-          - name: other
-            label: Other
-            description: Other hypervisor cluster type.
-            color: "#808080"
     relationships:
+      # The cluster's hypervisor family, and the only place it is recorded: a
+      # `cluster_type` dropdown alongside this relationship would be a second
+      # copy of the same fact, with nothing keeping the two in step.
       - name: hypervisor_type
         label: Hypervisor Type
         peer: VirtualizationHypervisorType
@@ -177,7 +177,7 @@ nodes:
         identifier: hypervisor_type__clusters
         optional: true
         description: Hypervisor family this cluster runs.
-        order_weight: 1250
+        order_weight: 1200
       - name: hosts
         peer: VirtualizationPhysicalHost
         cardinality: many
@@ -238,7 +238,7 @@ nodes:
       # DcimGenericDevice `platform` is left unset on hosts, since a second
       # copy of the same fact is what lets a Windows host end up in a Proxmox
       # cluster. Both sides pointing at one HypervisorType turns compatibility
-      # into an identity comparison instead of a platform/cluster_type matrix.
+      # into an identity comparison instead of a platform/family matrix.
       - name: hypervisor_type
         label: Hypervisor Type
         peer: VirtualizationHypervisorType
@@ -283,6 +283,12 @@ nodes:
         kind: Number
         optional: true
         order_weight: 1050
+        # Proxmox reserves everything below 100 for itself. Bounded here rather
+        # than only in the Create VM form, so an SDK or API write is held to
+        # the same range as the form.
+        parameters:
+          min_value: 100
+          max_value: 999999
       - name: ssh_public_key
         label: SSH Public Key
         description: Public key installed into the guest by cloud-init / cloudbase-init.

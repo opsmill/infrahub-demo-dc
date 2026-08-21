@@ -320,7 +320,6 @@ class DcimCable(DcimConnector):
 
 
 class VirtualizationCluster(CoreNode):
-    cluster_type: DropdownOptional
     description: StringOptional
     name: String
     hosts: RelationshipManager[VirtualizationPhysicalHost]
@@ -433,6 +432,7 @@ class VirtualizationHypervisorType(CoreNode):
     label: StringOptional
     name: String
     script_language: DropdownOptional
+    vmid_requirement: DropdownOptional
     artifact_group: RelationshipAttribute[CoreStandardGroup]
     clusters: RelationshipManager[VirtualizationCluster]
     hosts: RelationshipManager[VirtualizationPhysicalHost]

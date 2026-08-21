@@ -1411,13 +1411,19 @@ class InfrahubClient:
 
         VirtualizationPhysicalHost declares the `cluster` side of the
         cluster/hosts relationship, so the cluster is one hop from the host and
-        the whole shape comes back in a single traversal.
+        the whole shape comes back in a single traversal - including the
+        cluster's hypervisor family, which is what the form needs to decide
+        which VM ID field to offer and which artifact to render. Fetching that
+        row here rather than separately means the join runs on the
+        relationship, not on a name matched between two queries.
 
         Args:
             branch: Branch name to query (default: "main")
 
         Returns:
-            List of host dictionaries with id, name, and cluster (id, name, cluster_type)
+            List of host dictionaries with id, name, and cluster (id, name,
+            hypervisor), where hypervisor holds the family's name, label,
+            artifact_definition, script_language and vmid_requirement.
 
         Raises:
             InfrahubConnectionError: If connection fails
@@ -1435,7 +1441,15 @@ class InfrahubClient:
                                 node {
                                     id
                                     name { value }
-                                    cluster_type { value }
+                                    hypervisor_type {
+                                        node {
+                                            name { value }
+                                            label { value }
+                                            artifact_definition { value }
+                                            script_language { value }
+                                            vmid_requirement { value }
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -1446,15 +1460,25 @@ class InfrahubClient:
 
             result = self.execute_graphql(query, branch=branch)
 
+            hypervisor_fields = (
+                "name",
+                "label",
+                "artifact_definition",
+                "script_language",
+                "vmid_requirement",
+            )
             hosts = []
             for host_edge in result.get("VirtualizationPhysicalHost", {}).get("edges", []):
                 node = host_edge.get("node", {})
                 cluster_node = (node.get("cluster") or {}).get("node")
+                hypervisor_node = ((cluster_node or {}).get("hypervisor_type") or {}).get("node") or {}
                 cluster = (
                     {
                         "id": cluster_node.get("id"),
                         "name": cluster_node.get("name", {}).get("value"),
-                        "cluster_type": cluster_node.get("cluster_type", {}).get("value"),
+                        "hypervisor": {
+                            field: (hypervisor_node.get(field) or {}).get("value") for field in hypervisor_fields
+                        },
                     }
                     if cluster_node
                     else None
@@ -1470,58 +1494,6 @@ class InfrahubClient:
             return hosts
         except Exception as e:
             raise InfrahubAPIError(f"Failed to fetch physical hosts: {str(e)}")
-
-    def get_hypervisor_types(self, branch: str = "main") -> Dict[str, Dict[str, Any]]:
-        """Fetch the hypervisor types, keyed by the name clusters use.
-
-        These rows are what a hypervisor implies: which artifact definition
-        renders its provisioning script and what language that script is in.
-        Holding it as data means adding a hypervisor does not need a code change
-        here (see objects/bootstrap/07_hypervisor_types.yml).
-
-        Args:
-            branch: Branch name to query (default: "main")
-
-        Returns:
-            Dict mapping hypervisor name (proxmox, kvm, ...) to a dict with
-            label, artifact_definition, script_language and image_prefix.
-
-        Raises:
-            InfrahubAPIError: If API error occurs
-        """
-        try:
-            query = """
-            query GetHypervisorTypes {
-                VirtualizationHypervisorType {
-                    edges {
-                        node {
-                            name { value }
-                            label { value }
-                            artifact_definition { value }
-                            script_language { value }
-                            image_prefix { value }
-                        }
-                    }
-                }
-            }
-            """
-            result = self.execute_graphql(query, branch=branch)
-
-            types = {}
-            for edge in result.get("VirtualizationHypervisorType", {}).get("edges", []):
-                node = edge.get("node", {})
-                name = (node.get("name") or {}).get("value")
-                if not name:
-                    continue
-                types[name] = {
-                    "label": (node.get("label") or {}).get("value"),
-                    "artifact_definition": (node.get("artifact_definition") or {}).get("value"),
-                    "script_language": (node.get("script_language") or {}).get("value"),
-                    "image_prefix": (node.get("image_prefix") or {}).get("value"),
-                }
-            return types
-        except Exception as e:
-            raise InfrahubAPIError(f"Failed to fetch hypervisor types: {str(e)}")
 
     def get_used_vmids(self, branch: str = "main") -> Dict[str, Any]:
         """Fetch VM IDs already in use, grouped per cluster.
@@ -1769,27 +1741,30 @@ class InfrahubClient:
             cluster = data.get("cluster")
             if not cluster:
                 raise InfrahubAPIError("cluster is required (VM.cluster is mandatory in the schema)")
-            vmid = data.get("vmid")
-            customer = data.get("customer")
-
-            # vmid/customer are appended only when provided, since passing
-            # e.g. customer: { id: null } errors.
+            # Spliced in only when provided, since passing e.g.
+            # customer: { id: null } errors. One table drives the variable
+            # declaration, the mutation field and the variable value together,
+            # so a new optional field is a single row rather than three edits
+            # that have to agree.
+            # A falsy value means "not supplied" for all four: the schema floors
+            # vmid at 100, and an empty key, customer or platform is nothing to
+            # send.
+            optional_spec = (
+                ("vmid", "BigInt", "vmid: { value: $vmid }"),
+                ("customer", "String", "customer: { id: $customer }"),
+                ("ssh_public_key", "String", "ssh_public_key: { value: $ssh_public_key }"),
+                ("platform", "[String]", "platform: { hfid: $platform }"),
+            )
             optional_vars = []
             optional_fields = []
-            if vmid is not None:
-                optional_vars.append("$vmid: BigInt,")
-                optional_fields.append("vmid: { value: $vmid }")
-            if customer:
-                optional_vars.append("$customer: String,")
-                optional_fields.append("customer: { id: $customer }")
-            ssh_public_key = data.get("ssh_public_key")
-            platform = data.get("platform")
-            if ssh_public_key:
-                optional_vars.append("$ssh_public_key: String,")
-                optional_fields.append("ssh_public_key: { value: $ssh_public_key }")
-            if platform:
-                optional_vars.append("$platform: [String],")
-                optional_fields.append("platform: { hfid: $platform }")
+            optional_values: Dict[str, Any] = {}
+            for field, gql_type, mutation_field in optional_spec:
+                value = data.get(field)
+                if not value:
+                    continue
+                optional_vars.append(f"${field}: {gql_type},")
+                optional_fields.append(mutation_field)
+                optional_values[field] = value
 
             mutation = f"""
             mutation CreateVirtualMachine(
@@ -1835,22 +1810,15 @@ class InfrahubClient:
                 "name": data["name"],
                 "description": data.get("description", ""),
                 "host": data["host"],
+                "cluster": cluster,
                 "os_version": data.get("os_version", ""),
                 "status": data.get("status", "active"),
                 "vcpus": data.get("vcpus"),
                 "memory": data.get("memory"),
                 "disk": data.get("disk"),
                 "groups": groups,
+                **optional_values,
             }
-            variables["cluster"] = cluster
-            if vmid is not None:
-                variables["vmid"] = vmid
-            if customer:
-                variables["customer"] = customer
-            if ssh_public_key:
-                variables["ssh_public_key"] = ssh_public_key
-            if platform:
-                variables["platform"] = platform
 
             result = self.execute_graphql(mutation, variables, branch)
 

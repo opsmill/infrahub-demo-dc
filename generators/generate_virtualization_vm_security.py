@@ -98,9 +98,6 @@ class VirtualizationVMSecurityGenerator(InfrahubGenerator):
         )
         if security_ips:
             security_ip = security_ips[0]
-            # Saved rather than just read, for the same reason as the VM above:
-            # this generator created it, so it has to keep claiming it.
-            await security_ip.save(allow_upsert=True)
         else:
             security_ip = await self.client.create(
                 kind=SecurityIPAddress,
@@ -111,7 +108,9 @@ class VirtualizationVMSecurityGenerator(InfrahubGenerator):
                     "ipam_ip_address": ip_id,
                 },
             )
-            await security_ip.save(allow_upsert=True)
+        # Saved whether it was created here or reused, for the same reason as
+        # the VM above: this generator owns it, so it has to keep claiming it.
+        await security_ip.save(allow_upsert=True)
 
         address_group = await self.client.get(
             kind=SecurityAddressGroup,

@@ -12,6 +12,7 @@ from .config import (
     STREAMLIT_PORT,
 )
 from .ui import (
+    cached_fetch,
     display_error,
     display_logo,
     display_progress,
@@ -35,6 +36,7 @@ __all__ = [
     "GENERATOR_WAIT_TIME",
     "API_TIMEOUT",
     "API_RETRY_COUNT",
+    "cached_fetch",
     "display_error",
     "display_logo",
     "display_progress",

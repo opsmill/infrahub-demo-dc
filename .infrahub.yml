@@ -7,10 +7,11 @@ jinja2_transforms:
     template_path: templates/clab_topology.j2
   # Proxmox
   #
-  # Every per-hypervisor provisioning template `{% include %}`s the shared
-  # user-data partial, which Infrahub cannot see from `template_path` alone.
-  # Without the `watch` entry, editing the partial leaves all four provisioning
-  # artifacts rendered from the old copy.
+  # Every per-hypervisor provisioning template pulls in two shared partials -
+  # the user-data body and the banner/image-name macros - neither of which
+  # Infrahub can see from `template_path` alone. Without the `watch` entries,
+  # editing a partial leaves all four provisioning artifacts rendered from the
+  # old copy.
   - name: proxmox_vm_config
     description: Template to generate a Proxmox VE VM provisioning script
     query: vm_config
@@ -18,6 +19,7 @@ jinja2_transforms:
     watch:
       files:
         - templates/configs/partials/vm_userdata.j2
+        - templates/configs/partials/vm_macros.j2
   - name: vm_userdata
     description: Cloud-init / cloudbase-init user-data for a virtual machine
     query: vm_config
@@ -30,6 +32,7 @@ jinja2_transforms:
     watch:
       files:
         - templates/configs/partials/vm_userdata.j2
+        - templates/configs/partials/vm_macros.j2
   # Hyper-V
   - name: hyperv_vm_config
     description: Template to generate a Microsoft Hyper-V VM provisioning script
@@ -38,6 +41,7 @@ jinja2_transforms:
     watch:
       files:
         - templates/configs/partials/vm_userdata.j2
+        - templates/configs/partials/vm_macros.j2
   # ESXi
   - name: esxi_vm_config
     description: Template to generate a VMware ESXi VM provisioning script
@@ -46,6 +50,7 @@ jinja2_transforms:
     watch:
       files:
         - templates/configs/partials/vm_userdata.j2
+        - templates/configs/partials/vm_macros.j2
 
 artifact_definitions:
   # Cisco

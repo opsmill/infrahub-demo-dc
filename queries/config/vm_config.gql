@@ -43,11 +43,11 @@ query vm_config($name: String!) {
             name {
               value
             }
-            cluster_type {
-              value
-            }
             hypervisor_type {
               node {
+                name {
+                  value
+                }
                 image_prefix {
                   value
                 }
@@ -59,13 +59,6 @@ query vm_config($name: String!) {
           node {
             name {
               value
-            }
-            manufacturer {
-              node {
-                name {
-                  value
-                }
-              }
             }
           }
         }

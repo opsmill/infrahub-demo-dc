@@ -43,11 +43,11 @@
                 "name": {
                   "value": "FRA1-KVM-CLUSTER"
                 },
-                "cluster_type": {
-                  "value": "kvm"
-                },
                 "hypervisor_type": {
                   "node": {
+                    "name": {
+                      "value": "kvm"
+                    },
                     "image_prefix": {
                       "value": "tpl-"
                     }
@@ -59,13 +59,6 @@
               "node": {
                 "name": {
                   "value": "Linux"
-                },
-                "manufacturer": {
-                  "node": {
-                    "name": {
-                      "value": "Generic"
-                    }
-                  }
                 }
               }
             },

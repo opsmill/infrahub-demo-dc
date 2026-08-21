@@ -98,8 +98,8 @@ family is four steps:
 
 Nothing else changes. The generator that assigns artifact groups, the validation
 check, and the Service Catalog form all read the row rather than carrying their
-own copy of the mapping, and the cluster's `cluster_type` choice list is the only
-other place the family name appears.
+own copy of the mapping, and a cluster names its family through the
+`hypervisor_type` relationship, so the row is the only place it is written.
 
 ## What the generators do
 

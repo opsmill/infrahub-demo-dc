@@ -35,9 +35,6 @@ query virtualization_capacity($device: String!) {
               virtual_machines {
                 edges {
                   node {
-                    name {
-                      value
-                    }
                     vcpus {
                       value
                     }
@@ -80,9 +77,6 @@ query virtualization_capacity($device: String!) {
             hosts {
               edges {
                 node {
-                  name {
-                    value
-                  }
                   vcpus {
                     value
                   }
@@ -98,9 +92,6 @@ query virtualization_capacity($device: String!) {
             virtual_machines {
               edges {
                 node {
-                  name {
-                    value
-                  }
                   vcpus {
                     value
                   }

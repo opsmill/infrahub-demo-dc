@@ -18,6 +18,8 @@ a peer that is already a member. A hypervisor type with no artifact
 group (e.g. "other") only joins the umbrella group.
 """
 
+import asyncio
+
 from infrahub_sdk.generator import InfrahubGenerator  # type: ignore[import-not-found]
 from infrahub_sdk.protocols import CoreStandardGroup  # type: ignore[import-not-found]
 
@@ -51,17 +53,22 @@ class VMArtifactGroupsGenerator(InfrahubGenerator):
         else:
             self.logger.warning(f"- {vm_name}: hypervisor type {hypervisor_type.get('name')!r} names no artifact group")
 
-        for group_name in group_names:
-            group = await self.client.get(
-                kind=CoreStandardGroup,
-                branch=self.branch,
-                name__value=group_name,
+        # The groups are independent of each other, so both are fetched at once
+        # rather than one after the other.
+        groups = await asyncio.gather(
+            *(
+                self.client.get(kind=CoreStandardGroup, branch=self.branch, name__value=group_name)
+                for group_name in group_names
             )
-            # add_relationships issues a RelationshipAdd mutation, which touches
-            # only the peers it names. `members.extend()` + `save()` writes back
-            # the whole member list as it was read moments earlier, and one of
-            # these generators runs per VM concurrently - so each run would
-            # clobber the members its siblings added in between, and a group like
-            # vm_userdata_targets would end up with a fraction of the VMs.
-            await group.add_relationships(relation_to_update="members", related_nodes=[vm_id])
+        )
+        # add_relationships issues a RelationshipAdd mutation, which touches
+        # only the peers it names. `members.extend()` + `save()` writes back the
+        # whole member list as it was read moments earlier, and one of these
+        # generators runs per VM concurrently - so each run would clobber the
+        # members its siblings added in between, and a group like
+        # vm_userdata_targets would end up with a fraction of the VMs.
+        await asyncio.gather(
+            *(group.add_relationships(relation_to_update="members", related_nodes=[vm_id]) for group in groups)
+        )
+        for group_name in group_names:
             self.logger.info(f"- Added {vm_name} to {group_name}")

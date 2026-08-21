@@ -43,11 +43,11 @@
                 "name": {
                   "value": "FRA1-PROXMOX-CLUSTER"
                 },
-                "cluster_type": {
-                  "value": "proxmox"
-                },
                 "hypervisor_type": {
                   "node": {
+                    "name": {
+                      "value": "proxmox"
+                    },
                     "image_prefix": {
                       "value": "tpl-"
                     }
@@ -59,13 +59,6 @@
               "node": {
                 "name": {
                   "value": "Linux"
-                },
-                "manufacturer": {
-                  "node": {
-                    "name": {
-                      "value": "Generic"
-                    }
-                  }
                 }
               }
             },
