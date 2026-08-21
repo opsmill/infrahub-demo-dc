@@ -34,6 +34,9 @@ from .schema_protocols import DcimCable, DcimConsoleInterface, InterfacePhysical
 # Matches bracket notation: [1-48], [1,3,5], etc.
 RANGE_PATTERN = re.compile(r"(\[[\w,-]*[-,][\w,-]*\])")
 
+# CoreGeneratorGroup that attach_dc_firewall_policy targets in .infrahub.yml.
+DC_FIREWALL_POLICY_GROUP = "dc_firewall_policy_targets"
+
 
 # ============================================================================
 # UTILITY FUNCTIONS
@@ -380,6 +383,16 @@ class TopologyCreator:
             branch=self.branch,
             populate_store=True,
         )
+        # Generator groups are a separate kind and have to be fetched separately.
+        # A dc_firewall joins DC_FIREWALL_POLICY_GROUP so attach_dc_firewall_policy
+        # has a target to resolve against; see the payload below.
+        if any(item["role"] == "dc_firewall" for item in self.data["design"]["elements"]):
+            await self.client.filters(
+                kind="CoreGeneratorGroup",
+                name__values=[DC_FIREWALL_POLICY_GROUP],
+                branch=self.branch,
+                populate_store=True,
+            )
         # get the device templates
         await self.client.filters(
             kind="CoreObjectTemplate",
@@ -928,6 +941,28 @@ class TopologyCreator:
                 else:
                     group_name = f"{role}s"
 
+                group_ids = [
+                    self.client.store.get(
+                        kind="CoreStandardGroup",
+                        key=group_name,
+                        branch=self.branch,
+                    ).id,
+                ]
+                # A generator definition's targets resolve against its group's
+                # members, so a dc_firewall that is only in the juniper_firewall
+                # artifact group never gets virtualization-vms-policy attached
+                # and renders its config without the HTTPS-only rules. The
+                # dc-firewall-on-create trigger rule dispatches on the same
+                # group, so membership is what makes both paths work.
+                if role == "dc_firewall":
+                    group_ids.append(
+                        self.client.store.get(
+                            kind="CoreGeneratorGroup",
+                            key=DC_FIREWALL_POLICY_GROUP,
+                            branch=self.branch,
+                        ).id
+                    )
+
                 payload = {
                     "name": name,
                     # Note: object_template removed - interfaces are created explicitly with expanded ranges
@@ -941,13 +976,7 @@ class TopologyCreator:
                         branch=self.branch,
                     ).id,
                     "topology": self.data.get("id"),
-                    "member_of_groups": [
-                        self.client.store.get(
-                            kind="CoreStandardGroup",
-                            key=group_name,
-                            branch=self.branch,
-                        ).id,
-                    ],
+                    "member_of_groups": group_ids,
                     "primary_address": await self.client.allocate_next_ip_address(
                         resource_pool=self.client.store.get(
                             kind=CoreIPAddressPool,

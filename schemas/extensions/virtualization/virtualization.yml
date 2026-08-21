@@ -149,6 +149,10 @@ nodes:
     label: Virtualization Cluster
     icon: mdi:layers-triple
     include_in_menu: false
+    # A cluster has no capacity of its own - that is the sum of its hosts - so
+    # its templates carry the hypervisor family rather than a size
+    # (objects/bootstrap/08_virtualization_templates.yml).
+    generate_template: true
     human_friendly_id:
       - name__value
     order_by:
@@ -263,6 +267,12 @@ nodes:
     label: Virtual Machine
     icon: mdi:monitor
     include_in_menu: false
+    # T-shirt sized profiles (objects/bootstrap/08_virtualization_templates.yml)
+    # carry vcpus/memory/disk, so creating a VM is picking a size, not typing
+    # three numbers. A profile rather than a template because `host` is a
+    # mandatory Parent relationship, which a template object may not leave
+    # unset - a size template would have to name a host.
+    generate_profile: true
     inherit_from:
       - CoreArtifactTarget
       - DcimGenericDevice

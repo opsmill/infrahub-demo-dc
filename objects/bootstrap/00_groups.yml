@@ -110,8 +110,10 @@ spec:
         (secure_virtualization_vm and assign_vm_artifact_groups)
     - name: dc_firewall_policy_targets
       description: >-
-        Target group for the attach_dc_firewall_policy generator. Dispatch
-        happens through the dc-firewall-on-create trigger rule, so membership
-        stays empty - the group exists so the generator definition resolves
-        against a CoreGeneratorGroup instead of the juniper_firewall artifact
-        group.
+        DC firewalls that trigger the attach_dc_firewall_policy generator. Kept
+        separate from the juniper_firewall artifact group, which one group
+        cannot also be. Membership is required, not decorative: the generator
+        resolves its targets through this group, and the dc-firewall-on-create
+        trigger rule will not run it against a non-member. TopologyCreator adds
+        every dc_firewall it builds (see DC_FIREWALL_POLICY_GROUP in
+        generators/common.py).

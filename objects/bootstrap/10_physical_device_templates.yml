@@ -355,6 +355,10 @@ spec:
 # eth0 and eth1 are the pair cable_virtualization_host dual-homes to the
 # leaf switches - a template without both makes that generator skip the host.
 # Any further NIC is spare capacity and stays uncabled.
+#
+# `member_of_groups_for_instances` puts every host created from a template
+# into virtualization_hosts, the trigger group for that cabling generator, so
+# a host created in the UI is racked, cabled and addressed like a loaded one.
 apiVersion: infrahub.app/v1
 kind: Object
 spec:
@@ -369,6 +373,8 @@ spec:
       vcpus: 32
       memory: 256
       disk: 2000
+      member_of_groups_for_instances:
+        - virtualization_hosts
       interfaces:
         kind: TemplateInterfacePhysical
         parameters:
@@ -389,6 +395,8 @@ spec:
       vcpus: 48
       memory: 384
       disk: 3000
+      member_of_groups_for_instances:
+        - virtualization_hosts
       interfaces:
         kind: TemplateInterfacePhysical
         parameters:
@@ -409,6 +417,8 @@ spec:
       vcpus: 64
       memory: 512
       disk: 4000
+      member_of_groups_for_instances:
+        - virtualization_hosts
       interfaces:
         kind: TemplateInterfacePhysical
         parameters:
@@ -429,6 +439,8 @@ spec:
       vcpus: 96
       memory: 768
       disk: 8000
+      member_of_groups_for_instances:
+        - virtualization_hosts
       interfaces:
         kind: TemplateInterfacePhysical
         parameters:

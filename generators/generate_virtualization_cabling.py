@@ -263,6 +263,15 @@ class VirtualizationHostCablingGenerator(InfrahubGenerator):
             # the fabric and still needs its address, and the loop below reports
             # each NIC it could not cable.
             self.logger.warning(f"No free customer ports on any leaf switch, cannot cable {host_name}")
+        elif len(ranked_leafs) == 1 and len(HOST_INTERFACE_NAMES) > 1:
+            # `index % len(ranked_leafs)` still cables every NIC, but with one
+            # leaf to choose from they all land on it. The host comes up, so
+            # nothing below reports it - say so here, because a single-homed
+            # host loses the leaf redundancy this generator exists to provide.
+            self.logger.warning(
+                f"Only one leaf switch has free customer ports, so {host_name} will be "
+                f"single-homed to {ranked_leafs[0].name.value} instead of dual-homed"
+            )
 
         attached_nics = 0
         for index, nic_name in enumerate(HOST_INTERFACE_NAMES):

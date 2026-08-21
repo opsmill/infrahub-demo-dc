@@ -33,6 +33,9 @@ if "selected_branch" not in st.session_state:
 if "infrahub_url" not in st.session_state:
     st.session_state.infrahub_url = INFRAHUB_ADDRESS
 
+# CoreNumberPool that VM IDs are allocated from (objects/bootstrap/16_number_pools.yml).
+VMID_POOL_NAME = "VM-VMID"
+
 VM_CREATION_STEPS = [
     "Creating branch",
     "Creating virtual machine",
@@ -55,6 +58,7 @@ def initialize_vm_creation_state(form_data: Dict[str, Any]) -> None:
         "branch_name": branch_name,
         "form_data": form_data,
         "vm_id": None,
+        "vmid": None,
         "pc_url": None,
         "artifacts": [],
     }
@@ -99,7 +103,7 @@ def execute_vm_creation_step(client: InfrahubClient) -> None:
                 "vcpus": form_data.get("vcpus"),
                 "memory": form_data.get("memory"),
                 "disk": form_data.get("disk"),
-                "vmid": form_data.get("vmid"),
+                "vmid_pool": form_data.get("vmid_pool"),
                 "customer": form_data.get("customer"),
                 "group_names": group_names,
             }
@@ -123,12 +127,29 @@ def execute_vm_creation_step(client: InfrahubClient) -> None:
             # of holding the Streamlit run for a fixed interval every time.
             with st.status("Processing...", expanded=True) as status:
                 st.write("Waiting for Infrahub to assign an IP and apply the HTTPS-only security policy...")
-                if client.wait_for_vm_ip(state["vm_id"], branch_name, timeout=30):
+                # Best-effort, like the timeout below it: the VM already exists,
+                # so a failed poll must not abandon the run before the proposed
+                # change is created. Handled here rather than in the outer
+                # handler, which would leave the VM on an orphaned branch.
+                try:
+                    allocated = client.wait_for_vm_ip(state["vm_id"], branch_name, timeout=30)
+                except (
+                    InfrahubConnectionError,
+                    InfrahubHTTPError,
+                    InfrahubGraphQLError,
+                    InfrahubAPIError,
+                ) as e:
+                    allocated = False
+                    st.warning(f"Could not read the VM's IP allocation - continuing anyway. ({e})")
+                if allocated:
                     st.write("Processing complete")
                     status.update(label="Processing complete!", state="complete")
                 else:
                     st.write("No IP allocated yet - continuing anyway.")
                     status.update(label="Processing timed out", state="error")
+                # Read after the wait, not from the create response: a from_pool
+                # allocation resolves once the create commits.
+                state["vmid"] = client.get_vm_vmid(state["vm_id"], branch_name)
                 state["step"] = 4
                 st.rerun()
 
@@ -175,12 +196,10 @@ def execute_vm_creation_step(client: InfrahubClient) -> None:
         elif step == 6:
             # Step 6: Complete - show success message
             state["active"] = False
-            # The VM was created successfully, so the cached used-vmid map is
-            # stale - drop it so the next form load refetches and offers the
-            # right "next free" suggestion / duplicate check.
-            st.session_state.pop("vm_used_vmids", None)
             st.markdown("---")
             display_success(f"Virtual Machine '{vm_name}' created successfully!")
+            if state.get("vmid") is not None:
+                st.caption(f"VM ID {state['vmid']} allocated from the {VMID_POOL_NAME} pool.")
 
             st.markdown(f"""
             ### Next Steps
@@ -234,6 +253,14 @@ def execute_vm_creation_step(client: InfrahubClient) -> None:
                 f"Virtual Machine '{vm_name}' was created in branch '{branch_name}', "
                 f"but you'll need to manually create a Proposed Change."
             )
+        else:
+            # Without this the form would silently re-enable on a step that has
+            # no branch above, leaving the user with no message and a VM on an
+            # orphaned branch.
+            display_error(
+                f"Virtual machine creation failed at step {step}",
+                f"Branch: {branch_name}\n\n{str(e)}",
+            )
 
 
 def handle_vm_creation(form_data: Dict[str, Any]) -> None:
@@ -280,11 +307,16 @@ def main() -> None:
         lambda: [org for org in client.get_organizations() if org.get("type") == "OrganizationCustomer"],
         fallback=[],
     )
+    # VM IDs come from a branch-agnostic CoreNumberPool rather than from a scan
+    # of existing VMs: each VM is created on its own unmerged branch, where a
+    # sibling branch's VM is invisible, so only the pool can hand out an ID that
+    # is free everywhere. A missing pool is not fatal - the VM is then created
+    # without a VM ID, which is already correct for hyperv/vmware/other.
     cached_fetch(
-        "vm_used_vmids",
-        "used VM IDs",
-        client.get_used_vmids,
-        fallback={"by_cluster": {}, "next_free": 100},
+        "vm_vmid_pool",
+        "VM ID pool",
+        lambda: client.get_number_pool_id(VMID_POOL_NAME, st.session_state.selected_branch),
+        fallback=None,
     )
 
     # VM Creation Form
@@ -428,22 +460,15 @@ def main() -> None:
             # VMID: only some hypervisors key VMs by a numeric ID. Which ones,
             # and whether it is mandatory, is vmid_requirement on the
             # hypervisor family (objects/bootstrap/07_hypervisor_types.yml).
+            # There is no input to fill in: Infrahub allocates from VM-VMID at
+            # creation, which is the only way to get an ID that is free on every
+            # branch at once. Nothing to validate here as a result.
             vmid_requirement = hypervisor.get("vmid_requirement") or "unused"
-            vmid = None
-            if vmid_requirement in ("required", "optional"):
-                suggested_vmid = st.session_state.vm_used_vmids["next_free"]
-                required_marker = "*" if vmid_requirement == "required" else "(optional)"
-                vmid = st.number_input(
-                    f"VM ID {required_marker}",
-                    min_value=100,
-                    max_value=999999,
-                    value=suggested_vmid,
-                    help=(
-                        "Numeric ID used by the hypervisor to identify this VM. "
-                        f"Unique per cluster - {suggested_vmid} is the next unused ID."
-                    ),
-                    disabled=vm_creation_active,
-                )
+            vmid_pool = st.session_state.vm_vmid_pool if vmid_requirement in ("required", "optional") else None
+            if vmid_requirement == "required" and not vmid_pool:
+                st.warning(f"VM ID pool '{VMID_POOL_NAME}' not found - this VM will be created without a VM ID.")
+            elif vmid_pool:
+                st.caption("VM ID: allocated automatically by Infrahub on creation.")
             else:
                 st.caption("VM ID: not used by this hypervisor (identified by name/UUID).")
 
@@ -467,18 +492,6 @@ def main() -> None:
             elif not selected_host.get("cluster"):
                 errors.append("Selected host is not part of a cluster (VM.cluster is mandatory)")
 
-            if vmid_requirement == "required" and vmid is None:
-                family = hypervisor.get("label") or hypervisor.get("name") or "this hypervisor"
-                errors.append(f"VM ID is required for {family} clusters")
-            if vmid is not None and selected_host and selected_host.get("cluster"):
-                cluster_id = selected_host["cluster"]["id"]
-                used_vmids = st.session_state.vm_used_vmids["by_cluster"].get(cluster_id, set())
-                if vmid in used_vmids:
-                    errors.append(
-                        f"VM ID {vmid} is already used in cluster {selected_host['cluster']['name']} - "
-                        f"the next unused ID is {st.session_state.vm_used_vmids['next_free']}"
-                    )
-
             if errors:
                 display_error(
                     "Form validation failed",
@@ -501,7 +514,7 @@ def main() -> None:
                     "vcpus": vcpus,
                     "memory": memory,
                     "disk": disk,
-                    "vmid": vmid,
+                    "vmid_pool": vmid_pool,
                     "customer": customer_id,
                 }
 

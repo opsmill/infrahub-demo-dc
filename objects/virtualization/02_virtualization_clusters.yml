@@ -1,4 +1,9 @@
 # Virtualization Clusters - independent of any specific DC design
+#
+# Each cluster is created from the template of its hypervisor family
+# (objects/bootstrap/08_virtualization_templates.yml), which carries the
+# hypervisor_type relationship. Only the name, the Frankfurt-specific
+# description and the member hosts are set here.
 ---
 apiVersion: infrahub.app/v1
 kind: Object
@@ -7,26 +12,26 @@ spec:
   data:
     - name: "FRA1-PROXMOX-CLUSTER"
       description: "Proxmox VE cluster in Frankfurt"
-      hypervisor_type: proxmox
+      object_template: VIRTUALIZATION_CLUSTER_PROXMOX
       hosts:
         - fra1-pve-01
         - fra1-pve-02
 
     - name: "FRA1-KVM-CLUSTER"
       description: "KVM cluster in Frankfurt"
-      hypervisor_type: kvm
+      object_template: VIRTUALIZATION_CLUSTER_KVM
       hosts:
         - fra1-kvm-01
         - fra1-kvm-02
 
     - name: "FRA1-ESXI-CLUSTER"
       description: "VMware ESXi cluster in Frankfurt"
-      hypervisor_type: vmware
+      object_template: VIRTUALIZATION_CLUSTER_VMWARE
       hosts:
         - fra1-esx-01
 
     - name: "FRA1-HYPERV-CLUSTER"
       description: "Microsoft Hyper-V cluster in Frankfurt"
-      hypervisor_type: hyperv
+      object_template: VIRTUALIZATION_CLUSTER_HYPERV
       hosts:
         - fra1-hv-01

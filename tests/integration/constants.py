@@ -146,6 +146,8 @@ CHECK_DEFINITIONS = [
     "validate_edge",
     "validate_loadbalancer",
     "validate_virtualization_vm",
+    "validate_virtualization_host",
+    "validate_virtualization_capacity",
 ]
 """Every entry under ``check_definitions`` in ``.infrahub.yml``."""
 

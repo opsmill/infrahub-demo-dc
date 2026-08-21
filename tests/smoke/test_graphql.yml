@@ -148,6 +148,22 @@ infrahub_tests:
           path: queries/validation/virtualization_vm.gql
           kind: graphql-query-smoke
 
+  - resource: GraphQLQuery
+    resource_name: virtualization_host_validation
+    tests:
+      - name: syntax_check
+        spec:
+          path: queries/validation/virtualization_host.gql
+          kind: graphql-query-smoke
+
+  - resource: GraphQLQuery
+    resource_name: virtualization_capacity
+    tests:
+      - name: syntax_check
+        spec:
+          path: queries/validation/virtualization_capacity.gql
+          kind: graphql-query-smoke
+
   # --------------------  Validation  --------------------
   - resource: GraphQLQuery
     resource_name: loadbalancer_validation

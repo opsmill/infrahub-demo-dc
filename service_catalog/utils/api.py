@@ -1,7 +1,7 @@
 """Infrahub API client for the Service Catalog."""
 
 import time
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional
 from urllib.parse import urlencode
 
 from infrahub_sdk import Config, InfrahubClientSync
@@ -42,6 +42,12 @@ class InfrahubClient:
     # Seconds to wait before re-POSTing an artifact regen that has not
     # converged - long enough that the first POST is not simply still running.
     ARTIFACT_REPOST_AFTER = 20
+
+    # Seconds after the regen POST before an artifact whose storage_id has not
+    # moved is accepted as current. The object store is content-addressed, so a
+    # re-render producing identical bytes is indistinguishable from one that
+    # never ran; this bounds how long that case is waited out.
+    ARTIFACT_SETTLE_AFTER = 15
 
     def __init__(
         self,
@@ -1495,56 +1501,70 @@ class InfrahubClient:
         except Exception as e:
             raise InfrahubAPIError(f"Failed to fetch physical hosts: {str(e)}")
 
-    def get_used_vmids(self, branch: str = "main") -> Dict[str, Any]:
-        """Fetch VM IDs already in use, grouped per cluster.
+    def get_number_pool_id(self, name: str, branch: str = "main") -> Optional[str]:
+        """Look up a CoreNumberPool by name.
 
-        A VMID only has to be unique inside its cluster, and the schema does not
-        enforce that (the constraint would also reject VMID-less Hyper-V and
-        ESXi VMs), so the Create VM form is where the collision is caught: it
-        needs the used IDs of the selected host's cluster to validate input, and
-        a global maximum to suggest an ID that is free in every cluster.
+        Used for the VM ID pool. Allocating from a pool is what makes a VM ID
+        unique: every VM the catalog creates lands on its own unmerged branch,
+        where a VM on a sibling branch is invisible, so no query over the data
+        can tell which IDs are really taken. CoreNumberPool is branch-agnostic,
+        so the server hands out an ID that is free across every branch at once.
 
         Args:
-            branch: Branch name to query (default: "main")
+            name: CoreNumberPool name (e.g. "VM-VMID")
+            branch: Branch to query
 
         Returns:
-            Dictionary with:
-                - by_cluster: Dict mapping cluster ID -> set of used VM IDs
-                - next_free: int, one above the highest VM ID in any cluster
+            The pool's node ID, or None if no pool of that name exists
 
         Raises:
             InfrahubAPIError: If API error occurs
         """
-        try:
-            query = """
-            query GetUsedVmids {
-                VirtualizationVirtualMachine {
-                    edges {
-                        node {
-                            vmid { value }
-                            cluster { node { id } }
-                        }
-                    }
-                }
+        query = """
+        query NumberPool($name: String!) {
+            CoreNumberPool(name__value: $name) {
+                edges { node { id } }
             }
-            """
-            result = self.execute_graphql(query, branch=branch)
-
-            by_cluster: Dict[str, Set[int]] = {}
-            highest = 99
-            for edge in result.get("VirtualizationVirtualMachine", {}).get("edges", []):
-                node = edge.get("node", {})
-                vmid = (node.get("vmid") or {}).get("value")
-                if vmid is None:
-                    continue
-                cluster_id = ((node.get("cluster") or {}).get("node") or {}).get("id")
-                if cluster_id:
-                    by_cluster.setdefault(cluster_id, set()).add(vmid)
-                highest = max(highest, vmid)
-
-            return {"by_cluster": by_cluster, "next_free": highest + 1}
+        }
+        """
+        try:
+            result = self.execute_graphql(query, variables={"name": name}, branch=branch)
+            edges = result.get("CoreNumberPool", {}).get("edges", [])
+            return edges[0]["node"]["id"] if edges else None
         except Exception as e:
-            raise InfrahubAPIError(f"Failed to fetch used VM IDs: {str(e)}")
+            raise InfrahubAPIError(f"Failed to look up number pool {name}: {str(e)}")
+
+    def get_vm_vmid(self, vm_id: str, branch: str) -> Optional[int]:
+        """Read a VM's allocated VM ID.
+
+        Read back rather than taken from the create mutation's response: a
+        `from_pool` allocation is resolved after the create commits, so the
+        mutation returns the VM with vmid still null.
+
+        Args:
+            vm_id: VM node ID
+            branch: Branch the VM was created on
+
+        Returns:
+            The allocated VM ID, or None if the VM has none
+        """
+        query = """
+        query VmVmid($ids: [ID!]) {
+            VirtualizationVirtualMachine(ids: $ids) {
+                edges { node { vmid { value } } }
+            }
+        }
+        """
+        try:
+            edges = (
+                self.execute_graphql(query, variables={"ids": [vm_id]}, branch=branch)
+                .get("VirtualizationVirtualMachine", {})
+                .get("edges", [])
+            )
+            return (edges[0]["node"].get("vmid") or {}).get("value") if edges else None
+        except Exception:
+            # Cosmetic: the caption is skipped rather than failing the run.
+            return None
 
     def wait_for_vm_ip(self, vm_id: str, branch: str, timeout: int = 60) -> bool:
         """Poll until the VM's generator-allocated primary_address exists.
@@ -1613,6 +1633,18 @@ class InfrahubClient:
         rendered body, so returning on the node's existence alone hands back an
         artifact whose content endpoint answers 404.
 
+        Existence is still not enough on its own. Joining proxmox_vms /
+        vm_userdata_targets generates these artifacts already, so one is
+        usually Ready before this runs, and a poll that accepts any Ready
+        artifact returns that pre-existing body instantly - rendered before the
+        IP landed, but presented as freshly generated. The storage_ids in place
+        before the POST are recorded as a baseline, and an artifact counts as
+        fresh only once its storage_id moves off that baseline. The object store
+        is content-addressed, so a re-render that produces identical bytes keeps
+        its storage_id and never moves: ARTIFACT_SETTLE_AFTER seconds after the
+        POST, an unchanged artifact is accepted as current rather than waited
+        out to the timeout.
+
         Args:
             vm_id: VM node ID the artifacts target
             definition_names: CoreArtifactDefinition names to generate
@@ -1641,9 +1673,39 @@ class InfrahubClient:
         if missing:
             raise InfrahubAPIError(f"Unknown artifact definitions: {sorted(missing)}")
 
+        baseline = {a["definition_name"]: a["storage_id"] for a in self._fetch_ready_artifacts(vm_id, branch)}
+
         for def_id in def_ids.values():
             self._post_artifact_generate(def_id, branch)
 
+        deadline = time.time() + timeout
+        repost_at = time.time() + self.ARTIFACT_REPOST_AFTER
+        accept_unchanged_at = time.time() + self.ARTIFACT_SETTLE_AFTER
+        reposted = False
+        while time.time() < deadline:
+            by_definition = {a["definition_name"]: a for a in self._fetch_ready_artifacts(vm_id, branch)}
+            if set(definition_names) <= set(by_definition):
+                wanted = [by_definition[name] for name in definition_names]
+                regenerated = all(a["storage_id"] != baseline.get(a["definition_name"]) for a in wanted)
+                if regenerated or time.time() >= accept_unchanged_at:
+                    return wanted
+            if not reposted and time.time() >= repost_at:
+                for def_id in def_ids.values():
+                    self._post_artifact_generate(def_id, branch)
+                reposted = True
+            time.sleep(2)
+        raise InfrahubAPIError(f"Artifact regen did not converge for {definition_names} within {timeout}s")
+
+    def _fetch_ready_artifacts(self, vm_id: str, branch: str) -> List[Dict[str, Any]]:
+        """Read the VM's artifacts that are Ready and have a body in the store.
+
+        Args:
+            vm_id: VM node ID the artifacts target
+            branch: Branch to read
+
+        Returns:
+            List of dicts with id, name, definition_name, content_type, storage_id
+        """
         art_query = """
         query VmArtifacts($ids: [ID!]) {
             CoreArtifact(object__ids: $ids) {
@@ -1660,33 +1722,20 @@ class InfrahubClient:
             }
         }
         """
-        deadline = time.time() + timeout
-        repost_at = time.time() + self.ARTIFACT_REPOST_AFTER
-        reposted = False
-        while time.time() < deadline:
-            result = self.execute_graphql(art_query, variables={"ids": [vm_id]}, branch=branch)
-            artifacts = [
-                {
-                    "id": e["node"]["id"],
-                    "name": e["node"]["name"]["value"],
-                    "content_type": e["node"]["content_type"]["value"],
-                    "definition_name": e["node"]["definition"]["node"]["name"]["value"],
-                    "storage_id": e["node"]["storage_id"]["value"],
-                }
-                for e in result.get("CoreArtifact", {}).get("edges", [])
-                if e["node"].get("definition", {}).get("node")
-                and e["node"].get("status", {}).get("value") == "Ready"
-                and e["node"].get("storage_id", {}).get("value")
-            ]
-            found = {a["definition_name"] for a in artifacts}
-            if set(definition_names) <= found:
-                return [a for a in artifacts if a["definition_name"] in definition_names]
-            if not reposted and time.time() >= repost_at:
-                for def_id in def_ids.values():
-                    self._post_artifact_generate(def_id, branch)
-                reposted = True
-            time.sleep(2)
-        raise InfrahubAPIError(f"Artifact regen did not converge for {definition_names} within {timeout}s")
+        result = self.execute_graphql(art_query, variables={"ids": [vm_id]}, branch=branch)
+        return [
+            {
+                "id": e["node"]["id"],
+                "name": e["node"]["name"]["value"],
+                "content_type": e["node"]["content_type"]["value"],
+                "definition_name": e["node"]["definition"]["node"]["name"]["value"],
+                "storage_id": e["node"]["storage_id"]["value"],
+            }
+            for e in result.get("CoreArtifact", {}).get("edges", [])
+            if e["node"].get("definition", {}).get("node")
+            and e["node"].get("status", {}).get("value") == "Ready"
+            and e["node"].get("storage_id", {}).get("value")
+        ]
 
     def get_artifact_content(self, storage_id: str) -> str:
         """Fetch a rendered artifact's content from the object store.
@@ -1724,7 +1773,9 @@ class InfrahubClient:
                 - vcpus: int (optional)
                 - memory: int (optional, GB)
                 - disk: int (optional, GB)
-                - vmid: int (optional)
+                - vmid_pool: str (CoreNumberPool ID, optional - omit for a
+                  hypervisor family whose vmid_requirement is "unused", and the
+                  VM is created with no VM ID at all)
                 - customer: str (ID, optional)
                 - group_names: List[str] (CoreStandardGroup names, e.g. ["virtualization_vms"])
                 - platform: List[str] (optional, [manufacturer, name] HFID, e.g. ["Generic", "Linux"])
@@ -1746,11 +1797,13 @@ class InfrahubClient:
             # declaration, the mutation field and the variable value together,
             # so a new optional field is a single row rather than three edits
             # that have to agree.
-            # A falsy value means "not supplied" for all four: the schema floors
-            # vmid at 100, and an empty key, customer or platform is nothing to
-            # send.
+            # A falsy value means "not supplied" for all four: no pool means the
+            # hypervisor does not use VM IDs, and an empty key, customer or
+            # platform is nothing to send.
             optional_spec = (
-                ("vmid", "BigInt", "vmid: { value: $vmid }"),
+                # String! not String: from_pool.id is non-null in the schema, and
+                # the row is only spliced in when a pool was actually supplied.
+                ("vmid_pool", "String!", "vmid: { from_pool: { id: $vmid_pool } }"),
                 ("customer", "String", "customer: { id: $customer }"),
                 ("ssh_public_key", "String", "ssh_public_key: { value: $ssh_public_key }"),
                 ("platform", "[String]", "platform: { hfid: $platform }"),
@@ -1799,6 +1852,7 @@ class InfrahubClient:
                     object {{
                         id
                         name {{ value }}
+                        vmid {{ value }}
                     }}
                 }}
             }}
