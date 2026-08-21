@@ -217,18 +217,18 @@ things follow for anyone touching this:
   second test starts failing the same way, confirm the signature in the `task-worker` log first; a
   merge blocked by a *demo* data problem looks similar from the outside and must not be waved through.
 
-### An intermittent failure in the core tier
+### A race the cable count used to lose
 
-`test_10_dc_workflow::test_04_fabric_is_complete` occasionally fails in CI with
-`Expected at least 8 cables for a 2x4 spine-leaf mesh, found 0` and passes on rerun. It was seen
-twice on 2026-08-21, once on a commit and once on a tree without it, with a pass on the same
-feature history in between - so before blaming a change, check whether the failure reproduces.
-`test_03`'s two gates (device counts plus task quiescence) both pass, which means `create_dc`
-completed its device phases while its cabling phase either had not landed or failed silently.
-The blind spot that keeps the root cause invisible: the DC generator logs batch creation
-failures at DEBUG (`generators/common.py`), so a failed cable batch looks like a successful run
-in the CI log. Rerun the job to confirm the flake; the durable fix is raising those failures to
-errors so the next occurrence shows its cause.
+`test_10_dc_workflow::test_04_fabric_is_complete` used to fail intermittently in CI with
+`Expected at least 8 cables for a 2x4 spine-leaf mesh, found 0` - three times on 2026-08-21
+alone, on trees with and without unrelated changes, passing on rerun. The mechanism: `test_03`'s
+two gates (device counts plus task quiescence) can both hold in the window between `create_dc`'s
+device phases and its cabling phase, so a single read of the cable count raced the generator.
+The count now goes through the same bounded `wait_for` the device counts use, and the generator's
+creation failures log at error instead of debug (`generators/common.py`), so a fabric that truly
+never cables fails with the last count observed and a task log that says why. If the signature
+reappears despite the wait, that is no longer the race - read the `task-worker` log for the
+creation error before blaming the change under test.
 
 ### Authentication
 
