@@ -6,17 +6,20 @@ spec:
   data:
     - name: "web-servers"
       description: "All web servers"
+      zone: "dmz"
       ip_addresses:
         - ["web-server-01"]
         - ["web-server-02"]
 
     - name: "database-servers"
       description: "All database servers"
+      zone: "database"
       ip_addresses:
         - ["db-server-01"]
 
     - name: "mail-servers"
       description: "All mail servers"
+      zone: "external"
       ip_addresses:
         - ["mail-server"]
       fqdns:
@@ -24,6 +27,7 @@ spec:
 
     - name: "dns-servers"
       description: "All DNS servers"
+      zone: "internal"
       ip_addresses:
         - ["dns-server-01"]
         - ["ntp-server"]
@@ -36,12 +40,14 @@ spec:
 
     - name: "internal-networks"
       description: "All internal network segments"
+      zone: "internal"
       prefixes:
         - ["internal-network"]
         - ["server-network"]
 
     - name: "public-services"
       description: "Publicly accessible services"
+      zone: "dmz"
       prefixes:
         - ["dmz-network"]
       fqdns:
@@ -49,13 +55,16 @@ spec:
 
     - name: "management-servers"
       description: "Management and monitoring servers"
+      zone: "management"
       prefixes:
         - ["management-network"]
 
     - name: "development-servers"
       description: "Development environment servers"
+      zone: "development"
 
     - name: "internet"
       description: "Internet/external networks"
+      zone: "external"
       prefixes:
         - ["internet"]

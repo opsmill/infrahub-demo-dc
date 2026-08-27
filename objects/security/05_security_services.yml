@@ -54,6 +54,26 @@ spec:
       port: 636
       protocol: "tcp"
 
+    - name: "mysql"
+      description: "MySQL / MariaDB"
+      port: 3306
+      protocol: "tcp"
+
+    - name: "postgresql"
+      description: "PostgreSQL"
+      port: 5432
+      protocol: "tcp"
+
+    - name: "mssql"
+      description: "Microsoft SQL Server"
+      port: 1433
+      protocol: "tcp"
+
+    - name: "rdp"
+      description: "Remote Desktop Protocol"
+      port: 3389
+      protocol: "tcp"
+
 ---
 apiVersion: infrahub.app/v1
 kind: Object

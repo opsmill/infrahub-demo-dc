@@ -43,7 +43,9 @@ spec:
     - name: "database-services"
       description: "Database access services"
       services:
-        - ["ldap"]
+        - ["mysql"]
+        - ["postgresql"]
+        - ["mssql"]
 
     - name: "monitoring-services"
       description: "Network monitoring services"

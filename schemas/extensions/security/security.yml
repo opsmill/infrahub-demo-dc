@@ -217,6 +217,18 @@ nodes:
         kind: Generic
         optional: true
         order_weight: 2300
+      # Optional because a group may deliberately span zones. Where it is set, a rule's zones can
+      # be derived from the groups it references rather than asked for separately -- which is what
+      # lets an access request be expressed as "these addresses need to reach those addresses" by
+      # someone who does not think in zones.
+      - name: zone
+        peer: SecurityZone
+        label: Zone
+        cardinality: one
+        kind: Attribute
+        optional: true
+        order_weight: 2400
+        description: "Security zone the members of this group sit in"
 
   # ==========================================
   # Service Objects

@@ -1471,6 +1471,299 @@ class InfrahubClient:
         except Exception as e:
             raise InfrahubAPIError(f"Failed to fetch network segments: {str(e)}")
 
+    # ---------------------------------------------------------------------------------------------
+    # Firewall access requests
+    #
+    # A request is expressed as "these addresses need to reach those addresses, on these ports".
+    # Everything below exists to turn that into a SecurityPolicyRule on a branch, so the request is
+    # reviewed as a proposed change and graded by the `validate_security_policy` check rather than
+    # trusted because a form was filled in.
+    # ---------------------------------------------------------------------------------------------
+
+    CATCH_ALL_INDEX = 9999
+    """Index reserved for a policy's terminal deny. A requested rule must land before it."""
+
+    def get_address_groups(self, branch: str = "main") -> List[Dict[str, Any]]:
+        """Fetch address groups, with the zone each one sits in.
+
+        Args:
+            branch: Branch name to query (default: "main")
+
+        Returns:
+            List of dicts with keys: id, name, description, zone, zone_id, member_count.
+
+        Raises:
+            InfrahubAPIError: If the query fails.
+        """
+        query = """
+        query AddressGroups {
+          SecurityAddressGroup {
+            edges { node {
+              id
+              name { value }
+              description { value }
+              zone { node { id name { value } } }
+              ip_addresses { count }
+              prefixes { count }
+              ip_ranges { count }
+              fqdns { count }
+            } }
+          }
+        }
+        """
+        try:
+            result = self._client.execute_graphql(query=query, branch_name=branch)
+            groups = []
+            for edge in result.get("SecurityAddressGroup", {}).get("edges", []):
+                node = edge["node"]
+                zone = node.get("zone", {}).get("node") or {}
+                groups.append(
+                    {
+                        "id": node.get("id"),
+                        "name": node.get("name", {}).get("value"),
+                        "description": node.get("description", {}).get("value"),
+                        "zone": zone.get("name", {}).get("value") if zone else None,
+                        "zone_id": zone.get("id") if zone else None,
+                        "member_count": sum(
+                            (node.get(key) or {}).get("count") or 0
+                            for key in ("ip_addresses", "prefixes", "ip_ranges", "fqdns")
+                        ),
+                    }
+                )
+            return sorted(groups, key=lambda g: g["name"] or "")
+        except Exception as e:
+            raise InfrahubAPIError(f"Failed to fetch address groups: {str(e)}")
+
+    def get_services(self, branch: str = "main") -> List[Dict[str, Any]]:
+        """Fetch the individual services a request can select ports from.
+
+        Args:
+            branch: Branch name to query (default: "main")
+
+        Returns:
+            List of dicts with keys: id, name, protocol, port, description.
+
+        Raises:
+            InfrahubAPIError: If the query fails.
+        """
+        query = """
+        query Services {
+          SecurityService {
+            edges { node {
+              id
+              name { value }
+              description { value }
+              protocol { value }
+              port { value }
+            } }
+          }
+        }
+        """
+        try:
+            result = self._client.execute_graphql(query=query, branch_name=branch)
+            services = [
+                {
+                    "id": e["node"].get("id"),
+                    "name": e["node"].get("name", {}).get("value"),
+                    "description": e["node"].get("description", {}).get("value"),
+                    "protocol": e["node"].get("protocol", {}).get("value"),
+                    "port": e["node"].get("port", {}).get("value"),
+                }
+                for e in result.get("SecurityService", {}).get("edges", [])
+            ]
+            return sorted(services, key=lambda s: (s["protocol"] or "", s["port"] or 0))
+        except Exception as e:
+            raise InfrahubAPIError(f"Failed to fetch services: {str(e)}")
+
+    def get_security_policies(self, branch: str = "main") -> List[Dict[str, Any]]:
+        """Fetch security policies and the firewalls each one is attached to.
+
+        A policy attached to no firewall renders nowhere and is not checked, so the page needs the
+        firewall list to steer a request at one that does something.
+
+        Args:
+            branch: Branch name to query (default: "main")
+
+        Returns:
+            List of dicts with keys: id, name, description, firewalls.
+
+        Raises:
+            InfrahubAPIError: If the query fails.
+        """
+        query = """
+        query Policies {
+          SecurityPolicy {
+            edges { node {
+              id
+              name { value }
+              description { value }
+              firewalls { edges { node { id name { value } } } }
+            } }
+          }
+        }
+        """
+        try:
+            result = self._client.execute_graphql(query=query, branch_name=branch)
+            return [
+                {
+                    "id": e["node"].get("id"),
+                    "name": e["node"].get("name", {}).get("value"),
+                    "description": e["node"].get("description", {}).get("value"),
+                    "firewalls": [
+                        f["node"].get("name", {}).get("value") for f in e["node"].get("firewalls", {}).get("edges", [])
+                    ],
+                }
+                for e in result.get("SecurityPolicy", {}).get("edges", [])
+            ]
+        except Exception as e:
+            raise InfrahubAPIError(f"Failed to fetch security policies: {str(e)}")
+
+    def next_rule_index(self, policy_name: str, branch: str = "main", step: int = 10) -> int:
+        """Pick the index a requested rule should take within a policy.
+
+        A rule evaluated after the terminal deny can never match, so the index has to land before
+        it. `validate_security_policy` reports exactly that as an unreachable rule, which means
+        getting this wrong fails the proposed change rather than shipping bad configuration -- but
+        failing for a reason the requester cannot act on is not a useful check result.
+
+        Args:
+            policy_name: Name of the policy the rule joins.
+            branch: Branch name to query (default: "main")
+            step: Gap to leave between rules (default: 10).
+
+        Returns:
+            An unused index below :data:`CATCH_ALL_INDEX`.
+
+        Raises:
+            InfrahubAPIError: If the query fails, or the policy has no room left.
+        """
+        query = """
+        query PolicyRuleIndexes($policy: String!) {
+          SecurityPolicyRule(policy__name__value: $policy) {
+            edges { node { index { value } } }
+          }
+        }
+        """
+        try:
+            result = self._client.execute_graphql(query=query, branch_name=branch, variables={"policy": policy_name})
+            indexes = [
+                e["node"].get("index", {}).get("value") for e in result.get("SecurityPolicyRule", {}).get("edges", [])
+            ]
+            below = [i for i in indexes if i is not None and i < self.CATCH_ALL_INDEX]
+            candidate = (max(below) + step) if below else step
+
+            while candidate in indexes:
+                candidate += step
+            if candidate >= self.CATCH_ALL_INDEX:
+                raise InfrahubAPIError(
+                    f"Policy '{policy_name}' has no free index below {self.CATCH_ALL_INDEX}; "
+                    f"the rules before its terminal deny need renumbering."
+                )
+            return candidate
+        except InfrahubAPIError:
+            raise
+        except Exception as e:
+            raise InfrahubAPIError(f"Failed to determine the next rule index: {str(e)}")
+
+    def upsert_service(self, branch: str, name: str, protocol: str, port: int, description: str = "") -> str:
+        """Create a service object for a port, or return the existing one.
+
+        `SecurityService.name` is globally unique, so a second request for the same port has to
+        reuse the object rather than fail.
+
+        Args:
+            branch: Branch to create the object in.
+            name: Object name, e.g. ``tcp-8443``.
+            protocol: ``tcp``, ``udp`` or ``icmp``.
+            port: Port number.
+            description: Optional description.
+
+        Returns:
+            The service's ID.
+
+        Raises:
+            InfrahubAPIError: If the upsert fails.
+        """
+        try:
+            service = self._client.create(
+                kind="SecurityService",
+                branch=branch,
+                name=name,
+                description=description or f"{protocol.upper()} port {port}",
+                protocol=protocol,
+                port=port,
+            )
+            service.save(allow_upsert=True)
+            return str(service.id)
+        except Exception as e:
+            raise InfrahubAPIError(f"Failed to upsert service '{name}': {str(e)}")
+
+    def upsert_service_group(self, branch: str, name: str, service_ids: List[str], description: str = "") -> str:
+        """Create a service group holding the requested ports, or update the existing one.
+
+        Args:
+            branch: Branch to create the object in.
+            name: Group name.
+            service_ids: IDs of the member services.
+            description: Optional description.
+
+        Returns:
+            The group's ID.
+
+        Raises:
+            InfrahubAPIError: If the upsert fails.
+        """
+        try:
+            group = self._client.create(
+                kind="SecurityServiceGroup",
+                branch=branch,
+                name=name,
+                description=description or "Created from an access request",
+                services=service_ids,
+            )
+            group.save(allow_upsert=True)
+            return str(group.id)
+        except Exception as e:
+            raise InfrahubAPIError(f"Failed to upsert service group '{name}': {str(e)}")
+
+    def create_policy_rule(self, branch: str, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Create the rule an access request asks for.
+
+        Args:
+            branch: Branch to create the rule in.
+            data: Rule data with keys ``index``, ``name``, ``policy`` (ID), ``source_addresses``
+                and ``destination_addresses`` (lists of IDs), ``services`` (list of IDs), and
+                optionally ``source_zone`` / ``destination_zone`` (IDs), ``action`` and ``log``.
+
+        Returns:
+            Dict with keys: id, name, index.
+
+        Raises:
+            InfrahubAPIError: If creation fails.
+        """
+        try:
+            fields: Dict[str, Any] = {
+                "index": data["index"],
+                "name": data["name"],
+                "action": data.get("action", "permit"),
+                "log": data.get("log", True),
+                "policy": data["policy"],
+                "source_addresses": data.get("source_addresses") or [],
+                "destination_addresses": data.get("destination_addresses") or [],
+                "services": data.get("services") or [],
+            }
+            # Zones are derived from the address groups, so they are only set where the groups
+            # actually name one. Sending an explicit null is rejected by the API.
+            for key in ("source_zone", "destination_zone"):
+                if data.get(key):
+                    fields[key] = data[key]
+
+            rule = self._client.create(kind="SecurityPolicyRule", branch=branch, **fields)
+            rule.save(allow_upsert=True)
+            return {"id": str(rule.id), "name": data["name"], "index": data["index"]}
+        except Exception as e:
+            raise InfrahubAPIError(f"Failed to create policy rule: {str(e)}")
+
     def _sdk_object_to_dict(self, obj: Any) -> Dict[str, Any]:
         """Convert an SDK object to a dictionary.
 
