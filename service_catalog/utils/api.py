@@ -1483,6 +1483,9 @@ class InfrahubClient:
     CATCH_ALL_INDEX = 9999
     """Index reserved for a policy's terminal deny. A requested rule must land before it."""
 
+    MAX_BRANCHES_SCANNED = 50
+    """Ceiling on the branches searched for taken rule indexes, so allocation stays bounded."""
+
     def get_address_groups(self, branch: str = "main") -> List[Dict[str, Any]]:
         """Fetch address groups, with the zone each one sits in.
 
@@ -1618,17 +1621,21 @@ class InfrahubClient:
         except Exception as e:
             raise InfrahubAPIError(f"Failed to fetch security policies: {str(e)}")
 
-    def next_rule_index(self, policy_name: str, branch: str = "main", step: int = 10) -> int:
+    def next_rule_index(self, policy_name: str, step: int = 10) -> int:
         """Pick the index a requested rule should take within a policy.
 
-        A rule evaluated after the terminal deny can never match, so the index has to land before
-        it. `validate_security_policy` reports exactly that as an unreachable rule, which means
-        getting this wrong fails the proposed change rather than shipping bad configuration -- but
-        failing for a reason the requester cannot act on is not a useful check result.
+        Indexes are collected across ``main`` *and* every open branch. Allocating from ``main``
+        alone gives two requests raised before either merges the same index, and ``SecurityPolicyRule``
+        is unique on ``[policy, index]`` -- so the second one merges into a constraint violation
+        long after the requester has gone away.
+
+        A rule evaluated after the terminal deny can never match, so the index also has to land
+        before it. ``validate_security_policy`` reports exactly that as an unreachable rule, which
+        means getting it wrong fails the proposed change rather than shipping bad configuration --
+        but failing for a reason the requester cannot act on is not a useful check result.
 
         Args:
             policy_name: Name of the policy the rule joins.
-            branch: Branch name to query (default: "main")
             step: Gap to leave between rules (default: 10).
 
         Returns:
@@ -1645,14 +1652,31 @@ class InfrahubClient:
         }
         """
         try:
-            result = self._client.execute_graphql(query=query, branch_name=branch, variables={"policy": policy_name})
-            indexes = [
-                e["node"].get("index", {}).get("value") for e in result.get("SecurityPolicyRule", {}).get("edges", [])
-            ]
-            below = [i for i in indexes if i is not None and i < self.CATCH_ALL_INDEX]
-            candidate = (max(below) + step) if below else step
+            branches = ["main"]
+            try:
+                branches += [b["name"] for b in self.get_branches() if not b["is_default"]]
+            except InfrahubAPIError:
+                # A request against main alone is still better than no request at all.
+                pass
 
-            while candidate in indexes:
+            taken: set = set()
+            for branch_name in branches[: self.MAX_BRANCHES_SCANNED]:
+                try:
+                    result = self._client.execute_graphql(
+                        query=query, branch_name=branch_name, variables={"policy": policy_name}
+                    )
+                except Exception:
+                    # A branch deleted between listing and querying is not an error here.
+                    continue
+                taken.update(
+                    e["node"].get("index", {}).get("value")
+                    for e in result.get("SecurityPolicyRule", {}).get("edges", [])
+                    if e["node"].get("index", {}).get("value") is not None
+                )
+
+            below = [i for i in taken if i < self.CATCH_ALL_INDEX]
+            candidate = (max(below) + step) if below else step
+            while candidate in taken:
                 candidate += step
             if candidate >= self.CATCH_ALL_INDEX:
                 raise InfrahubAPIError(
@@ -1664,6 +1688,27 @@ class InfrahubClient:
             raise
         except Exception as e:
             raise InfrahubAPIError(f"Failed to determine the next rule index: {str(e)}")
+
+    def unique_branch_name(self, preferred: str) -> str:
+        """Return a branch name nothing is using yet.
+
+        Args:
+            preferred: The name the caller would like.
+
+        Returns:
+            ``preferred``, or it with a numeric suffix if that is taken.
+        """
+        try:
+            existing = {b["name"] for b in self.get_branches()}
+        except InfrahubAPIError:
+            return preferred
+
+        if preferred not in existing:
+            return preferred
+        suffix = 2
+        while f"{preferred}-{suffix}" in existing:
+            suffix += 1
+        return f"{preferred}-{suffix}"
 
     def upsert_service(self, branch: str, name: str, protocol: str, port: int, description: str = "") -> str:
         """Create a service object for a port, or return the existing one.

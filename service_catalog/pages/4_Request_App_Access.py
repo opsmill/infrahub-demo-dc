@@ -139,10 +139,11 @@ def build_service_group_name(pairs: List[Tuple[str, int]]) -> str:
     return "svc-" + "-".join(f"{protocol}{port}" for protocol, port in sorted(pairs))
 
 
-def initialize_request_state(form_data: Dict[str, Any]) -> None:
+def initialize_request_state(client: InfrahubClient, form_data: Dict[str, Any]) -> None:
     """Set up session state for the request workflow.
 
     Args:
+        client: InfrahubClient instance, used to pick a branch name nothing else holds.
         form_data: Everything the form collected.
     """
     source = slug(form_data["source_name"])
@@ -152,8 +153,7 @@ def initialize_request_state(form_data: Dict[str, Any]) -> None:
         "active": True,
         "step": 1,
         "form_data": form_data,
-        # The index is unique within the policy, so it keeps the branch name unique too.
-        "branch_name": f"access-{source}-to-{destination}-{form_data['index']}",
+        "branch_name": client.unique_branch_name(f"access-{source}-to-{destination}"),
         "rule_name": f"req-{source}-to-{destination}",
         "service_group_id": None,
         "error": None,
@@ -370,6 +370,10 @@ def main() -> None:
 
     # A policy attached to no firewall renders nowhere and is never checked, so those are last.
     policies = sorted(policies, key=lambda p: (not p["firewalls"], p["name"] or ""))
+
+    # Groups that are ready to use lead, so the page does not open on a warning about whichever
+    # group happens to sort first alphabetically.
+    groups = sorted(groups, key=lambda g: (not g.get("zone_id"), not g.get("member_count"), g["name"] or ""))
     group_by_label = {group_label(g): g for g in groups}
     service_by_label = {service_label(s): s for s in services}
 
@@ -474,6 +478,7 @@ def main() -> None:
                 ports_summary = ", ".join(f"{protocol}/{port}" for protocol, port in sorted(all_pairs))
 
                 initialize_request_state(
+                    client,
                     {
                         "source_id": source["id"],
                         "source_name": source["name"],
@@ -490,7 +495,7 @@ def main() -> None:
                         "index": index,
                         "requester": requester,
                         "justification": justification,
-                    }
+                    },
                 )
                 st.rerun()
 
