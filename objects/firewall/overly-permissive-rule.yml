@@ -1,0 +1,23 @@
+---
+# The rule `validate_security_policy` exists to stop.
+#
+# Loaded onto a branch by `uv run invoke demo-firewall-rule`, never by bootstrap: the shipped policy
+# has to stay clean, or every proposed change in the demo opens red. On a branch it produces two
+# findings on the proposed change -- the permit is unconstrained, and it opens a path from a less
+# trusted zone into a more trusted one -- so the change cannot merge without either constraining
+# the rule or someone overriding the check on the record.
+#
+# It reads exactly like the rule that gets added under pressure at 17:00 on a Friday, which is the
+# point: nothing about it looks alarming in a diff.
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: SecurityPolicyRule
+  data:
+    - index: 950
+      name: "temp-allow-app-migration"
+      action: "permit"
+      log: false
+      policy: "corporate-firewall-policy"
+      source_zone: "internal"
+      destination_zone: "database"

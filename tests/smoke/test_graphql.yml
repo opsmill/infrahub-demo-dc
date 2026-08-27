@@ -99,6 +99,14 @@ infrahub_tests:
           path: queries/config/juniper_firewall.gql
           kind: graphql-query-smoke
 
+  - resource: GraphQLQuery
+    resource_name: firewall_policy
+    tests:
+      - name: syntax_check
+        spec:
+          path: queries/config/firewall_policy.gql
+          kind: graphql-query-smoke
+
   # --------------------  Validation  --------------------
   - resource: GraphQLQuery
     resource_name: loadbalancer_validation

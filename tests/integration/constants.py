@@ -123,11 +123,18 @@ TRANSFORM_DEFINITIONS = [
     "edge",
     "equinix_pop",
     "juniper_firewall",
+    "panos",
     "topology_clab",
 ]
 """Every entry under ``python_transforms`` and ``jinja2_transforms`` in ``.infrahub.yml``."""
 
-CHECK_DEFINITIONS = ["validate_spine", "validate_leaf", "validate_edge", "validate_loadbalancer"]
+CHECK_DEFINITIONS = [
+    "validate_spine",
+    "validate_leaf",
+    "validate_edge",
+    "validate_loadbalancer",
+    "validate_security_policy",
+]
 """Every entry under ``check_definitions`` in ``.infrahub.yml``."""
 
 # --- artifact states -----------------------------------------------------------------------------

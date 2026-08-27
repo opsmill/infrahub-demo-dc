@@ -132,6 +132,13 @@ The firewall has several interfaces defined:
 
 These interfaces connect the firewall to the network infrastructure and provide connectivity for security policy enforcement.
 
+### The second firewall
+
+**dc1-pan-fw-01** is a Palo Alto PA-5220 running PAN-OS, in the same building, carrying the same
+`corporate-firewall-policy`. Nothing about the policy is vendor-specific, so both devices render
+from the same rules - JunOS on one, PAN-OS `set` commands on the other. Comparing the two artifacts
+side by side is the clearest demonstration of what holding policy as data buys you.
+
 ## Step 2: explore security management objects
 
 The security policy for corp-firewall is built from objects organized under the **Security Management** menu in the Infrahub UI.
@@ -258,8 +265,12 @@ Infrahub transforms the security policy data into vendor-specific firewall confi
 ### Access the firewall configuration artifact
 
 1. While viewing **corp-firewall**, look for the **Artifacts** section or tab
-2. You should see an artifact named **edge** or **firewall-configuration**
+2. You should see an artifact named **juniper-firewall**
 3. Click on the artifact to view the generated Juniper JunOS configuration
+
+Then do the same on **dc1-pan-fw-01**, whose artifact is named **panos-firewall**. Its objects are
+emitted under `shared` and its rules under a `DG-corporate-firewall-policy` device group, which is
+how the same policy reaches a fleet of firewalls through Panorama.
 
 ### Configuration sections
 
@@ -377,16 +388,13 @@ Security Policy Data (Infrahub)
     ↓
 GraphQL Query (fetch policy, rules, zones, addresses, services)
     ↓
-Python Transform (transforms/edge.py)
-    ↓
-Jinja2 Template (templates/edge.j2)
-    ↓
-Juniper JunOS Configuration (artifact)
+Python Transform ──┬── transforms/juniper_firewall.py ── templates/configs/juniper_firewall.j2 ── JunOS artifact
+                   └── transforms/panos.py ───────────── templates/configs/panos.j2 ──────────── PAN-OS artifact
 ```
 
 ### The transform
 
-The transform (`transforms/edge.py`) queries Infrahub for:
+The transform (`transforms/juniper_firewall.py`) queries Infrahub for:
 
 - Device details
 - Security zones
@@ -399,7 +407,7 @@ It then processes this data into a structure suitable for template rendering.
 
 ### The template
 
-The template (`templates/edge.j2`) contains Juniper JunOS-specific syntax and logic:
+The template (`templates/configs/juniper_firewall.j2`) contains Juniper JunOS-specific syntax and logic:
 
 - Iterates over zones to create zone configurations
 - Builds address books from address groups
@@ -408,14 +416,51 @@ The template (`templates/edge.j2`) contains Juniper JunOS-specific syntax and lo
 
 **Vendor flexibility:**
 
-The same security policy data could be transformed to different vendors by creating different templates:
+The same security policy data is already transformed for two vendors, by two transform and template
+pairs reading one shared query (`queries/config/firewall_policy.gql`):
 
-- Juniper JunOS (current implementation)
-- Cisco ASA
-- Palo Alto PAN-OS
-- Fortinet FortiGate
+- Juniper JunOS - `transforms/juniper_firewall.py`, artifact **juniper-firewall**
+- Palo Alto PAN-OS - `transforms/panos.py`, artifact **panos-firewall**
 
-This demonstrates Infrahub's vendor-neutral approach - the security policy is defined once and can be rendered for any supported platform.
+Adding Cisco ASA or Fortinet FortiGate means adding a template and a transform, and nothing else -
+no change to the schema, the data, or the existing vendors. That is the vendor-neutral claim made
+concrete: the security policy is defined once and rendered for each platform.
+
+## Step 7: let the policy check reject a bad rule
+
+Rendering configuration is only half of the story. The rule that causes an incident is usually the
+one that looked fine in review, so `validate_security_policy` runs on every proposed change that
+touches a firewall and blocks the ones that are too permissive.
+
+Run the demo:
+
+```bash
+uv run invoke demo-firewall-rule
+```
+
+This creates a branch, adds a single rule to `corporate-firewall-policy`, and opens a proposed
+change. The rule is innocuous-looking - a temporary permit from `internal` to `database` for an
+application migration - and the check rejects it with two findings:
+
+- it constrains neither destination nor service, so it permits everything between those zones
+- it opens a path from a less trusted zone into a more trusted one without being specific
+
+### What the check looks for
+
+The check reads the modelled policy rather than the rendered configuration, so one implementation
+covers every vendor. It fails a proposed change on:
+
+- **Any-to-any permits** - a permit rule with no destination and no service or application
+- **Empty groups** - a rule that references an address or service group with no members. This is
+  the subtle one: the rule looks constrained in the UI, but an empty group renders as `any`
+- **Trust inversion** - a permit into a more trusted zone that does not constrain both destination
+  and service
+- **Unreachable rules** - a rule an earlier rule already fully covers, which is dead configuration
+- **A missing default deny** - a policy that does not end in an explicit catch-all, leaving the
+  outcome to each platform's implicit default
+
+It also reports, without failing the change, permits that cross a zone boundary without logging and
+permits with no security profile attached.
 
 ## What you've learned
 
@@ -425,7 +470,8 @@ Congratulations! You've explored Infrahub's security management capabilities:
 - ✅ Explored security zones, addresses, services, and applications
 - ✅ Reviewed the corp-firewall device and its security policy
 - ✅ Examined the relationship between policy objects
-- ✅ Viewed generated Juniper JunOS firewall configurations
+- ✅ Viewed generated Juniper JunOS and Palo Alto PAN-OS firewall configurations
+- ✅ Watched a policy check reject an overly permissive rule in a proposed change
 - ✅ Modified security policies and regenerated configurations
 - ✅ Understood the transformation process from data to configuration
 
@@ -452,12 +498,10 @@ Apply the same security policy to multiple firewalls:
 
 ### Policy validation
 
-Use Infrahub's validation capabilities to ensure:
-
-- No overlapping rules with conflicting actions
-- All referenced objects exist (addresses, services, applications)
-- Required fields are populated
-- Trust levels between zones are logical
+`validate_security_policy` (`checks/security_policy.py`) already enforces permissiveness, zone
+trust, rule reachability and the default deny. Extend it, or add checks alongside it, for controls
+specific to your environment - rule expiry dates, ownership, or mapping each rule to the compliance
+framework that requires it.
 
 ### Integration with CI/CD
 

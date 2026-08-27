@@ -1,7 +1,7 @@
 from typing import Any
 
 from infrahub_sdk.transforms import InfrahubTransform
-from jinja2 import Environment, FileSystemLoader, select_autoescape
+from jinja2 import Environment, FileSystemLoader
 
 
 class JuniperFirewall(InfrahubTransform):
@@ -211,7 +211,9 @@ class JuniperFirewall(InfrahubTransform):
         template_path = f"{self.root_directory}/templates"
         env = Environment(
             loader=FileSystemLoader(template_path),
-            autoescape=select_autoescape(["j2"]),
+            # Device configuration is not HTML. `select_autoescape(["j2"])` turned it on for every
+            # template here, so a description containing `>` rendered as `&gt;` into JunOS.
+            autoescape=False,
         )
 
         # Render the template

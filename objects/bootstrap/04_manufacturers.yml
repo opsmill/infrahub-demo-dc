@@ -17,4 +17,5 @@ spec:
     - name: "HAProxy Technologies"
     - name: "Fortinet"
     - name: "F5 Networks"
+    - name: "Palo Alto Networks"
     - name: "Generic"

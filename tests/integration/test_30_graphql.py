@@ -41,6 +41,7 @@ QUERY_SUBJECTS: dict[str, tuple[str, str, str | None]] = {
     "loadbalancer_config": ("device", "DcimVirtualDevice", None),
     "loadbalancer_validation": ("device", "DcimVirtualDevice", None),
     "juniper_firewall_config": ("device", "SecurityFirewall", None),
+    "firewall_policy": ("device", "SecurityFirewall", None),
     "topology_dc": ("name", "TopologyDataCenter", None),
     "topology_simulator": ("name", "TopologyDataCenter", None),
     "topology_cabling": ("name", "TopologyDataCenter", None),

@@ -1,0 +1,262 @@
+query firewall_policy($device: String!) {
+  SecurityFirewall(name__value: $device) {
+    edges {
+      node {
+        id
+        name {
+          value
+        }
+        role {
+          value
+        }
+        platform {
+          node {
+            name {
+              value
+            }
+            netmiko_device_type {
+              value
+            }
+          }
+        }
+        location {
+          node {
+            # `location` peers to the LocationHosting generic, which does not expose `name`
+            # directly -- every other config query in this repository spreads the same way.
+            ... on LocationGeneric {
+              name {
+                value
+              }
+            }
+          }
+        }
+        interfaces {
+          edges {
+            node {
+              name {
+                value
+              }
+              role {
+                value
+              }
+              description {
+                value
+              }
+              ... on InterfacePhysical {
+                ip_addresses {
+                  edges {
+                    node {
+                      address {
+                        value
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+        policies {
+          edges {
+            node {
+              id
+              name {
+                value
+              }
+              description {
+                value
+              }
+              rules {
+                edges {
+                  node {
+                    id
+                    index {
+                      value
+                    }
+                    name {
+                      value
+                    }
+                    action {
+                      value
+                    }
+                    log {
+                      value
+                    }
+                    source_zone {
+                      node {
+                        name { value }
+                        trust_level { value }
+                      }
+                    }
+                    destination_zone {
+                      node {
+                        name { value }
+                        trust_level { value }
+                      }
+                    }
+                    source_addresses {
+                      edges {
+                        node {
+                          name { value }
+                          ip_addresses {
+                            edges {
+                              node {
+                                name { value }
+                                ipam_ip_address {
+                                  node {
+                                    address { value }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                          prefixes {
+                            edges {
+                              node {
+                                name { value }
+                                ipam_prefix {
+                                  node {
+                                    prefix { value }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                          ip_ranges {
+                            edges {
+                              node {
+                                name { value }
+                                start { value }
+                                end { value }
+                              }
+                            }
+                          }
+                          fqdns {
+                            edges {
+                              node {
+                                name { value }
+                                fqdn { value }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                    destination_addresses {
+                      edges {
+                        node {
+                          name { value }
+                          ip_addresses {
+                            edges {
+                              node {
+                                name { value }
+                                ipam_ip_address {
+                                  node {
+                                    address { value }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                          prefixes {
+                            edges {
+                              node {
+                                name { value }
+                                ipam_prefix {
+                                  node {
+                                    prefix { value }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                          ip_ranges {
+                            edges {
+                              node {
+                                name { value }
+                                start { value }
+                                end { value }
+                              }
+                            }
+                          }
+                          fqdns {
+                            edges {
+                              node {
+                                name { value }
+                                fqdn { value }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                    services {
+                      edges {
+                        node {
+                          name { value }
+                          services {
+                            edges {
+                              node {
+                                name { value }
+                                port { value }
+                                protocol { value }
+                              }
+                            }
+                          }
+                          service_ranges {
+                            edges {
+                              node {
+                                name { value }
+                                start { value }
+                                end { value }
+                                protocol { value }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                    applications {
+                      edges {
+                        node {
+                          name { value }
+                          category { value }
+                          risk_level { value }
+                        }
+                      }
+                    }
+                    url_categories {
+                      edges {
+                        node {
+                          name { value }
+                          risk_level { value }
+                        }
+                      }
+                    }
+                    security_profile {
+                      node {
+                        name { value }
+                        antivirus_enabled { value }
+                        ips_enabled { value }
+                        url_filtering_enabled { value }
+                      }
+                    }
+                    schedule {
+                      node {
+                        name { value }
+                        days_of_week { value }
+                        start_time { value }
+                        end_time { value }
+                        timezone { value }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

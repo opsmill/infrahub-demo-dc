@@ -1,15 +1,26 @@
 ---
+# Rules for `corporate-firewall-policy` are the ones under test: that policy is attached to both
+# `corp-firewall` (JunOS) and `dc1-pan-fw-01` (PAN-OS), so it renders to two vendors and is the
+# policy `validate_security_policy` inspects. Every permit below therefore constrains destination
+# and service, logs, and carries a security profile -- the baseline has to be clean, or the check
+# is red on arrival and stops meaning anything.
+#
+# The remaining policies are attached to no firewall. They exist as catalogue material for the UI
+# and are deliberately left looser.
 apiVersion: infrahub.app/v1
 kind: Object
 spec:
   kind: SecurityPolicyRule
   data:
+    # ---------------------------------------------------------------------------------------------
+    # corporate-firewall-policy -- rendered to JunOS and PAN-OS, validated on every proposed change
+    # ---------------------------------------------------------------------------------------------
     - index: 100
-      name: "allow-web-traffic"
+      name: "allow-internet-to-dmz-web"
       action: "permit"
       log: true
       policy: "corporate-firewall-policy"
-      source_zone: "internal"
+      source_zone: "external"
       destination_zone: "dmz"
       source_addresses:
         - ["internet"]
@@ -19,75 +30,170 @@ spec:
         - ["web-services"]
       applications:
         - ["web-browsing"]
+      security_profile: "dmz-security"
 
     - index: 200
-      name: "allow-database-access"
+      name: "allow-internal-to-dmz-web"
       action: "permit"
       log: true
-      policy: "server-access-policy"
-      source_zone: "server-farm"
-      destination_zone: "database"
+      policy: "corporate-firewall-policy"
+      source_zone: "internal"
+      destination_zone: "dmz"
+      source_addresses:
+        - ["internal-networks"]
+      destination_addresses:
+        - ["public-services"]
+      services:
+        - ["web-services"]
+      applications:
+        - ["web-browsing"]
+      security_profile: "standard-security"
 
     - index: 300
-      name: "allow-ssh-management"
+      name: "allow-internal-to-database"
       action: "permit"
       log: true
-      policy: "management-policy"
-      source_zone: "management"
-      destination_zone: "internal"
+      policy: "corporate-firewall-policy"
+      source_zone: "internal"
+      destination_zone: "database"
+      source_addresses:
+        - ["internal-networks"]
+      destination_addresses:
+        - ["database-servers"]
+      services:
+        - ["database-services"]
+      security_profile: "server-security"
 
     - index: 400
-      name: "guest-web-access"
+      name: "allow-business-email"
       action: "permit"
-      log: false
-      policy: "guest-network-policy"
-      source_zone: "guest"
+      log: true
+      policy: "corporate-firewall-policy"
+      source_zone: "internal"
       destination_zone: "external"
+      source_addresses:
+        - ["internal-networks"]
+      destination_addresses:
+        - ["mail-servers"]
+      services:
+        - ["mail-services"]
+      applications:
+        - ["business-email"]
+      security_profile: "standard-security"
+      schedule: "extended-hours"
 
     - index: 500
+      name: "allow-infrastructure-services"
+      action: "permit"
+      log: true
+      policy: "corporate-firewall-policy"
+      source_zone: "internal"
+      destination_zone: "internal"
+      source_addresses:
+        - ["internal-networks"]
+      destination_addresses:
+        - ["dns-servers"]
+      services:
+        - ["infrastructure-services"]
+      security_profile: "standard-security"
+
+    - index: 600
+      name: "allow-management-access"
+      action: "permit"
+      log: true
+      policy: "corporate-firewall-policy"
+      source_zone: "management"
+      destination_zone: "internal"
+      source_addresses:
+        - ["management-servers"]
+      destination_addresses:
+        - ["internal-networks"]
+      services:
+        - ["management-services"]
+      security_profile: "strict-security"
+      schedule: "maintenance-window"
+
+    - index: 700
       name: "block-file-sharing"
       action: "deny"
       log: true
       policy: "corporate-firewall-policy"
       source_zone: "internal"
       destination_zone: "external"
+      applications:
+        - ["file-sharing"]
 
-    - index: 600
-      name: "allow-business-email"
-      action: "permit"
-      log: false
-      policy: "corporate-firewall-policy"
-      source_zone: "internal"
-      destination_zone: "external"
-
-    - index: 700
+    - index: 800
       name: "deny-high-risk-categories"
       action: "deny"
       log: true
       policy: "corporate-firewall-policy"
       source_zone: "internal"
       destination_zone: "external"
+      url_categories:
+        - ["malware"]
+        - ["phishing"]
+        - ["gambling"]
+        - ["weapons"]
 
-    - index: 800
+    # The explicit catch-all. `validate_security_policy` requires one: without it the rendered
+    # configuration relies on the platform's implicit default, which differs by vendor and is the
+    # kind of assumption that does not survive a migration.
+    - index: 9999
+      name: "default-deny-all"
+      action: "deny"
+      log: true
+      policy: "corporate-firewall-policy"
+
+    # ---------------------------------------------------------------------------------------------
+    # Unattached catalogue policies
+    # ---------------------------------------------------------------------------------------------
+    - index: 100
+      name: "allow-database-access"
+      action: "permit"
+      log: true
+      policy: "server-access-policy"
+      source_zone: "server-farm"
+      destination_zone: "database"
+      source_addresses:
+        - ["internal-networks"]
+      destination_addresses:
+        - ["database-servers"]
+      services:
+        - ["database-services"]
+
+    - index: 100
+      name: "allow-ssh-management"
+      action: "permit"
+      log: true
+      policy: "management-policy"
+      source_zone: "management"
+      destination_zone: "internal"
+      source_addresses:
+        - ["management-servers"]
+      services:
+        - ["management-services"]
+
+    - index: 200
       name: "maintenance-access"
       action: "permit"
       log: true
       policy: "management-policy"
       source_zone: "management"
       destination_zone: "server-farm"
+      source_addresses:
+        - ["management-servers"]
+      services:
+        - ["management-services"]
+      schedule: "maintenance-window"
 
-    - index: 900
-      name: "allow-infrastructure-services"
+    - index: 100
+      name: "guest-web-access"
       action: "permit"
       log: false
-      policy: "corporate-firewall-policy"
-      source_zone: "internal"
-      destination_zone: "internal"
-
-    - index: 1000
-      name: "deny-all"
-      action: "deny"
-      log: true
-      policy: "corporate-firewall-policy"
-      source_zone: "external"
-      destination_zone: "internal"
+      policy: "guest-network-policy"
+      source_zone: "guest"
+      destination_zone: "external"
+      services:
+        - ["web-services"]
+      security_profile: "guest-security"

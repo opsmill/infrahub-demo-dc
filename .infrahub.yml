@@ -58,6 +58,14 @@ artifact_definitions:
     transformation: juniper_firewall
     parameters:
       device: name__value
+  # Palo Alto Firewall
+  - name: panos_config
+    artifact_name: panos-firewall
+    content_type: text/plain
+    targets: palo_alto_firewall
+    transformation: panos
+    parameters:
+      device: name__value
   # Containerlab
   - name: Containerlab Topology
     artifact_name: containerlab-topology
@@ -113,6 +121,13 @@ check_definitions:
     class_name: CheckLoadBalancer
     file_path: checks/loadbalancer.py
     targets: loadbalancers
+    parameters:
+      device: name__value
+  # Vendor-neutral: reads the modelled policy, so it covers every firewall the repo renders.
+  - name: validate_security_policy
+    class_name: CheckSecurityPolicy
+    file_path: checks/security_policy.py
+    targets: firewalls
     parameters:
       device: name__value
 
@@ -177,6 +192,12 @@ python_transforms:
     watch:
       files:
         - templates/configs/juniper_firewall.j2
+  - name: panos
+    class_name: PanosFirewall
+    file_path: transforms/panos.py
+    watch:
+      files:
+        - templates/configs/panos.j2
 
 generator_definitions:
   # All three generators subclass `TopologyCreator` from `generators/common.py`, which in turn imports
@@ -240,6 +261,10 @@ queries:
     file_path: queries/topology/equinix_pop.gql
   - name: juniper_firewall_config
     file_path: queries/config/juniper_firewall.gql
+  # Shared by the `panos` transform and the `validate_security_policy` check: rendering a policy and
+  # auditing it need the same resolved rule data, and one query keeps the two from drifting apart.
+  - name: firewall_policy
+    file_path: queries/config/firewall_policy.gql
   - name: segment
     file_path: queries/segment/segment.gql
   - name: rack_elevation_query

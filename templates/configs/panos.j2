@@ -1,0 +1,132 @@
+{#-
+  PAN-OS / Panorama configuration in `set` format.
+
+  Shared objects first, then the per-device template stack, then one device group per
+  SecurityPolicy. Rules are emitted in index order because PAN-OS evaluates a rulebase top-down --
+  the order of these lines *is* the policy.
+-#}
+# ------------------------------------------------------------------------------------------------
+# {{ data.device_name }}{% if data.platform %} ({{ data.platform }}){% endif %}
+
+{% if data.location %}
+# Site: {{ data.location }}{% if data.role %} | Role: {{ data.role }}{% endif %}
+
+{% endif %}
+# Generated from Infrahub. Do not edit on the device -- change the model and re-render.
+# ------------------------------------------------------------------------------------------------
+{% if data.unsupported %}
+
+# Not expressible in PAN-OS, carried here so the gap is visible rather than silently dropped:
+{% for note in data.unsupported %}
+#   - {{ note }}
+{% endfor %}
+{% endif %}
+
+# --------------------------------------------------  Shared objects  ----------------------------
+{% if data.addresses %}
+
+{% for address in data.addresses.values() | sort(attribute='name') %}
+set shared address {{ address.name }} {{ address.kind }} {{ address.value }}
+{% endfor %}
+{% endif %}
+{% if data.address_groups %}
+
+{% for group in data.address_groups.values() | sort(attribute='name') %}
+set shared address-group {{ group.name }} static [ {{ group.members | join(' ') }} ]
+{% endfor %}
+{% endif %}
+{% if data.services %}
+
+{% for service in data.services.values() | sort(attribute='name') %}
+set shared service {{ service.name }} protocol {{ service.protocol }} port {{ service.port }}
+{% endfor %}
+{% endif %}
+{% if data.service_groups %}
+
+{% for group in data.service_groups.values() | sort(attribute='name') %}
+set shared service-group {{ group.name }} members [ {{ group.members | join(' ') }} ]
+{% endfor %}
+{% endif %}
+{% if data.profile_groups %}
+
+{% for profile in data.profile_groups.values() | sort(attribute='name') %}
+{% if profile.antivirus %}
+set shared profile-group {{ profile.name }} virus [ default ]
+{% endif %}
+{% if profile.ips %}
+set shared profile-group {{ profile.name }} spyware [ strict ]
+set shared profile-group {{ profile.name }} vulnerability [ strict ]
+{% endif %}
+{% if profile.url_filtering %}
+set shared profile-group {{ profile.name }} url-filtering [ default ]
+{% endif %}
+{% endfor %}
+{% endif %}
+{% if data.schedules %}
+
+{% for schedule in data.schedules.values() | sort(attribute='name') %}
+{% for day in schedule.days %}
+set shared schedule {{ schedule.name }} schedule-type recurring weekly {{ day }} [ {{ schedule.start_time }}-{{ schedule.end_time }} ]
+{% endfor %}
+{% endfor %}
+{% endif %}
+
+# --------------------------------------------------  Template stack  ----------------------------
+
+set template {{ data.template_stack }} config deviceconfig system hostname {{ data.device_name }}
+{% for interface in data.interfaces %}
+{% if interface.role == 'management' %}
+{% if interface.ip_address %}
+set template {{ data.template_stack }} config deviceconfig system ip-address {{ interface.ip_address.split('/')[0] }}
+{% endif %}
+{% else %}
+{% if interface.ip_address %}
+set template {{ data.template_stack }} config network interface ethernet {{ interface.name }} layer3 ip {{ interface.ip_address }}
+{% else %}
+set template {{ data.template_stack }} config network interface ethernet {{ interface.name }} layer3
+{% endif %}
+{% if interface.description %}
+set template {{ data.template_stack }} config network interface ethernet {{ interface.name }} comment "{{ interface.description }}"
+{% endif %}
+{% endif %}
+{% endfor %}
+{% if data.zones %}
+
+{% for zone in data.zones %}
+{# Zone-to-interface membership is not modelled, so zones are declared without members. #}
+set template {{ data.template_stack }} config vsys vsys1 zone {{ zone.name }} network layer3
+{% endfor %}
+{% endif %}
+{% for device_group in data.device_groups %}
+
+# --------------------------------------------------  {{ device_group.name }}  -------------------
+{% if device_group.description %}
+
+set device-group {{ device_group.name }} description "{{ device_group.description }}"
+{% endif %}
+{% for rule in device_group.rules %}
+
+set device-group {{ device_group.name }} pre-rulebase security rules {{ rule.name }} from [ {{ rule.from_zone }} ]
+set device-group {{ device_group.name }} pre-rulebase security rules {{ rule.name }} to [ {{ rule.to_zone }} ]
+set device-group {{ device_group.name }} pre-rulebase security rules {{ rule.name }} source [ {{ rule.source | join(' ') }} ]
+set device-group {{ device_group.name }} pre-rulebase security rules {{ rule.name }} destination [ {{ rule.destination | join(' ') }} ]
+set device-group {{ device_group.name }} pre-rulebase security rules {{ rule.name }} application [ {{ rule.application | join(' ') }} ]
+set device-group {{ device_group.name }} pre-rulebase security rules {{ rule.name }} service [ {{ rule.service | join(' ') }} ]
+{% if rule.url_categories %}
+set device-group {{ device_group.name }} pre-rulebase security rules {{ rule.name }} category [ {{ rule.url_categories | join(' ') }} ]
+{% endif %}
+set device-group {{ device_group.name }} pre-rulebase security rules {{ rule.name }} action {{ rule.action }}
+{% if rule.log %}
+set device-group {{ device_group.name }} pre-rulebase security rules {{ rule.name }} log-start no
+set device-group {{ device_group.name }} pre-rulebase security rules {{ rule.name }} log-end yes
+{% else %}
+set device-group {{ device_group.name }} pre-rulebase security rules {{ rule.name }} log-end no
+{% endif %}
+{% if rule.profile_group %}
+set device-group {{ device_group.name }} pre-rulebase security rules {{ rule.name }} profile-setting group [ {{ rule.profile_group }} ]
+{% endif %}
+{% if rule.schedule %}
+set device-group {{ device_group.name }} pre-rulebase security rules {{ rule.name }} schedule {{ rule.schedule }}
+{% endif %}
+{% endfor %}
+{% endfor %}

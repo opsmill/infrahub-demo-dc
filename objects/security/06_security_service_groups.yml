@@ -8,24 +8,44 @@ spec:
       description: "Web-related services"
       services:
         - ["https"]
+        - ["http"]
 
     - name: "mail-services"
       description: "Email-related services"
+      services:
+        - ["smtp"]
 
     - name: "management-services"
       description: "Network management services"
+      services:
+        - ["ssh"]
+        - ["snmp"]
 
     - name: "file-transfer"
       description: "File transfer services"
+      services:
+        - ["ftp"]
+      service_ranges:
+        - ["ftp-data-range"]
 
     - name: "infrastructure-services"
       description: "Core infrastructure services"
+      services:
+        - ["dns"]
+        - ["ntp"]
 
     - name: "directory-services"
       description: "Directory and authentication services"
+      services:
+        - ["ldap"]
+        - ["ldaps"]
 
     - name: "database-services"
       description: "Database access services"
+      services:
+        - ["ldap"]
 
     - name: "monitoring-services"
       description: "Network monitoring services"
+      services:
+        - ["snmp"]

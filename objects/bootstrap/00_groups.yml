@@ -54,6 +54,8 @@ spec:
       description: All edge devices
     - name: juniper_firewall
       description: Juniper DC firewall
+    - name: palo_alto_firewall
+      description: Palo Alto firewalls rendered as PAN-OS/Panorama configuration
     - name: juniper_pop_firewall
       description: Juniper POP firewall
     - name: checkpoint_firewall

@@ -12,24 +12,45 @@ spec:
 
     - name: "database-servers"
       description: "All database servers"
+      ip_addresses:
+        - ["db-server-01"]
 
     - name: "mail-servers"
       description: "All mail servers"
+      ip_addresses:
+        - ["mail-server"]
+      fqdns:
+        - ["mail-server-fqdn"]
 
     - name: "dns-servers"
       description: "All DNS servers"
+      ip_addresses:
+        - ["dns-server-01"]
+        - ["ntp-server"]
 
     - name: "critical-servers"
       description: "Mission critical servers"
+      ip_addresses:
+        - ["db-server-01"]
+        - ["dns-server-01"]
 
     - name: "internal-networks"
       description: "All internal network segments"
+      prefixes:
+        - ["internal-network"]
+        - ["server-network"]
 
     - name: "public-services"
       description: "Publicly accessible services"
+      prefixes:
+        - ["dmz-network"]
+      fqdns:
+        - ["company-website"]
 
     - name: "management-servers"
       description: "Management and monitoring servers"
+      prefixes:
+        - ["management-network"]
 
     - name: "development-servers"
       description: "Development environment servers"

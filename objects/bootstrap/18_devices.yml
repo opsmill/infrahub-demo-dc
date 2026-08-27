@@ -12,6 +12,7 @@ spec:
       status: active
       member_of_groups:
         - juniper_firewall
+        - firewalls
       interfaces:
         kind: InterfacePhysical
         data:
@@ -28,6 +29,38 @@ spec:
             role: leaf
             status: active
           - name: ge-0/0/3
+            role: leaf
+            status: active
+
+    # Second vendor on the same security policy. `corporate-firewall-policy` is attached to both this
+    # device and `corp-firewall`, so one set of modelled rules renders as JunOS on one and as PAN-OS
+    # `set` commands on the other -- which is the point of holding policy as data rather than as
+    # vendor configuration.
+    - name: dc1-pan-fw-01
+      role: dc_firewall
+      device_type: [Palo Alto Networks, PA-5220]
+      platform: [Palo Alto Networks, PAN-OS]
+      location: par-1
+      status: active
+      member_of_groups:
+        - palo_alto_firewall
+        - firewalls
+      interfaces:
+        kind: InterfacePhysical
+        data:
+          - name: management
+            role: management
+            status: active
+          - name: ethernet1/1
+            role: uplink
+            status: active
+          - name: ethernet1/2
+            role: leaf
+            status: active
+          - name: ethernet1/3
+            role: leaf
+            status: active
+          - name: ethernet1/4
             role: leaf
             status: active
 

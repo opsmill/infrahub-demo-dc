@@ -741,6 +741,39 @@ def demo_conflict(context: Context, branch: str = "conflict-demo", device: str =
     context.run(f"uv run python scripts/create_conflict.py --branch {branch} --device {device}", pty=True)
 
 
+@task(optional=["branch"], name="demo-firewall-rule")
+def demo_firewall_rule(context: Context, branch: str = "add-firewall-rule") -> None:
+    """Propose an overly permissive firewall rule and let the policy check reject it."""
+    console.print()
+    console.print(
+        Panel(
+            f"[bold bright_red]Firewall Governance Demo[/bold bright_red]\n"
+            f"[dim]Branch:[/dim] {branch}\n"
+            f"[dim]Rule:[/dim] temp-allow-app-migration (internal -> database, any/any)",
+            border_style="bright_red",
+            box=box.SIMPLE,
+        )
+    )
+
+    console.print(f"\n[cyan]→[/cyan] Creating branch: [bold]{branch}[/bold]")
+    context.run(f"uv run infrahubctl branch create {branch}")
+
+    console.print(f"\n[cyan]→[/cyan] Adding the rule to branch: [bold]{branch}[/bold]")
+    context.run(f"uv run infrahubctl object load objects/firewall/overly-permissive-rule.yml --branch {branch}")
+
+    console.print(
+        f"\n[bright_magenta]→[/bright_magenta] Creating proposed change for branch '[bold]{branch}[/bold]'..."
+    )
+    context.run(f"uv run python scripts/create_proposed_change.py --branch {branch}", pty=True)
+
+    console.print(
+        "\n[yellow]→[/yellow] Open the proposed change and read the [bold]validate_security_policy[/bold] check: "
+        "the rule constrains neither destination nor service, and it opens a path from a less trusted "
+        "zone into a more trusted one."
+    )
+    console.print()
+
+
 @task(name="docs")
 def docs_build(context: Context) -> None:
     """Build documentation website."""

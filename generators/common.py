@@ -343,10 +343,12 @@ class TopologyCreator:
             )
         )
 
-        # Add juniper_firewall group if any firewall roles are present
+        # Add the firewall groups if any firewall roles are present. `juniper_firewall` drives the
+        # JunOS artifact; `firewalls` is vendor-neutral and is what `validate_security_policy`
+        # targets, so a generated firewall is policy-checked the same as a bootstrap one.
         firewall_roles = {"dc_firewall", "edge_firewall"}
         if any(item["role"] in firewall_roles for item in self.data["design"]["elements"]):
-            roles.append("juniper_firewall")
+            roles.extend(["juniper_firewall", "firewalls"])
 
         await self.client.filters(
             kind="CoreStandardGroup",
@@ -896,11 +898,12 @@ class TopologyCreator:
                 self.device_to_template[name] = template_name
 
                 # Construct the payload once per device
-                # Determine group name based on role
+                # Determine group names based on role. Firewalls join a vendor group for artifact
+                # rendering and the vendor-neutral `firewalls` group the policy check targets.
                 if role in ["dc_firewall", "edge_firewall"]:
-                    group_name = "juniper_firewall"
+                    group_names = ["juniper_firewall", "firewalls"]
                 else:
-                    group_name = f"{role}s"
+                    group_names = [f"{role}s"]
 
                 payload = {
                     "name": name,
@@ -920,7 +923,8 @@ class TopologyCreator:
                             kind="CoreStandardGroup",
                             key=group_name,
                             branch=self.branch,
-                        ).id,
+                        ).id
+                        for group_name in group_names
                     ],
                     "primary_address": await self.client.allocate_next_ip_address(
                         resource_pool=self.client.store.get(

@@ -8,6 +8,7 @@ spec:
       description: "Main corporate firewall security policy"
       firewalls:
         - ["corp-firewall"]
+        - ["dc1-pan-fw-01"]
 
     - name: "guest-network-policy"
       description: "Security policy for guest network access"

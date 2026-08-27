@@ -226,6 +226,12 @@ spec:
       full_depth: false
       manufacturer: Juniper
       platform: [Juniper, JunOS]
+    - name: PA-5220
+      part_number: PA-5220
+      height: 2
+      full_depth: true
+      manufacturer: Palo Alto Networks
+      platform: [Palo Alto Networks, PAN-OS]
     - name: C9200L-48P-4G
       part_number: C9200L-48P-4G
       height: 1
