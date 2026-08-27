@@ -774,6 +774,21 @@ def demo_firewall_rule(context: Context, branch: str = "add-firewall-rule") -> N
     console.print()
 
 
+@task(optional=["branch"], name="refresh-artifacts")
+def refresh_artifacts(context: Context, branch: str = "main") -> None:
+    """Re-render every artifact on a branch after its data changed."""
+    console.print()
+    console.print(
+        Panel(
+            f"[bold cyan]Refreshing artifacts[/bold cyan]\n[dim]Branch:[/dim] {branch}",
+            border_style="cyan",
+            box=box.SIMPLE,
+        )
+    )
+    context.run(f"uv run python scripts/refresh_artifacts.py --branch {branch}", pty=True)
+    console.print()
+
+
 @task(name="docs")
 def docs_build(context: Context) -> None:
     """Build documentation website."""
