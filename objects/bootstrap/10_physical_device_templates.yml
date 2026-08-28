@@ -144,6 +144,38 @@ spec:
           - template_name: SRX-1500_DC_FIREWALL_ge-0/0/[0-3]
             name: ge-0/0/[0-3]
             role: leaf
+    - template_name: PA-5220_EDGE_FIREWALL
+      device_type: [Palo Alto Networks, PA-5220]
+      role: edge_firewall
+      status: active
+      interfaces:
+        kind: TemplateInterfacePhysical
+        parameters:
+          expand_range: true
+        data:
+          # PAN-OS names the out-of-band port `management`, not a numbered ethernet interface, and
+          # configures it under `deviceconfig` rather than as a layer 3 interface.
+          - template_name: PA-5220_EDGE_FIREWALL_management
+            name: management
+            role: management
+          - template_name: PA-5220_EDGE_FIREWALL_ethernet1/[1-4]
+            name: ethernet1/[1-4]
+            role: leaf
+    - template_name: PA-5220_DC_FIREWALL
+      device_type: [Palo Alto Networks, PA-5220]
+      role: dc_firewall
+      status: active
+      interfaces:
+        kind: TemplateInterfacePhysical
+        parameters:
+          expand_range: true
+        data:
+          - template_name: PA-5220_DC_FIREWALL_management
+            name: management
+            role: management
+          - template_name: PA-5220_DC_FIREWALL_ethernet1/[1-4]
+            name: ethernet1/[1-4]
+            role: leaf
     - template_name: C9200L-24P-4G_OOB
       device_type: [Cisco, C9200L-24P-4G]
       role: oob

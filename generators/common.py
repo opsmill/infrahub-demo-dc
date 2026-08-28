@@ -156,6 +156,36 @@ def clean_data(data: Any) -> Any:
 # ============================================================================
 
 
+def _manufacturer_key(element: dict) -> str:
+    """Normalise a design element's manufacturer into the form group names use.
+
+    Args:
+        element: A design element carrying ``device_type.manufacturer.name``.
+
+    Returns:
+        The manufacturer name lowercased with spaces replaced by underscores, or an empty string
+        when the element does not carry one.
+    """
+    manufacturer = (element.get("device_type") or {}).get("manufacturer") or {}
+    return str(manufacturer.get("name", "")).lower().replace(" ", "_")
+
+
+FIREWALL_ROLES = {"dc_firewall", "edge_firewall"}
+"""Design roles that produce a ``SecurityFirewall`` rather than a ``DcimDevice``."""
+
+FIREWALL_VENDOR_GROUPS = {
+    "juniper": "juniper_firewall",
+    "palo_alto_networks": "palo_alto_firewall",
+}
+"""Manufacturer to the group whose artifact definition renders that vendor's configuration.
+
+Keyed by the manufacturer name lowercased with spaces replaced, matching how the manufacturer
+groups are built. A firewall from a manufacturer absent here still joins ``firewalls`` and is
+policy-checked; it simply has no configuration artifact until a transform exists for it, which is
+better than rendering another vendor's syntax onto it.
+"""
+
+
 class TopologyCreator:
     """
     Orchestrates the creation of network topology elements in Infrahub.
@@ -337,18 +367,25 @@ class TopologyCreator:
 
         roles = list(set(f"{item['role']}s" for item in self.data["design"]["elements"]))
         manufacturers = list(
-            set(
-                f"{item['device_type']['manufacturer']['name'].lower().replace(' ', '_')}_{item['role']}"
-                for item in self.data["design"]["elements"]
-            )
+            set(f"{_manufacturer_key(item)}_{item['role']}" for item in self.data["design"]["elements"])
         )
 
-        # Add the firewall groups if any firewall roles are present. `juniper_firewall` drives the
-        # JunOS artifact; `firewalls` is vendor-neutral and is what `validate_security_policy`
-        # targets, so a generated firewall is policy-checked the same as a bootstrap one.
-        firewall_roles = {"dc_firewall", "edge_firewall"}
-        if any(item["role"] in firewall_roles for item in self.data["design"]["elements"]):
-            roles.extend(["juniper_firewall", "firewalls"])
+        # Firewalls join two groups: one vendor group, which selects the artifact definition that
+        # renders their configuration, and the vendor-neutral `firewalls`, which is what the policy
+        # and reachability checks target. Only the vendor groups this design actually uses are
+        # fetched -- a design with Palo Alto firewalls must not pull in the Juniper group.
+        firewall_elements = [item for item in self.data["design"]["elements"] if item["role"] in FIREWALL_ROLES]
+        if firewall_elements:
+            roles.append("firewalls")
+            roles.extend(
+                sorted(
+                    {
+                        group
+                        for item in firewall_elements
+                        if (group := FIREWALL_VENDOR_GROUPS.get(_manufacturer_key(item))) is not None
+                    }
+                )
+            )
 
         await self.client.filters(
             kind="CoreStandardGroup",
@@ -897,11 +934,14 @@ class TopologyCreator:
                 template_name = device["template"]["template_name"]
                 self.device_to_template[name] = template_name
 
-                # Construct the payload once per device
-                # Determine group names based on role. Firewalls join a vendor group for artifact
-                # rendering and the vendor-neutral `firewalls` group the policy check targets.
-                if role in ["dc_firewall", "edge_firewall"]:
-                    group_names = ["juniper_firewall", "firewalls"]
+                # Construct the payload once per device.
+                # A firewall's vendor group decides which transform renders its configuration, so it
+                # follows the device's manufacturer rather than being assumed.
+                if role in FIREWALL_ROLES:
+                    group_names = ["firewalls"]
+                    vendor_group = FIREWALL_VENDOR_GROUPS.get(_manufacturer_key(device))
+                    if vendor_group:
+                        group_names.insert(0, vendor_group)
                 else:
                     group_names = [f"{role}s"]
 

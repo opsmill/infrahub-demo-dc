@@ -6,4 +6,4 @@ spec:
   data:
     - name: demo-dc
       location: "https://github.com/opsmill/infrahub-demo-dc.git"
-      ref: "main"
+      ref: "atg/spotty-ends-fix"

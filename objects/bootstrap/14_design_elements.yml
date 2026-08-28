@@ -58,6 +58,18 @@ spec:
       role: dc_firewall
       device_type: [Juniper, SRX-1500]
       template: SRX-1500_DC_FIREWALL
+    - name: 2 PALO ALTO EDGE FIREWALLS PA-5220
+      description: 2 Palo Alto EDGE PA-5220 firewalls
+      quantity: 2
+      role: edge_firewall
+      device_type: [Palo Alto Networks, PA-5220]
+      template: PA-5220_EDGE_FIREWALL
+    - name: 2 PALO ALTO DC FIREWALLS PA-5220
+      description: 2 Palo Alto DC PA-5220 firewalls
+      quantity: 2
+      role: dc_firewall
+      device_type: [Palo Alto Networks, PA-5220]
+      template: PA-5220_DC_FIREWALL
     - name: 2 CISCO OOB SWITCHES C9200L-24P-4G
       description: 2 Cisco C9200L-24P-4G OOB switches
       quantity: 2
