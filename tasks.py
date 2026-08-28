@@ -774,6 +774,40 @@ def demo_firewall_rule(context: Context, branch: str = "add-firewall-rule") -> N
     console.print()
 
 
+@task(optional=["branch"], name="demo-pivot-rule")
+def demo_pivot_rule(context: Context, branch: str = "add-pivot-rule") -> None:
+    """Propose a well-formed rule that still opens a path from the internet to the database."""
+    console.print()
+    console.print(
+        Panel(
+            f"[bold bright_red]Reachability Demo[/bold bright_red]\n"
+            f"[dim]Branch:[/dim] {branch}\n"
+            f"[dim]Rule:[/dim] allow-dmz-to-internal-app (constrained, logged, profiled)",
+            border_style="bright_red",
+            box=box.SIMPLE,
+        )
+    )
+
+    console.print(f"\n[cyan]→[/cyan] Creating branch: [bold]{branch}[/bold]")
+    context.run(f"uv run infrahubctl branch create {branch}")
+
+    console.print(f"\n[cyan]→[/cyan] Adding the rule to branch: [bold]{branch}[/bold]")
+    context.run(f"uv run infrahubctl object load objects/firewall/pivot-rule.yml --branch {branch}")
+
+    console.print(
+        f"\n[bright_magenta]→[/bright_magenta] Creating proposed change for branch '[bold]{branch}[/bold]'..."
+    )
+    context.run(f"uv run python scripts/create_proposed_change.py --branch {branch}", pty=True)
+
+    console.print(
+        "\n[yellow]→[/yellow] [bold]validate_security_policy[/bold] passes -- the rule is constrained "
+        "on both sides, names a service, logs and carries a profile. "
+        "[bold]validate_reachability[/bold] fails it: joined to the rules already approved, it puts "
+        "'external' three hops from 'database'."
+    )
+    console.print()
+
+
 @task(optional=["branch"], name="refresh-artifacts")
 def refresh_artifacts(context: Context, branch: str = "main") -> None:
     """Re-render every artifact on a branch after its data changed."""

@@ -462,6 +462,53 @@ covers every vendor. It fails a proposed change on:
 It also reports, without failing the change, permits that cross a zone boundary without logging and
 permits with no security profile attached.
 
+## Step 8: see what the policy permits in two hops
+
+Every check so far judges one rule. That is why the dangerous rules get approved: each one is
+reasonable on its own, and the exposure only exists once they are read together.
+
+Run the demo:
+
+```bash
+uv run invoke demo-pivot-rule
+```
+
+This adds a single rule, `allow-dmz-to-internal-app`. It is constrained on both sides, names a
+service, logs, and carries a security profile -- `validate_security_policy` passes it, and so would
+a reviewer reading it on its own.
+
+`validate_reachability` fails the change:
+
+```text
+'dmz' (trust 30) reaches 'database' (trust 95) in 2 hops, though no rule permits it
+directly. A host compromised in 'dmz' could pivot to 'database' along:
+dmz(30) -[allow-dmz-to-internal-app]-> internal(80) -[allow-internal-to-database]-> database(95)
+
+'external' (trust 0) reaches 'database' (trust 95) in 3 hops, though no rule permits it
+directly. A host compromised in 'external' could pivot to 'database' along:
+external(0) -[allow-internet-to-dmz-web]-> dmz(30) -[allow-dmz-to-internal-app]->
+internal(80) -[allow-internal-to-database]-> database(95)
+```
+
+`external -> dmz` was approved for the public web tier. `internal -> database` was approved for the
+application tier. Neither is wrong. The new rule joins them, and the internet is three hops from the
+database -- a path no rule expresses and no rule-by-rule review can find.
+
+### What the check does and does not claim
+
+It builds the graph the permit rules describe: zones as nodes, permits as edges. A pair reachable
+through an intermediate zone but never permitted directly is reported, and the message names the
+rule behind every hop so you know which one to narrow.
+
+The claim is about the policy, not about packets. It says the rulebase allows the chain, so a host
+compromised in the first zone could pivot to the last. Whether an intermediary would actually
+forward that traffic is a host question the firewall model cannot see.
+
+Errors are reserved for a path from an untrusted zone (trust 50 or below) into a sensitive one
+(trust 90 or above). Other climbs -- `management` reaching `database` through `internal`, for
+instance -- are reported without failing the change, because a highly trusted origin makes the
+pivot far less interesting.
+
 ## What you've learned
 
 Congratulations! You've explored Infrahub's security management capabilities:
@@ -472,6 +519,7 @@ Congratulations! You've explored Infrahub's security management capabilities:
 - ✅ Examined the relationship between policy objects
 - ✅ Viewed generated Juniper JunOS and Palo Alto PAN-OS firewall configurations
 - ✅ Watched a policy check reject an overly permissive rule in a proposed change
+- ✅ Saw a reachability check catch a pivot path that every per-rule control approved
 - ✅ Modified security policies and regenerated configurations
 - ✅ Understood the transformation process from data to configuration
 

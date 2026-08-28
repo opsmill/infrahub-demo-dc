@@ -1,0 +1,30 @@
+---
+# A rule that passes every per-rule control and still opens a path to the database.
+#
+# Loaded onto a branch by `uv run invoke demo-pivot-rule`, never by bootstrap. It is constrained on
+# both sides, names a service, logs, and carries a security profile -- `validate_security_policy`
+# has nothing to say about it, and neither would a reviewer reading it on its own.
+#
+# What it does is complete a chain. `external -> dmz` was approved for the public web tier and
+# `internal -> database` for the application tier; adding `dmz -> internal` joins them, and the
+# internet is three hops from the database. `validate_reachability` is the only thing in the
+# pipeline that can see that, because it is the only one that reads the rules together.
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: SecurityPolicyRule
+  data:
+    - index: 250
+      name: "allow-dmz-to-internal-app"
+      action: "permit"
+      log: true
+      policy: "corporate-firewall-policy"
+      source_zone: "dmz"
+      destination_zone: "internal"
+      source_addresses:
+        - ["web-servers"]
+      destination_addresses:
+        - ["internal-networks"]
+      services:
+        - ["web-services"]
+      security_profile: "standard-security"
