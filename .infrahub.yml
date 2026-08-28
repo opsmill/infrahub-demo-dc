@@ -130,6 +130,14 @@ check_definitions:
     targets: firewalls
     parameters:
       device: name__value
+  # Judges the rules together rather than one at a time: what the policy permits in two hops that
+  # no single rule permits directly.
+  - name: validate_reachability
+    class_name: CheckReachability
+    file_path: checks/reachability.py
+    targets: firewalls
+    parameters:
+      device: name__value
 
 # `watch` lists the files a component depends on that Infrahub cannot detect by reading the entry
 # point: helper modules imported at runtime, and Jinja templates chosen from device data rather than

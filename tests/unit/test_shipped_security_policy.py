@@ -21,6 +21,8 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from checks.reachability import analyse as analyse_reachability  # noqa: E402
+from checks.reachability import build_graph  # noqa: E402
 from checks.security_policy import analyse_policy, ends_in_catch_all_deny, normalise_rule  # noqa: E402
 
 SECURITY_OBJECTS = ROOT / "objects" / "security"
@@ -289,3 +291,25 @@ def test_every_group_the_shipped_policy_references_has_members(
         empty.extend(f"rule {entry['index']} ({entry['name']}) -> {group}" for group in normalised["empty_groups"])
 
     assert empty == [], "Groups referenced by the shipped policy hold no members:\n  - " + "\n  - ".join(empty)
+
+
+@pytest.mark.parametrize("policy_name", CHECKED_POLICIES)
+def test_the_shipped_policy_opens_no_pivot_path(
+    policy_name: str,
+    security_objects: dict[str, dict[str, dict[str, Any]]],
+) -> None:
+    """No untrusted zone reaches a sensitive one through an intermediate zone.
+
+    `validate_reachability` runs on the same firewalls as the policy check, so the shipped permits
+    have to leave headroom for a demo rule to be the thing that opens a path -- not arrive with one
+    already open.
+    """
+    rules = [
+        build_rule(entry, security_objects)
+        for entry in security_objects["SecurityPolicyRule"].values()
+        if entry.get("policy") == policy_name
+    ]
+    edges, trust = build_graph([{"name": {"value": policy_name}, "rules": {"edges": [{"node": r} for r in rules]}}])
+
+    errors, _ = analyse_reachability(edges, trust)
+    assert errors == [], "The shipped policy already permits a pivot path:\n  - " + "\n  - ".join(errors)

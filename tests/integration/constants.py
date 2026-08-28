@@ -134,6 +134,7 @@ CHECK_DEFINITIONS = [
     "validate_edge",
     "validate_loadbalancer",
     "validate_security_policy",
+    "validate_reachability",
 ]
 """Every entry under ``check_definitions`` in ``.infrahub.yml``."""
 
