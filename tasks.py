@@ -661,7 +661,14 @@ def lint_ruff(context: Context) -> None:
 
 @task(name="lint")
 def lint_all(context: Context) -> None:
-    """Run all linters."""
+    """Run all linters that a laptop can run.
+
+    Every lint job in ci.yml routes through one of the tasks below, with one deliberate exception:
+    the ``validate-documentation-style`` job downloads a vale binary and checks ``docs/docs`` with
+    it. vale is not a Python dependency and does not come from ``uv.lock``, so it cannot be assumed
+    on a contributor's PATH and is not aggregated here. A green ``invoke lint`` is CI's lint set
+    minus that prose gate.
+    """
     console.print()
     console.print(
         Panel(
