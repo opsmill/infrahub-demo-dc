@@ -11,7 +11,6 @@ import os
 from pathlib import Path
 from typing import Any
 
-import psutil
 import pytest
 
 CURRENT_DIR = Path(__file__).parent
@@ -31,26 +30,34 @@ CURRENT_DIR = Path(__file__).parent
 # ``SystemError`` derives from ``Exception`` directly, so a narrower clause listing ``RuntimeError``,
 # ``OSError`` and ``AttributeError`` -- which is what one sibling repository has -- does not catch it.
 # All three frequency fields are cosmetic telemetry; no reading here is worth an INTERNALERROR.
-_original_cpu_freq = psutil.cpu_freq
+try:
+    import psutil
+except ImportError:
+    # Nothing left to guard, so say nothing. ``psutil`` is not declared in ``pyproject.toml``; it
+    # arrives transitively with ``infrahub_testcontainers``, which is also where the plugin patched
+    # below comes from. No ``psutil`` means no plugin and no failure to prevent. An unguarded import,
+    # on the other hand, turns a dependency edge this repository does not own into a collection error
+    # for the entire suite -- the same class of failure this block exists to remove.
+    pass
+else:
+    _original_cpu_freq = psutil.cpu_freq
 
+    def _cpu_freq_or_none(*args: object, **kwargs: object) -> Any:  # noqa: ANN401 - mirrors psutil's loose return type
+        """Report CPU frequency, or ``None`` where the platform cannot.
 
-def _cpu_freq_or_none(*args: object, **kwargs: object) -> Any:  # noqa: ANN401 - mirrors psutil's loose return type
-    """Report CPU frequency, or ``None`` where the platform cannot.
+        Args:
+            *args: Passed through to ``psutil.cpu_freq``.
+            **kwargs: Passed through to ``psutil.cpu_freq``.
 
-    Args:
-        *args: Passed through to ``psutil.cpu_freq``.
-        **kwargs: Passed through to ``psutil.cpu_freq``.
+        Returns:
+            Whatever ``psutil.cpu_freq`` returns, or ``None`` when it raises.
+        """
+        try:
+            return _original_cpu_freq(*args, **kwargs)
+        except Exception:  # noqa: BLE001 - any failure here must degrade to None, never kill the session
+            return None
 
-    Returns:
-        Whatever ``psutil.cpu_freq`` returns, or ``None`` when it raises.
-    """
-    try:
-        return _original_cpu_freq(*args, **kwargs)
-    except Exception:  # noqa: BLE001 - any failure here must degrade to None, never kill the session
-        return None
-
-
-psutil.cpu_freq = _cpu_freq_or_none
+    psutil.cpu_freq = _cpu_freq_or_none
 
 # docker/compose#13899: `up --wait` fails on a project containing a zero-replica service, reporting it
 # as a missing dependency. The packaged compose file declares `task-manager-background-svc` with
