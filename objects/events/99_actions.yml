@@ -22,3 +22,27 @@ spec:
       mutation_action: created
       action: segment
       branch_scope: other_branches
+    - name: virtualization-host-on-create
+      description: Trigger cabling on create of a Virtualization Physical Host
+      node_kind: VirtualizationPhysicalHost
+      mutation_action: created
+      action: virtualization_host_cabling
+      branch_scope: other_branches
+    - name: virtualization-vm-on-create
+      description: Trigger HTTPS-only security setup on create of a Virtualization Virtual Machine
+      node_kind: VirtualizationVirtualMachine
+      mutation_action: created
+      action: virtualization_vm_security
+      branch_scope: other_branches
+    - name: virtualization-vm-groups-on-create
+      description: Trigger artifact group assignment on create of a Virtualization Virtual Machine
+      node_kind: VirtualizationVirtualMachine
+      mutation_action: created
+      action: virtualization_vm_artifact_groups
+      branch_scope: other_branches
+    - name: dc-firewall-on-create
+      description: Trigger virtualization policy attachment on create of a SecurityFirewall
+      node_kind: SecurityFirewall
+      mutation_action: created
+      action: dc_firewall_policy_attachment
+      branch_scope: other_branches

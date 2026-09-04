@@ -1,0 +1,345 @@
+# yaml-language-server: $schema=https://schema.infrahub.app/infrahub/schema/latest.json
+---
+version: "1.0"
+
+nodes:
+  # --------------------  Hypervisor Type  --------------------
+  # Everything that follows from "this is a Proxmox estate": the OS its hosts
+  # run, the artifact group its VMs belong to, the transform that renders their
+  # provisioning script, and how that script is written. Held as data so a new
+  # hypervisor is a row here plus a template, rather than edits spread across
+  # the schema, a generator constant, the Service Catalog and .infrahub.yml.
+  - name: HypervisorType
+    namespace: Virtualization
+    description: A hypervisor family and the conventions that follow from it.
+    label: Hypervisor Type
+    icon: mdi:cog-box
+    include_in_menu: false
+    human_friendly_id:
+      - name__value
+    order_by:
+      - name__value
+    display_label: "{{ label__value }}"
+    uniqueness_constraints:
+      - [name__value]
+    attributes:
+      - name: name
+        description: Short key for the hypervisor family, e.g. proxmox.
+        kind: Text
+        unique: true
+        order_weight: 1000
+      - name: label
+        kind: Text
+        optional: true
+        order_weight: 1100
+      - name: artifact_definition
+        label: Artifact Definition
+        description: Name of the artifact definition that renders a VM's provisioning script.
+        kind: Text
+        optional: true
+        order_weight: 1200
+      - name: script_language
+        label: Script Language
+        description: Language the provisioning script is written in, for syntax highlighting.
+        kind: Dropdown
+        optional: true
+        order_weight: 1300
+        choices:
+          - name: bash
+            label: Bash
+            description: POSIX shell script.
+            color: "#7ec8a0"
+          - name: powershell
+            label: PowerShell
+            description: Windows PowerShell script.
+            color: "#0078d4"
+      - name: image_prefix
+        label: Image Prefix
+        description: Prefix of the template image a VM is cloned from, e.g. "tpl-" in tpl-ubuntu-24.04.
+        kind: Text
+        optional: true
+        order_weight: 1400
+      # Whether this family keys its VMs by a numeric ID. Held here rather than
+      # as a list of hypervisor names in the Create VM form, so a new family
+      # states its own rule instead of falling into whatever the form's else
+      # branch happens to do.
+      - name: vmid_requirement
+        label: VM ID Requirement
+        description: Whether a VM of this family needs a numeric VM ID.
+        kind: Dropdown
+        optional: true
+        order_weight: 1450
+        choices:
+          - name: required
+            label: Required
+            description: Provisioning fails without a VM ID.
+            color: "#e57000"
+          - name: optional
+            label: Optional
+            description: A VM ID may be set but is not needed.
+            color: "#7ec8a0"
+          - name: unused
+            label: Unused
+            description: VMs are identified by name or UUID instead.
+            color: "#808080"
+      # How far this family is allowed to allocate beyond physical capacity,
+      # as a percentage: 400 is 4:1, 100 is no overcommit. A percentage rather
+      # than a ratio because Number is integer-only, so 1.5:1 has no spelling
+      # as a ratio. validate_virtualization_capacity reads these, and treats a
+      # missing value as 100.
+      - name: vcpu_overcommit_percent
+        label: vCPU Overcommit (%)
+        description: Allocatable vCPUs as a percentage of physical cores. 400 means 4:1.
+        kind: Number
+        optional: true
+        order_weight: 1500
+        parameters:
+          min_value: 100
+      - name: memory_overcommit_percent
+        label: Memory Overcommit (%)
+        description: Allocatable memory as a percentage of installed memory. 100 means no overcommit.
+        kind: Number
+        optional: true
+        order_weight: 1600
+        parameters:
+          min_value: 100
+      - name: disk_overcommit_percent
+        label: Disk Overcommit (%)
+        description: Allocatable disk as a percentage of usable capacity. 150 means 1.5:1 thin provisioning.
+        kind: Number
+        optional: true
+        order_weight: 1700
+        parameters:
+          min_value: 100
+    relationships:
+      - name: platform
+        peer: DcimPlatform
+        cardinality: one
+        kind: Attribute
+        optional: true
+        description: Operating system the hosts of this hypervisor family run.
+        order_weight: 2000
+      - name: artifact_group
+        label: Artifact Group
+        peer: CoreStandardGroup
+        cardinality: one
+        kind: Attribute
+        optional: true
+        description: Group the VMs of this hypervisor family join, so artifacts can target them.
+        order_weight: 2100
+      - name: clusters
+        peer: VirtualizationCluster
+        cardinality: many
+        kind: Attribute
+        identifier: hypervisor_type__clusters
+        optional: true
+        order_weight: 2200
+      - name: hosts
+        peer: VirtualizationPhysicalHost
+        cardinality: many
+        kind: Attribute
+        identifier: hypervisor_type__hosts
+        optional: true
+        order_weight: 2300
+
+  # --------------------  Virtualization Cluster  --------------------
+  - name: Cluster
+    namespace: Virtualization
+    description: A group of hypervisor hosts on which virtual machines run.
+    label: Virtualization Cluster
+    icon: mdi:layers-triple
+    include_in_menu: false
+    # A cluster has no capacity of its own - that is the sum of its hosts - so
+    # its templates carry the hypervisor family rather than a size
+    # (objects/bootstrap/08_virtualization_templates.yml).
+    generate_template: true
+    human_friendly_id:
+      - name__value
+    order_by:
+      - name__value
+    display_label: "{{ name__value }}"
+    uniqueness_constraints:
+      - [name__value]
+    attributes:
+      - name: name
+        kind: Text
+        unique: true
+        order_weight: 1000
+      - name: description
+        kind: Text
+        optional: true
+        order_weight: 1100
+    relationships:
+      # The cluster's hypervisor family, and the only place it is recorded: a
+      # `cluster_type` dropdown alongside this relationship would be a second
+      # copy of the same fact, with nothing keeping the two in step.
+      - name: hypervisor_type
+        label: Hypervisor Type
+        peer: VirtualizationHypervisorType
+        cardinality: one
+        kind: Attribute
+        identifier: hypervisor_type__clusters
+        optional: true
+        description: Hypervisor family this cluster runs.
+        order_weight: 1200
+      - name: hosts
+        peer: VirtualizationPhysicalHost
+        cardinality: many
+        kind: Attribute
+        optional: true
+        description: Hypervisor hosts that are members of this cluster.
+        order_weight: 2000
+      - name: virtual_machines
+        label: Virtual Machines
+        peer: VirtualizationVirtualMachine
+        cardinality: many
+        kind: Attribute
+        optional: true
+        description: Virtual machines that belong to this cluster.
+        order_weight: 2100
+
+  # --------------------  Physical Host  --------------------
+  - name: PhysicalHost
+    namespace: Virtualization
+    description: A physical server that hosts virtual machines via a hypervisor.
+    label: Physical Host
+    icon: mdi:server
+    include_in_menu: false
+    generate_template: true
+    inherit_from:
+      - CoreArtifactTarget
+      - DcimGenericDevice
+      - DcimPhysicalDevice
+      - ComputeGenericUnit
+      - VirtualizationHostVirtualMachine
+    uniqueness_constraints:
+      - [name__value]
+    # Relationship pickers render the peer's display label, and they cannot be
+    # filtered by another field's value, so the hypervisor family goes in the
+    # label: picking hosts for a cluster shows "fra1-hv-01 (hyperv)" and a
+    # mismatch is visible before it is saved.
+    display_label: "{{ name__value }} ({{ hypervisor_type__name__value }})"
+    attributes:
+      # DcimDevice declares its own `role` with the network vocabulary (leaf,
+      # spine, dc_firewall, ...) on the concrete node rather than on
+      # DcimGenericDevice, so a host inherits no role at all. A server's roles
+      # are a different vocabulary, declared here.
+      - name: role
+        kind: Dropdown
+        optional: true
+        order_weight: 1400
+        choices:
+          - name: hypervisor
+            label: Hypervisor
+            description: Runs a hypervisor that hosts VMs.
+            color: "#7ec8a0"
+          - name: compute
+            label: Compute
+            description: Runs a workload directly on the hardware.
+            color: "#9fb8d4"
+    relationships:
+      # The host's hypervisor family, and with it the OS it runs: the
+      # DcimGenericDevice `platform` is left unset on hosts, since a second
+      # copy of the same fact is what lets a Windows host end up in a Proxmox
+      # cluster. Both sides pointing at one HypervisorType turns compatibility
+      # into an identity comparison instead of a platform/family matrix.
+      - name: hypervisor_type
+        label: Hypervisor Type
+        peer: VirtualizationHypervisorType
+        cardinality: one
+        kind: Attribute
+        identifier: hypervisor_type__hosts
+        optional: true
+        description: Hypervisor family this host runs.
+        order_weight: 1140
+      - name: cluster
+        peer: VirtualizationCluster
+        cardinality: one
+        kind: Attribute
+        optional: true
+        description: Virtualization cluster this host is a member of.
+        order_weight: 1150
+
+  # --------------------  Virtual Machine  --------------------
+  - name: VirtualMachine
+    namespace: Virtualization
+    description: A virtual machine hosted on a hypervisor.
+    label: Virtual Machine
+    icon: mdi:monitor
+    include_in_menu: false
+    # T-shirt sized profiles (objects/bootstrap/08_virtualization_templates.yml)
+    # carry vcpus/memory/disk, so creating a VM is picking a size, not typing
+    # three numbers. A profile rather than a template because `host` is a
+    # mandatory Parent relationship, which a template object may not leave
+    # unset - a size template would have to name a host.
+    generate_profile: true
+    inherit_from:
+      - CoreArtifactTarget
+      - DcimGenericDevice
+      - ComputeGenericUnit
+    uniqueness_constraints:
+      - [name__value]
+      # No [cluster, vmid__value] constraint. A VMID is only unique within its
+      # cluster, so the pair looks like the right constraint, but the validator
+      # counts an unset vmid as a value: only Proxmox and KVM VMs carry one, so
+      # the second VMID-less Hyper-V or ESXi VM in a cluster would be rejected
+      # with "Violates uniqueness constraint 'cluster-vmid'". Per-cluster VMID
+      # collisions are caught in the Create VM form instead, from the
+      # per-cluster used-ID map get_used_vmids() already returns.
+    attributes:
+      - name: vmid
+        label: VM ID
+        description: Numeric ID used by the hypervisor to identify this VM (e.g. Proxmox VMID).
+        kind: Number
+        optional: true
+        order_weight: 1050
+        # Proxmox reserves everything below 100 for itself. Bounded here rather
+        # than only in the Create VM form, so an SDK or API write is held to
+        # the same range as the form.
+        parameters:
+          min_value: 100
+          max_value: 999999
+      - name: ssh_public_key
+        label: SSH Public Key
+        description: Public key installed into the guest by cloud-init / cloudbase-init.
+        kind: Text
+        optional: true
+        order_weight: 1075
+    relationships:
+      - name: host
+        peer: VirtualizationHostVirtualMachine
+        cardinality: one
+        kind: Parent
+        identifier: host__virtual_machines
+        optional: false
+        description: Physical host running this virtual machine.
+        order_weight: 1150
+      - name: cluster
+        peer: VirtualizationCluster
+        cardinality: one
+        kind: Attribute
+        # Mandatory: every VM runs on a host that belongs to exactly one
+        # cluster.
+        optional: false
+        description: Virtualization cluster this virtual machine belongs to.
+        order_weight: 1200
+      - name: customer
+        peer: OrganizationCustomer
+        cardinality: one
+        kind: Attribute
+        optional: true
+        description: Customer that uses this virtual machine.
+        order_weight: 1300
+
+extensions:
+  nodes:
+    - kind: OrganizationCustomer
+      relationships:
+        - name: virtual_machines
+          label: Virtual Machines
+          peer: VirtualizationVirtualMachine
+          cardinality: many
+          kind: Attribute
+          optional: true
+          description: Virtual machines used by this customer.
+          order_weight: 2600

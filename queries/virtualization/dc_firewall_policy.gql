@@ -1,0 +1,15 @@
+query dc_firewall_policy($device: String!) {
+  # role filter: only dc_firewall devices get the virtualization VM policy,
+  # so the generator no-ops (empty result) for edge firewalls instead of
+  # re-checking the role in Python.
+  SecurityFirewall(name__value: $device, role__value: "dc_firewall") {
+    edges {
+      node {
+        id
+        name {
+          value
+        }
+      }
+    }
+  }
+}

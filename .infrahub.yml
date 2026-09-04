@@ -5,6 +5,52 @@ jinja2_transforms:
     description: Template to generate a containerlab topology
     query: topology_simulator
     template_path: templates/clab_topology.j2
+  # Proxmox
+  #
+  # Every per-hypervisor provisioning template pulls in two shared partials -
+  # the user-data body and the banner/image-name macros - neither of which
+  # Infrahub can see from `template_path` alone. Without the `watch` entries,
+  # editing a partial leaves all four provisioning artifacts rendered from the
+  # old copy.
+  - name: proxmox_vm_config
+    description: Template to generate a Proxmox VE VM provisioning script
+    query: vm_config
+    template_path: templates/configs/proxmox_vm.j2
+    watch:
+      files:
+        - templates/configs/partials/vm_userdata.j2
+        - templates/configs/partials/vm_macros.j2
+  - name: vm_userdata
+    description: Cloud-init / cloudbase-init user-data for a virtual machine
+    query: vm_config
+    template_path: templates/configs/partials/vm_userdata.j2
+  # KVM
+  - name: kvm_vm_config
+    description: Template to generate a KVM/libvirt VM provisioning script
+    query: vm_config
+    template_path: templates/configs/kvm_vm.j2
+    watch:
+      files:
+        - templates/configs/partials/vm_userdata.j2
+        - templates/configs/partials/vm_macros.j2
+  # Hyper-V
+  - name: hyperv_vm_config
+    description: Template to generate a Microsoft Hyper-V VM provisioning script
+    query: vm_config
+    template_path: templates/configs/hyperv_vm.j2
+    watch:
+      files:
+        - templates/configs/partials/vm_userdata.j2
+        - templates/configs/partials/vm_macros.j2
+  # ESXi
+  - name: esxi_vm_config
+    description: Template to generate a VMware ESXi VM provisioning script
+    query: vm_config
+    template_path: templates/configs/esxi_vm.j2
+    watch:
+      files:
+        - templates/configs/partials/vm_userdata.j2
+        - templates/configs/partials/vm_macros.j2
 
 artifact_definitions:
   # Cisco
@@ -89,6 +135,45 @@ artifact_definitions:
     transformation: rack_elevation
     parameters:
       name: name__value
+  # Proxmox
+  - name: proxmox_vm_config
+    artifact_name: proxmox-vm
+    content_type: text/plain
+    targets: proxmox_vms
+    transformation: proxmox_vm_config
+    parameters:
+      name: name__value
+  - name: vm_userdata
+    artifact_name: vm-userdata
+    content_type: application/yaml
+    targets: vm_userdata_targets
+    transformation: vm_userdata
+    parameters:
+      name: name__value
+  # KVM
+  - name: kvm_vm_config
+    artifact_name: kvm-vm
+    content_type: text/plain
+    targets: kvm_vms
+    transformation: kvm_vm_config
+    parameters:
+      name: name__value
+  # Hyper-V
+  - name: hyperv_vm_config
+    artifact_name: hyperv-vm
+    content_type: text/plain
+    targets: hyperv_vms
+    transformation: hyperv_vm_config
+    parameters:
+      name: name__value
+  # ESXi
+  - name: esxi_vm_config
+    artifact_name: esxi-vm
+    content_type: text/plain
+    targets: esxi_vms
+    transformation: esxi_vm_config
+    parameters:
+      name: name__value
 
 check_definitions:
   - name: validate_spine
@@ -113,6 +198,24 @@ check_definitions:
     class_name: CheckLoadBalancer
     file_path: checks/loadbalancer.py
     targets: loadbalancers
+    parameters:
+      device: name__value
+  - name: validate_virtualization_vm
+    class_name: CheckVirtualizationVM
+    file_path: checks/virtualization_vm.py
+    targets: virtualization_vms
+    parameters:
+      device: name__value
+  - name: validate_virtualization_host
+    class_name: CheckVirtualizationHost
+    file_path: checks/virtualization_host.py
+    targets: virtualization_hosts
+    parameters:
+      device: name__value
+  - name: validate_virtualization_capacity
+    class_name: CheckVirtualizationCapacity
+    file_path: checks/virtualization_capacity.py
+    targets: virtualization_vms
     parameters:
       device: name__value
 
@@ -214,6 +317,53 @@ generator_definitions:
       files:
         - generators/common.py
         - generators/schema_protocols.py
+  # The virtualization generators import `clean_data` from `generators/common.py`,
+  # which imports `generators/schema_protocols.py`. Same invisible-dependency
+  # problem as the topology generators above.
+  - name: cable_virtualization_host
+    file_path: generators/generate_virtualization_cabling.py
+    targets: virtualization_hosts
+    query: virtualization_host_cabling
+    class_name: VirtualizationHostCablingGenerator
+    parameters:
+      name: name__value
+    watch:
+      files:
+        - generators/common.py
+        - generators/schema_protocols.py
+  - name: secure_virtualization_vm
+    file_path: generators/generate_virtualization_vm_security.py
+    targets: virtualization_vms
+    query: virtualization_vm_security
+    class_name: VirtualizationVMSecurityGenerator
+    parameters:
+      name: name__value
+    watch:
+      files:
+        - generators/common.py
+        - generators/schema_protocols.py
+  - name: assign_vm_artifact_groups
+    file_path: generators/generate_vm_artifact_groups.py
+    targets: virtualization_vms
+    query: vm_artifact_groups
+    class_name: VMArtifactGroupsGenerator
+    parameters:
+      name: name__value
+    watch:
+      files:
+        - generators/common.py
+        - generators/schema_protocols.py
+  - name: attach_dc_firewall_policy
+    file_path: generators/generate_dc_firewall_policy.py
+    targets: dc_firewall_policy_targets
+    query: dc_firewall_policy
+    class_name: DcFirewallPolicyGenerator
+    parameters:
+      device: name__value
+    watch:
+      files:
+        - generators/common.py
+        - generators/schema_protocols.py
 
 queries:
   - name: topology_dc
@@ -244,6 +394,22 @@ queries:
     file_path: queries/segment/segment.gql
   - name: rack_elevation_query
     file_path: queries/visualization/rack_elevation.gql
+  - name: virtualization_host_cabling
+    file_path: queries/virtualization/host_cabling.gql
+  - name: virtualization_vm_security
+    file_path: queries/virtualization/vm_security.gql
+  - name: vm_artifact_groups
+    file_path: queries/virtualization/vm_artifact_groups.gql
+  - name: dc_firewall_policy
+    file_path: queries/virtualization/dc_firewall_policy.gql
+  - name: virtualization_vm_validation
+    file_path: queries/validation/virtualization_vm.gql
+  - name: virtualization_host_validation
+    file_path: queries/validation/virtualization_host.gql
+  - name: virtualization_capacity
+    file_path: queries/validation/virtualization_capacity.gql
+  - name: vm_config
+    file_path: queries/config/vm_config.gql
 schemas:
   - schemas/
 menus:

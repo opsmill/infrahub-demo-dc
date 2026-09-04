@@ -17,7 +17,7 @@ extensions:
               color: "#7fbf7f"
             - name: provisioning
               label: Provisioning
-              description: In the process of being set up and configured.
+              description: Being set up and configured.
               color: "#ffff7f"
             - name: maintenance
               label: Maintenance

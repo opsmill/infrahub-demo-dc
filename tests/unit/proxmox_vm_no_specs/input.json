@@ -1,0 +1,95 @@
+{
+  "data": {
+    "VirtualizationVirtualMachine": {
+      "edges": [
+        {
+          "node": {
+            "name": {
+              "value": "fra1-vm-web01"
+            },
+            "description": {
+              "value": "Web server VM"
+            },
+            "status": {
+              "value": "active"
+            },
+            "os_version": {
+              "value": "Ubuntu 22.04"
+            },
+            "vmid": {
+              "value": 100
+            },
+            "vcpus": {
+              "value": 4
+            },
+            "memory": {
+              "value": null
+            },
+            "disk": {
+              "value": 80
+            },
+            "ssh_public_key": {
+              "value": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA demo@opsmill"
+            },
+            "host": {
+              "node": {
+                "name": {
+                  "value": "fra1-pve-01"
+                }
+              }
+            },
+            "cluster": {
+              "node": {
+                "name": {
+                  "value": "FRA1-PROXMOX-CLUSTER"
+                },
+                "hypervisor_type": {
+                  "node": {
+                    "name": {
+                      "value": "proxmox"
+                    },
+                    "image_prefix": {
+                      "value": "tpl-"
+                    }
+                  }
+                }
+              }
+            },
+            "platform": {
+              "node": {
+                "name": {
+                  "value": "Linux"
+                }
+              }
+            },
+            "primary_address": {
+              "node": {
+                "address": {
+                  "value": "100.64.0.1/16"
+                }
+              }
+            },
+            "tags": {
+              "edges": [
+                {
+                  "node": {
+                    "name": {
+                      "value": "web"
+                    }
+                  }
+                },
+                {
+                  "node": {
+                    "name": {
+                      "value": "production"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  }
+}

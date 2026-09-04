@@ -1,0 +1,69 @@
+{#- ============================================================================
+    Microsoft Hyper-V VM Provisioning Script (PowerShell)
+
+    Hyper-V has no native cloud-init datasource: this script builds a NoCloud
+    ISO (volume label CIDATA) from Infrahub-rendered user-data and attaches it
+    as a DVD. Template VHDX convention: C:\HyperV\Templates\tpl-<os_version
+    slug>.vhdx. Requires Windows ADK's oscdimg.exe on PATH. Run elevated.
+    ============================================================================ -#}
+{% set vm = data.VirtualizationVirtualMachine.edges[0].node %}
+{% import "templates/configs/partials/vm_macros.j2" as vm_macros %}
+{% set is_windows = vm.platform.node and vm.platform.node.name.value == "Windows" %}
+{% set tpl = vm_macros.image_name(vm) %}
+{{ vm_macros.banner(vm) }}
+$ErrorActionPreference = "Stop"
+
+{% if vm.vcpus.value is none or vm.memory.value is none or vm.disk.value is none or vm.os_version.value is none %}
+# This VM has no complete size or OS recorded in Infrahub. vcpus, memory,
+# disk and os_version are optional in the schema (a size profile normally
+# sets the first three), so a VM written directly through the SDK or API can
+# be missing them - refuse to render a script that would fail or
+# misprovision at deploy time (an unset memory renders `-MemoryStartupBytes
+# NoneGB`, which only errors once the script runs).
+throw "ERROR: {{ vm.name.value }} needs vcpus, memory, disk and os_version set in Infrahub"
+{% else %}
+$TemplateVhdx = "C:\HyperV\Templates\{{ tpl }}.vhdx"
+$VmRoot = "C:\HyperV\VMs\{{ vm.name.value }}"
+if (-not (Test-Path $TemplateVhdx)) {
+    throw "Template $TemplateVhdx not found"
+}
+New-Item -ItemType Directory -Force -Path $VmRoot | Out-Null
+
+# Cloud-init user-data rendered by Infrahub (see the vm-userdata artifact).
+$UserData = @'
+{% include "templates/configs/partials/vm_userdata.j2" %}
+'@
+{# Literal (single-quoted) here-string: an expandable @"..."@ would let a
+   crafted VM name run `$(...)` inside this elevated script. #}
+$MetaData = @'
+instance-id: {{ vm.name.value }}
+local-hostname: {{ vm.name.value }}
+'@
+
+$SeedDir = Join-Path $VmRoot "seed"
+New-Item -ItemType Directory -Force -Path $SeedDir | Out-Null
+Set-Content -Path (Join-Path $SeedDir "user-data") -Value $UserData -Encoding ascii -NoNewline
+Set-Content -Path (Join-Path $SeedDir "meta-data") -Value $MetaData -Encoding ascii -NoNewline
+& oscdimg.exe -j2 -lCIDATA $SeedDir (Join-Path $VmRoot "seed.iso")
+
+Copy-Item $TemplateVhdx (Join-Path $VmRoot "{{ vm.name.value }}.vhdx")
+Resize-VHD -Path (Join-Path $VmRoot "{{ vm.name.value }}.vhdx") -SizeBytes {{ vm.disk.value }}GB
+
+New-VM -Name "{{ vm.name.value }}" `
+    -MemoryStartupBytes {{ vm.memory.value }}GB `
+    -Generation 2 `
+    -VHDPath (Join-Path $VmRoot "{{ vm.name.value }}.vhdx") `
+    -SwitchName "Default Switch"
+Set-VMProcessor -VMName "{{ vm.name.value }}" -Count {{ vm.vcpus.value }}
+{% if not is_windows %}
+# Linux guests: template signing certs vary - disable Secure Boot.
+Set-VMFirmware -VMName "{{ vm.name.value }}" -EnableSecureBoot Off
+{% endif %}
+Add-VMDvdDrive -VMName "{{ vm.name.value }}" -Path (Join-Path $VmRoot "seed.iso")
+
+{% if vm.status.value == "active" %}
+Start-VM -Name "{{ vm.name.value }}"
+{% else %}
+# Status is "{{ vm.status.value }}" - VM created but left powered off.
+{% endif %}
+{% endif %}

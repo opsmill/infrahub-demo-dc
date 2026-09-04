@@ -1,0 +1,69 @@
+query virtualization_host_cabling($name: String!) {
+  VirtualizationPhysicalHost(name__value: $name) {
+    edges {
+      node {
+        id
+        name {
+          value
+        }
+        device_type {
+          node {
+            height {
+              value
+            }
+          }
+        }
+        primary_address {
+          node {
+            address {
+              value
+            }
+          }
+        }
+        location {
+          node {
+            id
+            __typename
+            ... on LocationBuilding {
+              ancestors {
+                edges {
+                  node {
+                    id
+                    __typename
+                  }
+                }
+              }
+            }
+            ... on LocationRack {
+              ancestors {
+                edges {
+                  node {
+                    id
+                    __typename
+                  }
+                }
+              }
+            }
+          }
+        }
+        interfaces {
+          edges {
+            node {
+              id
+              name {
+                value
+              }
+              ... on InterfacePhysical {
+                connector {
+                  node {
+                    id
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

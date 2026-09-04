@@ -1,0 +1,65 @@
+# Virtualization Physical Hosts - independent of any specific DC design
+#
+# Hardware model, capacity (vcpus/memory/disk), role, status and the physical
+# NICs all come from the sized templates in
+# objects/bootstrap/10_physical_device_templates.yml. Only what differs per
+# host is set here.
+#
+# `hypervisor_type` carries the OS too, through its own platform relationship,
+# so the DcimGenericDevice `platform` is deliberately left unset: a second copy
+# of that fact is what allows a Windows host inside a Proxmox cluster. The
+# host's type and its cluster's type must match, which validate_virtualization_host
+# enforces.
+---
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: VirtualizationPhysicalHost
+  data:
+    - name: "fra1-pve-01"
+      description: "Proxmox VE host in Frankfurt"
+      object_template: VIRTUALIZATION_HOST_LARGE
+      location: "fra-1"
+      hypervisor_type: proxmox
+      member_of_groups:
+        - virtualization_hosts
+
+    - name: "fra1-pve-02"
+      description: "Proxmox VE host in Frankfurt"
+      object_template: VIRTUALIZATION_HOST_LARGE
+      location: "fra-1"
+      hypervisor_type: proxmox
+      member_of_groups:
+        - virtualization_hosts
+
+    - name: "fra1-kvm-01"
+      description: "KVM host in Frankfurt"
+      object_template: VIRTUALIZATION_HOST_SMALL
+      location: "fra-1"
+      hypervisor_type: kvm
+      member_of_groups:
+        - virtualization_hosts
+
+    - name: "fra1-kvm-02"
+      description: "KVM host in Frankfurt"
+      object_template: VIRTUALIZATION_HOST_SMALL
+      location: "fra-1"
+      hypervisor_type: kvm
+      member_of_groups:
+        - virtualization_hosts
+
+    - name: "fra1-esx-01"
+      description: "VMware ESXi host in Frankfurt"
+      object_template: VIRTUALIZATION_HOST_MEDIUM
+      location: "fra-1"
+      hypervisor_type: vmware
+      member_of_groups:
+        - virtualization_hosts
+
+    - name: "fra1-hv-01"
+      description: "Microsoft Hyper-V host in Frankfurt"
+      object_template: VIRTUALIZATION_HOST_MEDIUM
+      location: "fra-1"
+      hypervisor_type: hyperv
+      member_of_groups:
+        - virtualization_hosts

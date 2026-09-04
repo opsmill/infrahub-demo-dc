@@ -1,0 +1,10 @@
+#cloud-config
+# VM: fra1-vm-win01 (Windows guest - cloudbase-init)
+set_hostname: fra1-vm-win01
+users:
+  - name: Admin
+    groups: Administrators
+    ssh_authorized_keys:
+      - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA demo@opsmill
+# NOTE: no password is stored in Infrahub. Set the first-boot Administrator
+# password at deploy time (cloudbase-init inject or console).

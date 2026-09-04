@@ -25,6 +25,7 @@ home_page = st.Page("pages/0_Dashboard.py", title="Home", icon="🏠", default=T
 service_catalog_pages = [
     st.Page("pages/1_Create_DC.py", title="Create DC", icon="🏗️"),
     st.Page("pages/2_Create_VPN.py", title="Create VPN", icon="🔗"),
+    st.Page("pages/4_Create_VM.py", title="Create VM", icon="🖥️"),
 ]
 
 visualization_pages = [

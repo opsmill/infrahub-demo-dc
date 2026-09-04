@@ -1,6 +1,8 @@
 """Infrahub API client for the Service Catalog."""
 
+import time
 from typing import Any, Dict, List, Optional
+from urllib.parse import urlencode
 
 from infrahub_sdk import Config, InfrahubClientSync
 
@@ -36,6 +38,16 @@ class InfrahubGraphQLError(InfrahubAPIError):
 
 class InfrahubClient:
     """Client for interacting with the Infrahub API using the official SDK."""
+
+    # Seconds to wait before re-POSTing an artifact regen that has not
+    # converged - long enough that the first POST is not simply still running.
+    ARTIFACT_REPOST_AFTER = 20
+
+    # Seconds after the regen POST before an artifact whose storage_id has not
+    # moved is accepted as current. The object store is content-addressed, so a
+    # re-render producing identical bytes is indistinguishable from one that
+    # never ran; this bounds how long that case is waited out.
+    ARTIFACT_SETTLE_AFTER = 15
 
     def __init__(
         self,
@@ -620,7 +632,14 @@ class InfrahubClient:
             InfrahubAPIError: If API error occurs
         """
         try:
-            # Use GraphQL to filter racks by parent (row)
+            # Use GraphQL to filter racks by parent (row).
+            #
+            # The parent is deliberately not selected. It is not used below, and
+            # asking for `parent { node { id } }` alone makes the server answer
+            # 500 "Unable to identify the type of the instance": the peer is a
+            # location generic, so the selection needs a type discriminator
+            # (`__typename`, or an inline fragment) to resolve. Selecting a field
+            # nobody reads is not worth either.
             query = """
             query GetRacksByRow($row_id: ID!) {
                 LocationRack(parent__ids: [$row_id]) {
@@ -629,11 +648,6 @@ class InfrahubClient:
                             id
                             name { value }
                             shortname { value }
-                            parent {
-                                node {
-                                    id
-                                }
-                            }
                         }
                     }
                 }
@@ -662,14 +676,26 @@ class InfrahubClient:
             raise InfrahubAPIError(f"Failed to fetch racks for row: {str(e)}")
 
     def get_devices_by_rack(self, rack_id: str, branch: str = "main") -> List[Dict[str, Any]]:
-        """Fetch DcimDevice objects for a specific rack.
+        """Fetch every rack-mounted device in a rack, hypervisor hosts included.
+
+        Queries the DcimPhysicalDevice generic rather than the concrete
+        DcimDevice kind: a VirtualizationPhysicalHost is rack-mounted and gets
+        placed by the cabling generator, but it is not a DcimDevice, so the
+        concrete kind leaves hosts out of the rack drawing entirely.
+
+        The generic exposes what every rack-mounted device has (position,
+        device_type, location); `name` and `role` live further down the
+        inheritance tree, so they come from inline fragments. `role` is
+        declared separately on DcimDevice (network roles) and on
+        VirtualizationPhysicalHost (hypervisor/compute).
 
         Args:
             rack_id: LocationRack ID
             branch: Branch name to query (default: "main")
 
         Returns:
-            List of DcimDevice dictionaries with id, name, position, height, and device_type
+            List of device dictionaries with id, kind, name, position, height,
+            role, and device_type
 
         Raises:
             InfrahubConnectionError: If connection fails
@@ -679,13 +705,12 @@ class InfrahubClient:
             # Use GraphQL to filter devices by location (rack)
             query = """
             query GetDevicesByRack($rack_id: ID!) {
-                DcimDevice(location__ids: [$rack_id]) {
+                DcimPhysicalDevice(location__ids: [$rack_id]) {
                     edges {
                         node {
                             id
-                            name { value }
+                            __typename
                             position { value }
-                            role { value }
                             device_type {
                                 node {
                                     name { value }
@@ -697,6 +722,15 @@ class InfrahubClient:
                                     id
                                 }
                             }
+                            ... on DcimGenericDevice {
+                                name { value }
+                            }
+                            ... on DcimDevice {
+                                role { value }
+                            }
+                            ... on VirtualizationPhysicalHost {
+                                role { value }
+                            }
                         }
                     }
                 }
@@ -706,7 +740,7 @@ class InfrahubClient:
             result = self.execute_graphql(query, {"rack_id": rack_id}, branch)
 
             devices = []
-            edges = result.get("DcimDevice", {}).get("edges", [])
+            edges = result.get("DcimPhysicalDevice", {}).get("edges", [])
 
             for edge in edges:
                 node = edge.get("node", {})
@@ -721,10 +755,13 @@ class InfrahubClient:
 
                 device_dict = {
                     "id": node.get("id"),
+                    # The concrete kind, so a caller can link to the right
+                    # object page: a hypervisor host is not a DcimDevice.
+                    "kind": node.get("__typename"),
                     "name": {"value": node.get("name", {}).get("value")},
                     "position": {"value": node.get("position", {}).get("value")},
                     "height": {"value": device_height},
-                    "role": {"value": node.get("role", {}).get("value")},
+                    "role": {"value": (node.get("role") or {}).get("value")},
                 }
 
                 # Add device type if available
@@ -773,7 +810,7 @@ class InfrahubClient:
             branch: Branch name to query (default: "main")
 
         Returns:
-            List of LocationPod dictionaries with id, name, and parent relationship
+            List of LocationPod dictionaries with id and name
 
         Raises:
             InfrahubConnectionError: If connection fails
@@ -781,6 +818,10 @@ class InfrahubClient:
         """
         try:
             # Use GraphQL to filter pods by parent (building)
+            # The parent is deliberately not selected: it is unused below, and
+            # `parent { node { id } }` alone makes the server answer 500 "Unable to
+            # identify the type of the instance" (the peer is a location generic,
+            # so the selection needs `__typename` or an inline fragment).
             query = """
             query GetPodsByBuilding($building_id: ID!) {
                 LocationPod(parent__ids: [$building_id]) {
@@ -788,11 +829,6 @@ class InfrahubClient:
                         node {
                             id
                             name { value }
-                            parent {
-                                node {
-                                    id
-                                }
-                            }
                         }
                     }
                 }
@@ -825,7 +861,7 @@ class InfrahubClient:
             branch: Branch name to query (default: "main")
 
         Returns:
-            List of LocationRack dictionaries with id, name, and parent relationship
+            List of LocationRack dictionaries with id and name
 
         Raises:
             InfrahubConnectionError: If connection fails
@@ -833,6 +869,10 @@ class InfrahubClient:
         """
         try:
             # Use GraphQL to filter racks by parent (pod)
+            # The parent is deliberately not selected: it is unused below, and
+            # `parent { node { id } }` alone makes the server answer 500 "Unable to
+            # identify the type of the instance" (the peer is a location generic,
+            # so the selection needs `__typename` or an inline fragment).
             query = """
             query GetRacksByPod($pod_id: ID!) {
                 LocationRack(parent__ids: [$pod_id]) {
@@ -840,11 +880,6 @@ class InfrahubClient:
                         node {
                             id
                             name { value }
-                            parent {
-                                node {
-                                    id
-                                }
-                            }
                         }
                     }
                 }
@@ -1377,11 +1412,488 @@ class InfrahubClient:
         except Exception as e:
             raise InfrahubAPIError(f"Failed to create network segment: {str(e)}")
 
-    def _get_group_id(self, group_name: str, branch: str) -> str:
-        """Look up a CoreStandardGroup ID by name.
+    def get_physical_hosts(self, branch: str = "main") -> List[Dict[str, Any]]:
+        """Fetch VirtualizationPhysicalHost objects, including their cluster.
+
+        VirtualizationPhysicalHost declares the `cluster` side of the
+        cluster/hosts relationship, so the cluster is one hop from the host and
+        the whole shape comes back in a single traversal - including the
+        cluster's hypervisor family, which is what the form needs to decide
+        which VM ID field to offer and which artifact to render. Fetching that
+        row here rather than separately means the join runs on the
+        relationship, not on a name matched between two queries.
 
         Args:
-            group_name: Name of the CoreStandardGroup.
+            branch: Branch name to query (default: "main")
+
+        Returns:
+            List of host dictionaries with id, name, and cluster (id, name,
+            hypervisor), where hypervisor holds the family's name, label,
+            artifact_definition, script_language and vmid_requirement.
+
+        Raises:
+            InfrahubConnectionError: If connection fails
+            InfrahubAPIError: If API error occurs
+        """
+        try:
+            query = """
+            query GetPhysicalHostsAndClusters {
+                VirtualizationPhysicalHost {
+                    edges {
+                        node {
+                            id
+                            name { value }
+                            cluster {
+                                node {
+                                    id
+                                    name { value }
+                                    hypervisor_type {
+                                        node {
+                                            name { value }
+                                            label { value }
+                                            artifact_definition { value }
+                                            script_language { value }
+                                            vmid_requirement { value }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            """
+
+            result = self.execute_graphql(query, branch=branch)
+
+            hypervisor_fields = (
+                "name",
+                "label",
+                "artifact_definition",
+                "script_language",
+                "vmid_requirement",
+            )
+            hosts = []
+            for host_edge in result.get("VirtualizationPhysicalHost", {}).get("edges", []):
+                node = host_edge.get("node", {})
+                cluster_node = (node.get("cluster") or {}).get("node")
+                hypervisor_node = ((cluster_node or {}).get("hypervisor_type") or {}).get("node") or {}
+                cluster = (
+                    {
+                        "id": cluster_node.get("id"),
+                        "name": cluster_node.get("name", {}).get("value"),
+                        "hypervisor": {
+                            field: (hypervisor_node.get(field) or {}).get("value") for field in hypervisor_fields
+                        },
+                    }
+                    if cluster_node
+                    else None
+                )
+                hosts.append(
+                    {
+                        "id": node.get("id"),
+                        "name": node.get("name", {}).get("value"),
+                        "cluster": cluster,
+                    }
+                )
+
+            return hosts
+        except Exception as e:
+            raise InfrahubAPIError(f"Failed to fetch physical hosts: {str(e)}")
+
+    def get_number_pool_id(self, name: str, branch: str = "main") -> Optional[str]:
+        """Look up a CoreNumberPool by name.
+
+        Used for the VM ID pool. Allocating from a pool is what makes a VM ID
+        unique: every VM the catalog creates lands on its own unmerged branch,
+        where a VM on a sibling branch is invisible, so no query over the data
+        can tell which IDs are really taken. CoreNumberPool is branch-agnostic,
+        so the server hands out an ID that is free across every branch at once.
+
+        Args:
+            name: CoreNumberPool name (e.g. "VM-VMID")
+            branch: Branch to query
+
+        Returns:
+            The pool's node ID, or None if no pool of that name exists
+
+        Raises:
+            InfrahubAPIError: If API error occurs
+        """
+        query = """
+        query NumberPool($name: String!) {
+            CoreNumberPool(name__value: $name) {
+                edges { node { id } }
+            }
+        }
+        """
+        try:
+            result = self.execute_graphql(query, variables={"name": name}, branch=branch)
+            edges = result.get("CoreNumberPool", {}).get("edges", [])
+            return edges[0]["node"]["id"] if edges else None
+        except Exception as e:
+            raise InfrahubAPIError(f"Failed to look up number pool {name}: {str(e)}")
+
+    def get_vm_vmid(self, vm_id: str, branch: str) -> Optional[int]:
+        """Read a VM's allocated VM ID.
+
+        Read back rather than taken from the create mutation's response: a
+        `from_pool` allocation is resolved after the create commits, so the
+        mutation returns the VM with vmid still null.
+
+        Args:
+            vm_id: VM node ID
+            branch: Branch the VM was created on
+
+        Returns:
+            The allocated VM ID, or None if the VM has none
+        """
+        query = """
+        query VmVmid($ids: [ID!]) {
+            VirtualizationVirtualMachine(ids: $ids) {
+                edges { node { vmid { value } } }
+            }
+        }
+        """
+        try:
+            edges = (
+                self.execute_graphql(query, variables={"ids": [vm_id]}, branch=branch)
+                .get("VirtualizationVirtualMachine", {})
+                .get("edges", [])
+            )
+            return (edges[0]["node"].get("vmid") or {}).get("value") if edges else None
+        except Exception:
+            # Cosmetic: the caption is skipped rather than failing the run.
+            return None
+
+    def wait_for_vm_ip(self, vm_id: str, branch: str, timeout: int = 60) -> bool:
+        """Poll until the VM's generator-allocated primary_address exists.
+
+        The security generator assigns the IP asynchronously after creation;
+        rendering artifacts before it lands produces a script without an IP.
+
+        Args:
+            vm_id: VM node ID
+            branch: Branch the VM was created on
+            timeout: Seconds to wait before giving up
+
+        Returns:
+            True if the IP appeared within the timeout, False otherwise
+        """
+        query = """
+        query VmIp($ids: [ID!]) {
+            VirtualizationVirtualMachine(ids: $ids) {
+                edges { node { primary_address { node { id } } } }
+            }
+        }
+        """
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            result = self.execute_graphql(query, variables={"ids": [vm_id]}, branch=branch)
+            edges = result.get("VirtualizationVirtualMachine", {}).get("edges", [])
+            if edges and (edges[0].get("node", {}).get("primary_address") or {}).get("node"):
+                return True
+            time.sleep(2)
+        return False
+
+    def _post_artifact_generate(self, def_id: str, branch: str) -> None:
+        """POST /api/artifact/generate/<def-id> to queue a regen.
+
+        The SDK's ``InfrahubClientSync._post`` has no ``params`` argument, so
+        the branch is encoded directly into the URL's query string.
+
+        Args:
+            def_id: CoreArtifactDefinition ID to regenerate.
+            branch: Branch to generate on.
+
+        Raises:
+            InfrahubAPIError: If the POST does not return a 2xx status.
+        """
+        url = f"{self.base_url}/api/artifact/generate/{def_id}?{urlencode({'branch': branch})}"
+        response = self._client._post(url=url, payload={})
+        if response.status_code >= 300:
+            raise InfrahubAPIError(
+                f"Artifact generate POST failed for {def_id}: {response.status_code} {response.text}"
+            )
+
+    def generate_and_wait_for_artifacts(
+        self, vm_id: str, definition_names: List[str], branch: str, timeout: int = 90
+    ) -> List[Dict[str, Any]]:
+        """Trigger artifact regen for the given definitions and poll until done.
+
+        POST /api/artifact/generate is fire-and-forget (returns once QUEUED),
+        so this polls CoreArtifact until every definition has produced an
+        artifact for the VM. If nothing has converged after
+        ARTIFACT_REPOST_AFTER seconds it re-POSTs once, covering a first POST
+        that landed before the definition's targets were visible on the branch,
+        and raises on timeout instead of silently returning nothing.
+
+        An artifact only counts as done once it is Ready *and* carries a
+        storage_id: Infrahub creates the CoreArtifact node before it uploads the
+        rendered body, so returning on the node's existence alone hands back an
+        artifact whose content endpoint answers 404.
+
+        Existence is still not enough on its own. Joining proxmox_vms /
+        vm_userdata_targets generates these artifacts already, so one is
+        usually Ready before this runs, and a poll that accepts any Ready
+        artifact returns that pre-existing body instantly - rendered before the
+        IP landed, but presented as freshly generated. The storage_ids in place
+        before the POST are recorded as a baseline, and an artifact counts as
+        fresh only once its storage_id moves off that baseline. The object store
+        is content-addressed, so a re-render that produces identical bytes keeps
+        its storage_id and never moves: ARTIFACT_SETTLE_AFTER seconds after the
+        POST, an unchanged artifact is accepted as current rather than waited
+        out to the timeout.
+
+        Args:
+            vm_id: VM node ID the artifacts target
+            definition_names: CoreArtifactDefinition names to generate
+            branch: Branch to generate on
+            timeout: Seconds before raising
+
+        Returns:
+            List of dicts with id, name, definition_name, content_type, storage_id
+
+        Raises:
+            InfrahubAPIError: If a definition name is unknown or regen times out
+        """
+        def_query = """
+        query ArtifactDefs($names: [String!]) {
+            CoreArtifactDefinition(name__values: $names) {
+                edges { node { id name { value } } }
+            }
+        }
+        """
+        result = self.execute_graphql(def_query, variables={"names": definition_names}, branch=branch)
+        def_ids = {
+            e["node"]["name"]["value"]: e["node"]["id"]
+            for e in result.get("CoreArtifactDefinition", {}).get("edges", [])
+        }
+        missing = set(definition_names) - set(def_ids)
+        if missing:
+            raise InfrahubAPIError(f"Unknown artifact definitions: {sorted(missing)}")
+
+        baseline = {a["definition_name"]: a["storage_id"] for a in self._fetch_ready_artifacts(vm_id, branch)}
+
+        for def_id in def_ids.values():
+            self._post_artifact_generate(def_id, branch)
+
+        deadline = time.time() + timeout
+        repost_at = time.time() + self.ARTIFACT_REPOST_AFTER
+        accept_unchanged_at = time.time() + self.ARTIFACT_SETTLE_AFTER
+        reposted = False
+        while time.time() < deadline:
+            by_definition = {a["definition_name"]: a for a in self._fetch_ready_artifacts(vm_id, branch)}
+            if set(definition_names) <= set(by_definition):
+                wanted = [by_definition[name] for name in definition_names]
+                regenerated = all(a["storage_id"] != baseline.get(a["definition_name"]) for a in wanted)
+                if regenerated or time.time() >= accept_unchanged_at:
+                    return wanted
+            if not reposted and time.time() >= repost_at:
+                for def_id in def_ids.values():
+                    self._post_artifact_generate(def_id, branch)
+                reposted = True
+            time.sleep(2)
+        raise InfrahubAPIError(f"Artifact regen did not converge for {definition_names} within {timeout}s")
+
+    def _fetch_ready_artifacts(self, vm_id: str, branch: str) -> List[Dict[str, Any]]:
+        """Read the VM's artifacts that are Ready and have a body in the store.
+
+        Args:
+            vm_id: VM node ID the artifacts target
+            branch: Branch to read
+
+        Returns:
+            List of dicts with id, name, definition_name, content_type, storage_id
+        """
+        art_query = """
+        query VmArtifacts($ids: [ID!]) {
+            CoreArtifact(object__ids: $ids) {
+                edges {
+                    node {
+                        id
+                        name { value }
+                        content_type { value }
+                        status { value }
+                        storage_id { value }
+                        definition { node { name { value } } }
+                    }
+                }
+            }
+        }
+        """
+        result = self.execute_graphql(art_query, variables={"ids": [vm_id]}, branch=branch)
+        return [
+            {
+                "id": e["node"]["id"],
+                "name": e["node"]["name"]["value"],
+                "content_type": e["node"]["content_type"]["value"],
+                "definition_name": e["node"]["definition"]["node"]["name"]["value"],
+                "storage_id": e["node"]["storage_id"]["value"],
+            }
+            for e in result.get("CoreArtifact", {}).get("edges", [])
+            if e["node"].get("definition", {}).get("node")
+            and e["node"].get("status", {}).get("value") == "Ready"
+            and e["node"].get("storage_id", {}).get("value")
+        ]
+
+    def get_artifact_content(self, storage_id: str) -> str:
+        """Fetch a rendered artifact's content from the object store.
+
+        Reads the body by its storage_id, which is what
+        `generate_and_wait_for_artifacts` already waits for. The object store is
+        content-addressed, so no branch is involved.
+
+        Args:
+            storage_id: storage_id of the CoreArtifact to read
+
+        Returns:
+            The artifact body as text
+
+        Raises:
+            InfrahubAPIError: If the object store does not return the content.
+        """
+        try:
+            return self._client.object_store.get(identifier=storage_id)
+        except Exception as e:
+            raise InfrahubAPIError(f"Failed to fetch artifact content for {storage_id}: {str(e)}")
+
+    def create_virtual_machine(self, branch: str, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Create a VirtualizationVirtualMachine object.
+
+        Args:
+            branch: Branch to create the object in
+            data: Virtual machine data dictionary with structure:
+                - name: str
+                - host: str (ID, required)
+                - cluster: str (ID, required - derived from host, mandatory in schema)
+                - description: str (optional)
+                - os_version: str (optional)
+                - status: str (active, provisioning, maintenance, drained)
+                - vcpus: int (optional)
+                - memory: int (optional, GB)
+                - disk: int (optional, GB)
+                - vmid_pool: str (CoreNumberPool ID, optional - omit for a
+                  hypervisor family whose vmid_requirement is "unused", and the
+                  VM is created with no VM ID at all)
+                - customer: str (ID, optional)
+                - group_names: List[str] (CoreStandardGroup names, e.g. ["virtualization_vms"])
+                - platform: List[str] (optional, [manufacturer, name] HFID, e.g. ["Generic", "Linux"])
+                - ssh_public_key: str (optional)
+
+        Returns:
+            Created virtual machine dictionary
+
+        Raises:
+            InfrahubConnectionError: If connection fails
+            InfrahubAPIError: If API error occurs
+        """
+        try:
+            cluster = data.get("cluster")
+            if not cluster:
+                raise InfrahubAPIError("cluster is required (VM.cluster is mandatory in the schema)")
+            # Spliced in only when provided, since passing e.g.
+            # customer: { id: null } errors. One table drives the variable
+            # declaration, the mutation field and the variable value together,
+            # so a new optional field is a single row rather than three edits
+            # that have to agree.
+            # A falsy value means "not supplied" for all four: no pool means the
+            # hypervisor does not use VM IDs, and an empty key, customer or
+            # platform is nothing to send.
+            optional_spec = (
+                # String! not String: from_pool.id is non-null in the schema, and
+                # the row is only spliced in when a pool was actually supplied.
+                ("vmid_pool", "String!", "vmid: { from_pool: { id: $vmid_pool } }"),
+                ("customer", "String", "customer: { id: $customer }"),
+                ("ssh_public_key", "String", "ssh_public_key: { value: $ssh_public_key }"),
+                ("platform", "[String]", "platform: { hfid: $platform }"),
+            )
+            optional_vars = []
+            optional_fields = []
+            optional_values: Dict[str, Any] = {}
+            for field, gql_type, mutation_field in optional_spec:
+                value = data.get(field)
+                if not value:
+                    continue
+                optional_vars.append(f"${field}: {gql_type},")
+                optional_fields.append(mutation_field)
+                optional_values[field] = value
+
+            mutation = f"""
+            mutation CreateVirtualMachine(
+                $name: String!,
+                $description: String,
+                $host: String!,
+                $cluster: String!,
+                $os_version: String,
+                $status: String!,
+                $vcpus: BigInt,
+                $memory: BigInt,
+                $disk: BigInt,
+                $groups: [RelatedNodeInput],
+                {" ".join(optional_vars)}
+            ) {{
+                VirtualizationVirtualMachineCreate(
+                    data: {{
+                        name: {{ value: $name }}
+                        description: {{ value: $description }}
+                        host: {{ id: $host }}
+                        cluster: {{ id: $cluster }}
+                        os_version: {{ value: $os_version }}
+                        status: {{ value: $status }}
+                        vcpus: {{ value: $vcpus }}
+                        memory: {{ value: $memory }}
+                        disk: {{ value: $disk }}
+                        member_of_groups: $groups
+                        {" ".join(optional_fields)}
+                    }}
+                ) {{
+                    ok
+                    object {{
+                        id
+                        name {{ value }}
+                        vmid {{ value }}
+                    }}
+                }}
+            }}
+            """
+
+            groups = [{"id": self._get_group_id(name, branch)} for name in data.get("group_names", [])]
+
+            variables: Dict[str, Any] = {
+                "name": data["name"],
+                "description": data.get("description", ""),
+                "host": data["host"],
+                "cluster": cluster,
+                "os_version": data.get("os_version", ""),
+                "status": data.get("status", "active"),
+                "vcpus": data.get("vcpus"),
+                "memory": data.get("memory"),
+                "disk": data.get("disk"),
+                "groups": groups,
+                **optional_values,
+            }
+
+            result = self.execute_graphql(mutation, variables, branch)
+
+            if result.get("VirtualizationVirtualMachineCreate", {}).get("ok"):
+                vm_obj = result["VirtualizationVirtualMachineCreate"]["object"]
+                return {"id": vm_obj["id"], "name": vm_obj["name"]}
+            else:
+                raise InfrahubAPIError(f"Failed to create virtual machine: {result}")
+
+        except Exception as e:
+            raise InfrahubAPIError(f"Failed to create virtual machine: {str(e)}")
+
+    def _get_group_id(self, group_name: str, branch: str) -> str:
+        """Look up a group ID by name across all group kinds.
+
+        Queries the CoreGroup generic so both CoreStandardGroup (artifact
+        targets like proxmox_vms) and CoreGeneratorGroup (generator targets
+        like virtualization_vms) resolve.
+
+        Args:
+            group_name: Name of the group.
             branch: Branch to query.
 
         Returns:
@@ -1392,7 +1904,7 @@ class InfrahubClient:
         """
         query = """
         query GetGroup($name: String!) {
-            CoreStandardGroup(name__value: $name) {
+            CoreGroup(name__value: $name) {
                 edges {
                     node {
                         id
@@ -1402,7 +1914,7 @@ class InfrahubClient:
         }
         """
         result = self.execute_graphql(query, {"name": group_name}, branch)
-        edges = result.get("CoreStandardGroup", {}).get("edges", [])
+        edges = result.get("CoreGroup", {}).get("edges", [])
         if not edges:
             raise InfrahubAPIError(f"Group '{group_name}' not found")
         return edges[0]["node"]["id"]

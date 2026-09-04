@@ -1,0 +1,30 @@
+query vm_artifact_groups($name: String!) {
+  VirtualizationVirtualMachine(name__value: $name) {
+    edges {
+      node {
+        id
+        name {
+          value
+        }
+        cluster {
+          node {
+            hypervisor_type {
+              node {
+                name {
+                  value
+                }
+                artifact_group {
+                  node {
+                    name {
+                      value
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

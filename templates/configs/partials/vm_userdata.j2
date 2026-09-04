@@ -1,0 +1,42 @@
+{#- ============================================================================
+    Cloud-init / cloudbase-init user-data for a VirtualizationVirtualMachine.
+
+    Branches on platform: Windows renders a cloudbase-init cloud-config,
+    anything else a Linux cloud-init cloud-config. Included by every
+    per-hypervisor provisioning template and also published standalone as
+    the vm_userdata artifact (application/yaml).
+
+    Derives `vm` from the global `data` so it works both standalone and
+    via {% include %}.
+    ============================================================================ -#}
+{% set vm = data.VirtualizationVirtualMachine.edges[0].node %}
+{% set is_windows = vm.platform.node and vm.platform.node.name.value == "Windows" %}
+#cloud-config
+# VM: {{ vm.name.value }} ({{ "Windows guest - cloudbase-init" if is_windows else "Linux guest - cloud-init" }})
+{% if is_windows %}
+set_hostname: {{ vm.name.value }}
+users:
+  - name: Admin
+    groups: Administrators
+{% if vm.ssh_public_key.value %}
+    ssh_authorized_keys:
+      - {{ vm.ssh_public_key.value }}
+{% endif %}
+# NOTE: no password is stored in Infrahub. Set the first-boot Administrator
+# password at deploy time (cloudbase-init inject or console).
+{% else %}
+hostname: {{ vm.name.value }}
+manage_etc_hosts: true
+users:
+  - name: admin
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    shell: /bin/bash
+{% if vm.ssh_public_key.value %}
+    ssh_authorized_keys:
+      - {{ vm.ssh_public_key.value }}
+{% endif %}
+packages:
+  - qemu-guest-agent
+runcmd:
+  - systemctl enable --now qemu-guest-agent
+{% endif %}

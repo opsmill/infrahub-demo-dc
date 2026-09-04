@@ -45,7 +45,7 @@ nodes:
             color: "#DDA0DD"
           - name: x
             label: Extra Large (X)
-            description: "Enterprise customer - 200 Segments, 2000 prefixes"
+            description: "Enterprise - 200 segments, 2000 prefixes"
             color: "#F0E68C"
         default_value: m
       - name: status

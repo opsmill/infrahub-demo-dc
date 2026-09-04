@@ -1,0 +1,138 @@
+# Virtualization Virtual Machines - independent of any specific DC design
+#
+# Compute sizing (vcpus/memory/disk) comes from the t-shirt sized profiles in
+# objects/bootstrap/08_virtualization_templates.yml: SMALL 2/8/40,
+# MEDIUM 4/16/100, LARGE 8/32/250, XLARGE 16/64/500. A size is a starting
+# point, not a contract - an explicit value on the VM overrides the profile,
+# which is how fra1-vm-db01 and fra1-vm-win02 get their bigger disks.
+#
+# Each customer's VMs form one coherent stack: OpsMill runs the Linux web/db
+# tier, Customer 2 the Windows pair, Customer 3 the application pair and
+# Customer 4 the cache. The SSH key is the owning customer's key (the C00n
+# suffix mirrors their customer_id), installed by cloud-init / cloudbase-init,
+# so a key never lands in another customer's guest.
+---
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: VirtualizationVirtualMachine
+  data:
+    - name: "fra1-vm-web01"
+      description: "Web server VM"
+      profiles:
+        - VIRTUALIZATION_VM_SMALL
+      host: "fra1-pve-01"
+      cluster: "FRA1-PROXMOX-CLUSTER"
+      customer: "OpsMill"
+      platform: [Generic, Linux]
+      os_version: "Ubuntu 22.04"
+      status: active
+      vmid: 100
+      ssh_public_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAC001 demo@opsmill"
+      member_of_groups:
+        - virtualization_vms
+
+    - name: "fra1-vm-db01"
+      description: "Database server VM"
+      profiles:
+        - VIRTUALIZATION_VM_LARGE
+      host: "fra1-pve-01"
+      cluster: "FRA1-PROXMOX-CLUSTER"
+      customer: "OpsMill"
+      platform: [Generic, Linux]
+      os_version: "Ubuntu 22.04"
+      status: active
+      disk: 500
+      vmid: 101
+      ssh_public_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAC001 demo@opsmill"
+      member_of_groups:
+        - virtualization_vms
+
+    - name: "fra1-vm-web02"
+      description: "Web server VM"
+      profiles:
+        - VIRTUALIZATION_VM_SMALL
+      host: "fra1-pve-02"
+      cluster: "FRA1-PROXMOX-CLUSTER"
+      customer: "OpsMill"
+      platform: [Generic, Linux]
+      os_version: "Ubuntu 22.04"
+      status: active
+      vmid: 102
+      ssh_public_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAC001 demo@opsmill"
+      member_of_groups:
+        - virtualization_vms
+
+    - name: "fra1-vm-app01"
+      description: "Application server VM"
+      profiles:
+        - VIRTUALIZATION_VM_MEDIUM
+      host: "fra1-kvm-01"
+      cluster: "FRA1-KVM-CLUSTER"
+      customer: "Customer 3"
+      platform: [Generic, Linux]
+      os_version: "Ubuntu 22.04"
+      status: active
+      vmid: 103
+      ssh_public_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAC003 demo@customer3"
+      member_of_groups:
+        - virtualization_vms
+
+    - name: "fra1-vm-app02"
+      description: "Application server VM"
+      profiles:
+        - VIRTUALIZATION_VM_MEDIUM
+      host: "fra1-kvm-01"
+      cluster: "FRA1-KVM-CLUSTER"
+      customer: "Customer 3"
+      platform: [Generic, Linux]
+      os_version: "Ubuntu 22.04"
+      status: active
+      vmid: 104
+      ssh_public_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAC003 demo@customer3"
+      member_of_groups:
+        - virtualization_vms
+
+    - name: "fra1-vm-cache01"
+      description: "Cache server VM"
+      profiles:
+        - VIRTUALIZATION_VM_SMALL
+      host: "fra1-kvm-02"
+      cluster: "FRA1-KVM-CLUSTER"
+      customer: "Customer 4"
+      platform: [Generic, Linux]
+      os_version: "Ubuntu 22.04"
+      status: provisioning
+      vmid: 105
+      ssh_public_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAC004 demo@customer4"
+      member_of_groups:
+        - virtualization_vms
+
+    - name: "fra1-vm-win01"
+      description: "Windows application server VM"
+      profiles:
+        - VIRTUALIZATION_VM_MEDIUM
+      host: "fra1-esx-01"
+      cluster: "FRA1-ESXI-CLUSTER"
+      customer: "Customer 2"
+      platform: [Generic, Windows]
+      os_version: "Windows Server 2022"
+      status: active
+      ssh_public_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAC002 demo@customer2"
+      member_of_groups:
+        - virtualization_vms
+
+    - name: "fra1-vm-win02"
+      description: "Windows file server VM"
+      profiles:
+        - VIRTUALIZATION_VM_MEDIUM
+      host: "fra1-hv-01"
+      cluster: "FRA1-HYPERV-CLUSTER"
+      customer: "Customer 2"
+      platform: [Generic, Windows]
+      os_version: "Windows Server 2022"
+      status: active
+      disk: 250
+      ssh_public_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAC002 demo@customer2"
+      member_of_groups:
+        - virtualization_vms

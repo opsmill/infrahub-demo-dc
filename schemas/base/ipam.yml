@@ -85,7 +85,7 @@ nodes:
             color: "#9678B6"
           - name: loopback-vtep
             label: Loopback VTEP
-            description: Facilitates virtualized network communications within loopback configurations.
+            description: Loopback prefix for VTEP communication.
             color: "#CDB4DB"
     relationships:
       - name: organization

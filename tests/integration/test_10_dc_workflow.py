@@ -115,10 +115,18 @@ async def test_04_fabric_is_complete(
     assert not unaddressed, f"Devices created without a management address: {sorted(unaddressed)}"
 
     # Fabric cabling: spine-leaf is a full mesh, so at minimum one cable per spine-leaf pair, plus
-    # the out-of-band management and console cabling on top.
-    cables = await client.count(kind="DcimCable", branch=BRANCH)
-    assert cables >= spines * leafs, (
-        f"Expected at least {spines * leafs} cables for a {spines}x{leafs} spine-leaf mesh, found {cables}."
+    # the out-of-band management and console cabling on top. Counted through a bounded wait rather
+    # than one read: test_03's quiescence gate can sample an idle instant between the generator's
+    # device phases and its cabling phase, and a single read here is what intermittently found 0
+    # cables in CI while the fabric was otherwise complete.
+    async def cables_present() -> tuple[bool, int]:
+        count = await client.count(kind="DcimCable", branch=BRANCH)
+        return count >= spines * leafs, count
+
+    await h.wait_for(
+        cables_present,
+        f"at least {spines * leafs} cables for the {spines}x{leafs} spine-leaf mesh",
+        timeout=c.GENERATOR_TIMEOUT,
     )
 
     # Dual loopbacks: loopback0 carries the underlay, loopback1 is the VTEP and overlay address.

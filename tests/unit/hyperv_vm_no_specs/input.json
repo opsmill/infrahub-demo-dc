@@ -1,0 +1,80 @@
+{
+  "data": {
+    "VirtualizationVirtualMachine": {
+      "edges": [
+        {
+          "node": {
+            "name": {
+              "value": "fra1-vm-win02"
+            },
+            "description": {
+              "value": "Windows application server"
+            },
+            "status": {
+              "value": "active"
+            },
+            "os_version": {
+              "value": "Windows Server 2022"
+            },
+            "vmid": {
+              "value": null
+            },
+            "vcpus": {
+              "value": 4
+            },
+            "memory": {
+              "value": null
+            },
+            "disk": {
+              "value": 120
+            },
+            "ssh_public_key": {
+              "value": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA demo@opsmill"
+            },
+            "host": {
+              "node": {
+                "name": {
+                  "value": "fra1-hv-01"
+                }
+              }
+            },
+            "cluster": {
+              "node": {
+                "name": {
+                  "value": "FRA1-HYPERV-CLUSTER"
+                },
+                "hypervisor_type": {
+                  "node": {
+                    "name": {
+                      "value": "hyperv"
+                    },
+                    "image_prefix": {
+                      "value": "tpl-"
+                    }
+                  }
+                }
+              }
+            },
+            "platform": {
+              "node": {
+                "name": {
+                  "value": "Windows"
+                }
+              }
+            },
+            "primary_address": {
+              "node": {
+                "address": {
+                  "value": "100.64.0.5/16"
+                }
+              }
+            },
+            "tags": {
+              "edges": []
+            }
+          }
+        }
+      ]
+    }
+  }
+}

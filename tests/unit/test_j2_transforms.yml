@@ -13,3 +13,116 @@ infrahub_tests:
         spec:
           kind: "jinja2-transform-unit-render"
           directory: simulators
+
+  - resource: Jinja2Transform
+    resource_name: proxmox_vm_config
+    tests:
+      - name: syntax_check
+        spec:
+          kind: jinja2-transform-smoke
+      - name: renders_allocated_ip_and_vmid
+        expect: PASS
+        spec:
+          kind: "jinja2-transform-unit-render"
+          directory: proxmox_vm
+          output: output.txt
+      - name: missing_vmid_fails_loudly
+        expect: PASS
+        spec:
+          kind: "jinja2-transform-unit-render"
+          directory: proxmox_vm_no_vmid
+          output: output.txt
+      # vcpus/memory/disk/os_version are optional in the schema, so a VM
+      # written without a size profile must render a loud error script, not
+      # crash the render or emit a script that misprovisions at deploy time.
+      - name: missing_specs_fail_loudly
+        expect: PASS
+        spec:
+          kind: "jinja2-transform-unit-render"
+          directory: proxmox_vm_no_specs
+          output: output.txt
+
+  - resource: Jinja2Transform
+    resource_name: kvm_vm_config
+    tests:
+      - name: syntax_check
+        spec:
+          kind: jinja2-transform-smoke
+      - name: renders_nocloud_seed_flow
+        expect: PASS
+        spec:
+          kind: "jinja2-transform-unit-render"
+          directory: kvm_vm
+          output: output.txt
+      - name: non_active_leaves_vm_shut_down
+        expect: PASS
+        spec:
+          kind: "jinja2-transform-unit-render"
+          directory: kvm_vm_provisioning
+          output: output.txt
+      - name: missing_specs_fail_loudly
+        expect: PASS
+        spec:
+          kind: "jinja2-transform-unit-render"
+          directory: kvm_vm_no_specs
+          output: output.txt
+
+  - resource: Jinja2Transform
+    resource_name: hyperv_vm_config
+    tests:
+      - name: syntax_check
+        spec:
+          kind: jinja2-transform-smoke
+      - name: renders_nocloud_iso_flow
+        expect: PASS
+        spec:
+          kind: "jinja2-transform-unit-render"
+          directory: hyperv_vm
+          output: output.txt
+      - name: missing_specs_fail_loudly
+        expect: PASS
+        spec:
+          kind: "jinja2-transform-unit-render"
+          directory: hyperv_vm_no_specs
+          output: output.txt
+
+  - resource: Jinja2Transform
+    resource_name: esxi_vm_config
+    tests:
+      - name: syntax_check
+        spec:
+          kind: jinja2-transform-smoke
+      - name: renders_guestinfo_flow
+        expect: PASS
+        spec:
+          kind: "jinja2-transform-unit-render"
+          directory: esxi_vm
+          output: output.txt
+      - name: missing_specs_fail_loudly
+        expect: PASS
+        spec:
+          kind: "jinja2-transform-unit-render"
+          directory: esxi_vm_no_specs
+          output: output.txt
+
+  - resource: Jinja2Transform
+    resource_name: vm_userdata
+    tests:
+      - name: syntax_check
+        spec:
+          kind: jinja2-transform-smoke
+      # The partial renders from the same vm_config payload as the provisioning
+      # templates, so these reuse their input rather than carrying a second
+      # copy of it that has to be migrated alongside on every query change.
+      - name: linux_cloud_init
+        expect: PASS
+        spec:
+          kind: "jinja2-transform-unit-render"
+          directory: proxmox_vm
+          output: userdata_output.txt
+      - name: windows_cloudbase_init
+        expect: PASS
+        spec:
+          kind: "jinja2-transform-unit-render"
+          directory: esxi_vm
+          output: userdata_output.txt

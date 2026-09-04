@@ -82,13 +82,25 @@ interfaces {
 {%- if vlans %}
     ## Integrated Routing and Bridging (IRB) for L3 VLANs
     irb {
+{#-     Gateway address comes from the segment's prefix in Infrahub, not from a
+        convention built on the VLAN ID. Same two conditions as the Arista
+        template, in the same order: gateway is derived from the prefix for
+        every segment regardless of type, so gating on it alone would give an
+        l2_only segment that happens to carry a prefix a routed IRB unit here
+        and none on an Arista leaf in the same fabric. -#}
 {%-     for vlan in vlans %}
+{%-         if vlan.segment_type in ['l3_gateway', 'l3_vrf'] %}
+{%-             if vlan.gateway %}
         unit {{ vlan.vlan_id }} {
             description "{{ vlan.name }} Gateway";
             family inet {
-                address 192.168.{{ vlan.vlan_id }}.1/24;
+                address {{ vlan.gateway }};
             }
         }
+{%-             else %}
+        ## VLAN {{ vlan.vlan_id }} is an L3 segment with no prefix in Infrahub - no gateway rendered
+{%-             endif %}
+{%-         endif %}
 {%-     endfor %}
     }
 {%- endif %}
@@ -182,7 +194,12 @@ vlans {
 {%-     for vlan in vlans %}
     {{ vlan.name }} {
         vlan-id {{ vlan.vlan_id }};
+{#-     Only bind the VLAN to an IRB unit the block above actually rendered:
+        an l2_only segment, or an L3 one with no prefix, otherwise points at a
+        unit that does not exist. -#}
+{%-         if vlan.segment_type in ['l3_gateway', 'l3_vrf'] and vlan.gateway %}
         l3-interface irb.{{ vlan.vlan_id }};
+{%-         endif %}
     }
 {%-     endfor %}
 }

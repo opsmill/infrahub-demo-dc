@@ -18,7 +18,7 @@ generics:
         choices:
           - name: "TRANSIT"
             label: "Transit Provider"
-            description: "Peering with transit provider for internet connectivity"
+            description: "Transit peering for internet connectivity."
             color: "#FF6B6B"
           - name: "CUSTOMER"
             label: "Customer"
@@ -48,7 +48,7 @@ generics:
             color: "#74B9FF"
           - name: "EXTERNAL"
             label: "External Partners"
-            description: "Peering with external devices requiring artifact generation"
+            description: "External peering that generates artifacts."
             color: "#FD79A8"
         default_value: "INTERNAL"
         order_weight: 1300

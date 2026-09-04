@@ -52,35 +52,35 @@ nodes:
         choices:
           - name: roundrobin
             label: Round Robin
-            description: Distributes traffic evenly across all available frontends.
+            description: Evenly distributes traffic across frontends.
             color: "#A9CCE3"  # pastel blue
           - name: leastconn
             label: Least Connections
-            description: Sends traffic to the frontend with the fewest connections.
+            description: Frontend with the fewest connections wins.
             color: "#A9DFBF"  # light pastel green
           - name: source
             label: Source IP Hash
-            description: Ensures requests from the same source IP are always sent to the same frontend.
+            description: Same source IP always hits the same frontend.
             color: "#D2B4DE"  # pastel purple
           - name: first
             label: First Available
-            description: Sends all traffic to the first available frontend in the server list.
+            description: All traffic to the first available frontend.
             color: "#AFC7F2"  # pastel cornflower blue
           - name: static-rr
             label: Static Round Robin
-            description: Distributes traffic based on a static round-robin algorithm.
+            description: Static round-robin distribution.
             color: "#CDEACC"  # slightly darker pastel green
           - name: uri
             label: URI Hash
-            description: Balances traffic based on the hash of the request URI.
+            description: Balances on a hash of the request URI.
             color: "#C9A9E3"  # pastel violet
           - name: hdr
             label: Header Hash
-            description: Balances traffic based on the value of a specified HTTP header.
+            description: Balances on a specified HTTP header value.
             color: "#D8E4BC"  # pastel greenish-yellow
           - name: random
             label: Random
-            description: Balances traffic randomly across available frontends.
+            description: Random distribution across frontends.
             color: "#CDEACC"  # slightly darker pastel green
         default_value: roundrobin
       - name: ssl_certificate

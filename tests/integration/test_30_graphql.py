@@ -48,6 +48,14 @@ QUERY_SUBJECTS: dict[str, tuple[str, str, str | None]] = {
     "equinix_pop_config": ("name", "TopologyColocationCenter", None),
     "segment": ("name", "ServiceNetworkSegment", None),
     "rack_elevation_query": ("name", "LocationRack", None),
+    "virtualization_host_cabling": ("name", "VirtualizationPhysicalHost", None),
+    "virtualization_vm_security": ("name", "VirtualizationVirtualMachine", None),
+    "vm_artifact_groups": ("name", "VirtualizationVirtualMachine", None),
+    "dc_firewall_policy": ("device", "SecurityFirewall", "dc_firewall"),
+    "vm_config": ("name", "VirtualizationVirtualMachine", None),
+    "virtualization_vm_validation": ("device", "VirtualizationVirtualMachine", None),
+    "virtualization_host_validation": ("device", "VirtualizationPhysicalHost", None),
+    "virtualization_capacity": ("device", "VirtualizationVirtualMachine", None),
 }
 """How to supply each query's single variable. Keyed by the name used in ``.infrahub.yml``."""
 

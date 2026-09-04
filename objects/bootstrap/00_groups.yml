@@ -80,3 +80,40 @@ spec:
       description: Network Segments for VPN/VxLAN services
     - name: racks
       description: Racks
+    - name: proxmox_vms
+      description: Virtual machines hosted on a Proxmox VE cluster
+    - name: kvm_vms
+      description: Virtual machines hosted on a KVM/libvirt cluster
+    - name: hyperv_vms
+      description: Virtual machines hosted on a Microsoft Hyper-V cluster
+    - name: esxi_vms
+      description: Virtual machines hosted on a VMware ESXi cluster
+    - name: vm_userdata_targets
+      description: All virtual machines - target group for the vm-userdata artifact
+
+---
+# Generator target groups. generator_definitions.targets in .infrahub.yml
+# resolves strictly against CoreGeneratorGroup - a CoreStandardGroup of the
+# same name parses but never dispatches. Kept separate from the artifact
+# target groups above (e.g. proxmox_vms, juniper_firewall), since one group
+# cannot correctly be both.
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: CoreGeneratorGroup
+  data:
+    - name: virtualization_hosts
+      description: Physical hosts that trigger the virtualization cabling generator
+    - name: virtualization_vms
+      description: >-
+        Virtual machines that trigger the virtualization VM generators
+        (secure_virtualization_vm and assign_vm_artifact_groups)
+    - name: dc_firewall_policy_targets
+      description: >-
+        DC firewalls that trigger the attach_dc_firewall_policy generator. Kept
+        separate from the juniper_firewall artifact group, which one group
+        cannot also be. Membership is required, not decorative: the generator
+        resolves its targets through this group, and the dc-firewall-on-create
+        trigger rule will not run it against a non-member. TopologyCreator adds
+        every dc_firewall it builds (see DC_FIREWALL_POLICY_GROUP in
+        generators/common.py).

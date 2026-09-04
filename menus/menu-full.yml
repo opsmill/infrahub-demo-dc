@@ -9,12 +9,14 @@ spec:
       label: Documentation
       icon: "mdi:book-open-variant"
       kind: DocsDocs
+      order_weight: 1000
 
     # ===================== DEVICE MANAGEMENT =====================
     - namespace: Dcim
       name: DeviceManagementMenu
       label: Device Management
       icon: "mdi:server"
+      order_weight: 2000
       children:
         data:
           # --------- Core Infrastructure ---------
@@ -79,12 +81,50 @@ spec:
                   kind: DcimDeviceType
                   icon: "mdi:package-variant"
 
+    # --------- Virtualization ---------
+    - namespace: Virtualization
+      name: VirtualizationMenu
+      label: "Virtualization"
+      icon: "mdi:server-network"
+      order_weight: 3000
+      children:
+        data:
+          # Physical first, then the cluster they form, then the VMs on top:
+          # the order data is built in. Icons match the `icon` on each schema
+          # node so the sidebar and the object views agree.
+          - name: PhysicalHost
+            namespace: Virtualization
+            label: "Physical Hosts"
+            icon: "mdi:server"
+            order_weight: 1000
+            kind: VirtualizationPhysicalHost
+
+          - name: Cluster
+            namespace: Virtualization
+            label: "Clusters"
+            icon: "mdi:layers-triple"
+            order_weight: 2000
+            kind: VirtualizationCluster
+
+          - name: VirtualMachine
+            namespace: Virtualization
+            label: "Virtual Machines"
+            icon: "mdi:monitor"
+            order_weight: 3000
+            kind: VirtualizationVirtualMachine
+
+          # VirtualizationHypervisorType is deliberately not in the menu: it
+          # is bootstrap reference data edited roughly never, and it stays
+          # reachable through the hypervisor_type relationship on any cluster
+          # or host, and through search.
+
     # ===================== LOAD BALANCING =====================
 
     - namespace: Loadbalancing
       name: ManagementMenu
       label: LB Management
       icon: carbon:load-balancer-global
+      order_weight: 4000
       children:
         data:
 
@@ -104,6 +144,7 @@ spec:
       name: ManagementMenu
       label: Routing Management
       icon: "mdi:router"
+      order_weight: 5000
       children:
         data:
           - namespace: Routing
@@ -183,6 +224,7 @@ spec:
       name: SecurityMenu
       label: Security Management
       icon: "mdi:security"
+      order_weight: 6000
       children:
         data:
           # --------- Policies & Rules ---------
@@ -337,12 +379,14 @@ spec:
       label: Locations
       kind: LocationGeneric
       icon: "mdi:map-marker"
+      order_weight: 7000
 
     # ===================== TOPOLOGY & DESIGN =====================
     - namespace: Topology
       name: TopologyMenu
       label: Network Topologies
       icon: "mdi:network"
+      order_weight: 8000
       children:
         data:
           - namespace: Topology
@@ -392,6 +436,7 @@ spec:
       name: Generic
       label: Services
       icon: "mdi:cog-box"
+      order_weight: 9000
       children:
         data:
           # --------- Security Services ---------

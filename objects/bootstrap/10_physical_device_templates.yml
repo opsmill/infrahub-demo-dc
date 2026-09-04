@@ -346,3 +346,111 @@ spec:
           - template_name: QFX5220-32CD_LEAF_ge-0/0/[2-3]
             name: ge-0/0/[2-3]
             role: customer
+
+---
+# Hypervisor host templates, one per hardware size. Each carries the model
+# (device_type), the capacity that model ships with, and every physical port
+# including the out-of-band management NIC.
+#
+# eth0 and eth1 are the pair cable_virtualization_host dual-homes to the
+# leaf switches - a template without both makes that generator skip the host.
+# Any further NIC is spare capacity and stays uncabled.
+#
+# `member_of_groups_for_instances` puts every host created from a template
+# into virtualization_hosts, the trigger group for that cabling generator, so
+# a host created in the UI is racked, cabled and addressed like a loaded one.
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: TemplateVirtualizationPhysicalHost
+  parameters:
+    expand_range: true
+  data:
+    - template_name: VIRTUALIZATION_HOST_SMALL
+      device_type: [Dell, PowerEdge R650]
+      role: hypervisor
+      status: active
+      vcpus: 32
+      memory: 256
+      disk: 2000
+      member_of_groups_for_instances:
+        - virtualization_hosts
+      interfaces:
+        kind: TemplateInterfacePhysical
+        parameters:
+          expand_range: true
+        data:
+          - template_name: VIRTUALIZATION_HOST_SMALL_eth[0-1]
+            name: eth[0-1]
+            role: access
+            status: free
+          - template_name: VIRTUALIZATION_HOST_SMALL_idrac
+            name: idrac
+            role: management
+            status: free
+    - template_name: VIRTUALIZATION_HOST_MEDIUM
+      device_type: [HPE, ProLiant DL380 Gen11]
+      role: hypervisor
+      status: active
+      vcpus: 48
+      memory: 384
+      disk: 3000
+      member_of_groups_for_instances:
+        - virtualization_hosts
+      interfaces:
+        kind: TemplateInterfacePhysical
+        parameters:
+          expand_range: true
+        data:
+          - template_name: VIRTUALIZATION_HOST_MEDIUM_eth[0-3]
+            name: eth[0-3]
+            role: access
+            status: free
+          - template_name: VIRTUALIZATION_HOST_MEDIUM_ilo
+            name: ilo
+            role: management
+            status: free
+    - template_name: VIRTUALIZATION_HOST_LARGE
+      device_type: [Dell, PowerEdge R760]
+      role: hypervisor
+      status: active
+      vcpus: 64
+      memory: 512
+      disk: 4000
+      member_of_groups_for_instances:
+        - virtualization_hosts
+      interfaces:
+        kind: TemplateInterfacePhysical
+        parameters:
+          expand_range: true
+        data:
+          - template_name: VIRTUALIZATION_HOST_LARGE_eth[0-3]
+            name: eth[0-3]
+            role: access
+            status: free
+          - template_name: VIRTUALIZATION_HOST_LARGE_idrac
+            name: idrac
+            role: management
+            status: free
+    - template_name: VIRTUALIZATION_HOST_XLARGE
+      device_type: [HPE, ProLiant DL385 Gen11]
+      role: hypervisor
+      status: active
+      vcpus: 96
+      memory: 768
+      disk: 8000
+      member_of_groups_for_instances:
+        - virtualization_hosts
+      interfaces:
+        kind: TemplateInterfacePhysical
+        parameters:
+          expand_range: true
+        data:
+          - template_name: VIRTUALIZATION_HOST_XLARGE_eth[0-5]
+            name: eth[0-5]
+            role: access
+            status: free
+          - template_name: VIRTUALIZATION_HOST_XLARGE_ilo
+            name: ilo
+            role: management
+            status: free

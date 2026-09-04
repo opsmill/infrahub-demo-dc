@@ -4,6 +4,7 @@ extends: default
 ignore: |
   /generated-configs
   /.git
+  /.local-mirror
   /docs/node_modules
   /docs/pnpm-lock.yaml
   /.venv

@@ -99,6 +99,71 @@ infrahub_tests:
           path: queries/config/juniper_firewall.gql
           kind: graphql-query-smoke
 
+  # --------------------  Virtualization  --------------------
+  - resource: GraphQLQuery
+    resource_name: virtualization_host_cabling
+    tests:
+      - name: syntax_check
+        spec:
+          path: queries/virtualization/host_cabling.gql
+          kind: graphql-query-smoke
+
+  - resource: GraphQLQuery
+    resource_name: virtualization_vm_security
+    tests:
+      - name: syntax_check
+        spec:
+          path: queries/virtualization/vm_security.gql
+          kind: graphql-query-smoke
+
+  - resource: GraphQLQuery
+    resource_name: vm_artifact_groups
+    tests:
+      - name: syntax_check
+        spec:
+          path: queries/virtualization/vm_artifact_groups.gql
+          kind: graphql-query-smoke
+
+  - resource: GraphQLQuery
+    resource_name: dc_firewall_policy
+    tests:
+      - name: syntax_check
+        spec:
+          path: queries/virtualization/dc_firewall_policy.gql
+          kind: graphql-query-smoke
+
+  - resource: GraphQLQuery
+    resource_name: vm_config
+    tests:
+      - name: syntax_check
+        spec:
+          path: queries/config/vm_config.gql
+          kind: graphql-query-smoke
+
+  - resource: GraphQLQuery
+    resource_name: virtualization_vm_validation
+    tests:
+      - name: syntax_check
+        spec:
+          path: queries/validation/virtualization_vm.gql
+          kind: graphql-query-smoke
+
+  - resource: GraphQLQuery
+    resource_name: virtualization_host_validation
+    tests:
+      - name: syntax_check
+        spec:
+          path: queries/validation/virtualization_host.gql
+          kind: graphql-query-smoke
+
+  - resource: GraphQLQuery
+    resource_name: virtualization_capacity
+    tests:
+      - name: syntax_check
+        spec:
+          path: queries/validation/virtualization_capacity.gql
+          kind: graphql-query-smoke
+
   # --------------------  Validation  --------------------
   - resource: GraphQLQuery
     resource_name: loadbalancer_validation

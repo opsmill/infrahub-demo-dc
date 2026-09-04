@@ -33,7 +33,7 @@ nodes:
             color: "#7fbf7f"
           - name: provisioning
             label: Provisioning
-            description: In the process of being set up and configured.
+            description: Being set up and configured.
             color: "#ffff7f"
           - name: maintenance
             label: Maintenance
@@ -49,15 +49,15 @@ nodes:
         choices:
           - name: server
             label: Server
-            description: Dedicated systems for managing networked resources.
+            description: Systems that serve networked resources.
             color: "#c4bed7"
           - name: management
             label: Management
-            description: Network segments for administrative and control tasks.
+            description: Segments for admin and control tasks.
             color: "#9af1e1"
           - name: user
             label: User
-            description: Segments designed for end-user access and activities.
+            description: Segments for end-user access.
             color: "#a0b78d"
     relationships:
       - name: location

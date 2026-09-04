@@ -1,0 +1,61 @@
+{#- ============================================================================
+    VMware ESXi/vSphere VM Provisioning Script (govc)
+
+    Clones a cloud-ready template (convention: tpl-<os_version slug>) and
+    injects user-data through the guestinfo interface - consumed by
+    cloud-init's VMware datasource (Linux) or cloudbase-init's
+    VMwareGuestInfoService (Windows). Requires govc with GOVC_URL /
+    GOVC_USERNAME / GOVC_PASSWORD exported.
+
+    Runs from any POSIX host with govc installed (e.g. an admin
+    workstation) - not on the ESXi host itself. Uses `base64 | tr -d
+    '\n'` rather than `base64 -w0` since -w0 is GNU-coreutils-only and
+    unsupported by the BSD/macOS base64 commonly found on such hosts.
+    ============================================================================ -#}
+{% set vm = data.VirtualizationVirtualMachine.edges[0].node %}
+{% import "templates/configs/partials/vm_macros.j2" as vm_macros %}
+{% set tpl = vm_macros.image_name(vm) %}
+#!/bin/bash
+{{ vm_macros.banner(vm) }}
+set -euo pipefail
+
+{% if vm.vcpus.value is none or vm.memory.value is none or vm.disk.value is none or vm.os_version.value is none %}
+# This VM has no complete size or OS recorded in Infrahub. vcpus, memory,
+# disk and os_version are optional in the schema (a size profile normally
+# sets the first three), so a VM written directly through the SDK or API can
+# be missing them - refuse to render a script that would fail or
+# misprovision at deploy time.
+echo "ERROR: {{ vm.name.value }} needs vcpus, memory, disk and os_version set in Infrahub" >&2
+exit 1
+{% else %}
+# Cloud-init user-data rendered by Infrahub (see the vm-userdata artifact).
+USERDATA_B64="$(base64 <<'CLOUDINIT' | tr -d '\n'
+{% include "templates/configs/partials/vm_userdata.j2" %}
+CLOUDINIT
+)"
+{# Quoted delimiter: nothing in the rendered metadata may be expanded by the
+   shell, or a crafted VM name would execute inside this script. #}
+METADATA_B64="$(base64 <<'METADATA' | tr -d '\n'
+instance-id: {{ vm.name.value }}
+local-hostname: {{ vm.name.value }}
+METADATA
+)"
+
+govc vm.clone -vm "{{ tpl }}" -on=false \
+  -c {{ vm.vcpus.value }} -m {{ (vm.memory.value * 1024) | int }} \
+  "{{ vm.name.value }}"
+
+govc vm.disk.change -vm "{{ vm.name.value }}" -size {{ vm.disk.value }}G
+
+govc vm.change -vm "{{ vm.name.value }}" \
+  -e "guestinfo.userdata=$USERDATA_B64" \
+  -e "guestinfo.userdata.encoding=base64" \
+  -e "guestinfo.metadata=$METADATA_B64" \
+  -e "guestinfo.metadata.encoding=base64"
+
+{% if vm.status.value == "active" %}
+govc vm.power -on "{{ vm.name.value }}"
+{% else %}
+# Status is "{{ vm.status.value }}" - VM created but left powered off.
+{% endif %}
+{% endif %}

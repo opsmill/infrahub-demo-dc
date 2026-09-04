@@ -26,7 +26,7 @@ generics:
             color: "#7fbf7f"
           - name: provisioning
             label: Provisioning
-            description: "In the process of being set up and configured."
+            description: "Being set up and configured."
             color: "#ffff7f"
           - name: maintenance
             label: Maintenance
@@ -202,7 +202,7 @@ nodes:
             color: "#e6e6fa"
           - name: border_leaf
             label: Border Leaf Switch
-            description: Border Leaf providing external connectivity in a Fabric.
+            description: Border leaf providing external connectivity.
             color: "#dda0dd"
           - name: tor
             label: Tor Switch

@@ -1,0 +1,75 @@
+{#- ============================================================================
+    Proxmox VE VM Provisioning Script
+
+    Clones a cloud-init-ready template (convention: tpl-<os_version slug>,
+    e.g. tpl-ubuntu-22.04) and configures it via the cloud-init drive:
+    user-data comes from the Infrahub-rendered snippet (--cicustom), the IP
+    from --ipconfig0. Run on the target Proxmox node as root/PVEVMAdmin.
+
+    Rendered with trim_blocks/lstrip_blocks enabled (infrahub_sdk defaults).
+    ============================================================================ -#}
+{% set vm = data.VirtualizationVirtualMachine.edges[0].node %}
+{% import "templates/configs/partials/vm_macros.j2" as vm_macros %}
+{% set is_windows = vm.platform.node and vm.platform.node.name.value == "Windows" %}
+{% set tpl = vm_macros.image_name(vm) %}
+#!/bin/bash
+{{ vm_macros.banner(vm) }}
+set -euo pipefail
+
+{% if vm.vmid.value is none %}
+# This VM has no VMID assigned in Infrahub. A VMID is required to provision
+# on Proxmox - set one on the VirtualizationVirtualMachine object and
+# regenerate this artifact.
+echo "ERROR: {{ vm.name.value }} has no VMID assigned in Infrahub" >&2
+exit 1
+{% elif vm.vcpus.value is none or vm.memory.value is none or vm.disk.value is none or vm.os_version.value is none %}
+# This VM has no complete size or OS recorded in Infrahub. vcpus, memory,
+# disk and os_version are optional in the schema (a size profile normally
+# sets the first three), so a VM written directly through the SDK or API can
+# be missing them - refuse to render a script that would fail or
+# misprovision at deploy time.
+echo "ERROR: {{ vm.name.value }} needs vcpus, memory, disk and os_version set in Infrahub" >&2
+exit 1
+{% else %}
+TEMPLATE_VMID="$(qm list | awk -v t="{{ tpl }}" '$2 == t {print $1}')"
+if [ -z "$TEMPLATE_VMID" ]; then
+  echo "ERROR: template {{ tpl }} not found on this node" >&2
+  exit 1
+fi
+
+# Cloud-init user-data rendered by Infrahub (see the vm-userdata artifact).
+cat > "/var/lib/vz/snippets/{{ vm.name.value }}-user-data.yml" <<'CLOUDINIT'
+{% include "templates/configs/partials/vm_userdata.j2" %}
+CLOUDINIT
+
+qm clone "$TEMPLATE_VMID" {{ vm.vmid.value }} --name "{{ vm.name.value }}" --full
+
+qm set {{ vm.vmid.value }} \
+  --cores {{ vm.vcpus.value }} \
+  --memory {{ (vm.memory.value * 1024) | int }} \
+  --net0 virtio,bridge=vmbr0 \
+  --ide2 local-lvm:cloudinit \
+  --cicustom "user=local:snippets/{{ vm.name.value }}-user-data.yml" \
+{% if vm.primary_address.node %}
+  --ipconfig0 "ip={{ vm.primary_address.node.address.value }}" \
+{% endif %}
+  --ostype {{ "win11" if is_windows else "l26" }} \
+  --agent enabled=1
+
+qm disk resize {{ vm.vmid.value }} scsi0 {{ vm.disk.value }}G
+
+{# Single-quoted with quote-escaping: the description is free text, and a
+   double-quoted interpolation would let `"; rm ...` in it escape into this
+   root-run script. #}
+qm set {{ vm.vmid.value }} --description '{{ (vm.description.value or vm.name.value) | replace("'", "'\\''") }} - {{ vm.os_version.value | replace("'", "'\\''") }}'
+
+{% if vm.tags.edges %}
+qm set {{ vm.vmid.value }} --tags '{{ vm.tags.edges | map(attribute="node.name.value") | join(",") | replace("'", "'\\''") }}'
+
+{% endif %}
+{% if vm.status.value == "active" %}
+qm start {{ vm.vmid.value }}
+{% else %}
+# Status is "{{ vm.status.value }}" - VM created but left powered off.
+{% endif %}
+{% endif %}

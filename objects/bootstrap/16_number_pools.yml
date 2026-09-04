@@ -1,0 +1,31 @@
+---
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: CoreNumberPool
+  data:
+    - name: PRIVATE-ASN32
+      description: Private 32 bit ASN Pool
+      node: RoutingAutonomousSystem
+      node_attribute: asn
+      start_range: 4200000000
+      end_range: 4294967294
+    - name: PRIVATE-ASN4
+      description: Private 4 bit ASN Pool
+      node: RoutingAutonomousSystem
+      node_attribute: asn
+      start_range: 64512
+      end_range: 65534
+
+    # A VMID has to be unique per cluster, and the Create VM page puts every new
+    # VM on its own unmerged branch - where a VM on a sibling branch is invisible,
+    # so no query over the data can tell what is really taken. CoreNumberPool is
+    # branch-agnostic, so allocations are unique across every branch at once.
+    # Only proxmox (required) and kvm (optional) draw from it; hyperv, vmware and
+    # other are vmid_requirement: unused and simply never reference the pool.
+    - name: VM-VMID
+      description: VM IDs for Proxmox and KVM virtual machines
+      node: VirtualizationVirtualMachine
+      node_attribute: vmid
+      start_range: 100
+      end_range: 999999

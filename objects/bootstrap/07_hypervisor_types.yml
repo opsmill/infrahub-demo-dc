@@ -1,0 +1,77 @@
+# Hypervisor families and the conventions that follow from each one.
+#
+# Single source for facts that were previously repeated in a cluster_type
+# dropdown, CLUSTER_TYPE_TO_GROUP in generators/generate_vm_artifact_groups.py,
+# the HYPERVISORS map in the Service Catalog, and the artifact wiring in
+# .infrahub.yml. A cluster now names its family through the hypervisor_type
+# relationship, so these rows are the only place any of it is written.
+#
+# vmid_requirement is what the Create VM form reads to decide whether to offer
+# a VM ID field, instead of testing the family name against a hardcoded list.
+#
+# The overcommit percentages are the ratios each family is normally run at,
+# expressed as a percentage because Number is integer-only: 400 is 4:1, 100 is
+# no overcommit. validate_virtualization_capacity compares allocation against
+# them and treats a missing value as 100.
+#
+# Loads after 00_groups.yml (artifact_group) and 05_platforms.yml (platform).
+---
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: VirtualizationHypervisorType
+  data:
+    - name: proxmox
+      label: Proxmox VE
+      platform: [Generic, Linux]
+      artifact_group: proxmox_vms
+      artifact_definition: proxmox_vm_config
+      script_language: bash
+      image_prefix: "tpl-"
+      vmid_requirement: required
+      vcpu_overcommit_percent: 400
+      memory_overcommit_percent: 100
+      disk_overcommit_percent: 150
+
+    - name: kvm
+      label: KVM
+      platform: [Generic, Linux]
+      artifact_group: kvm_vms
+      artifact_definition: kvm_vm_config
+      script_language: bash
+      image_prefix: "tpl-"
+      vmid_requirement: optional
+      vcpu_overcommit_percent: 400
+      memory_overcommit_percent: 100
+      disk_overcommit_percent: 150
+
+    - name: hyperv
+      label: Microsoft Hyper-V
+      platform: [Generic, Windows]
+      artifact_group: hyperv_vms
+      artifact_definition: hyperv_vm_config
+      script_language: powershell
+      image_prefix: "tpl-"
+      vmid_requirement: unused
+      vcpu_overcommit_percent: 200
+      memory_overcommit_percent: 100
+      disk_overcommit_percent: 150
+
+    - name: vmware
+      label: VMware vSphere
+      platform: [VMware, ESXi]
+      artifact_group: esxi_vms
+      artifact_definition: esxi_vm_config
+      script_language: bash
+      image_prefix: "tpl-"
+      vmid_requirement: unused
+      vcpu_overcommit_percent: 300
+      memory_overcommit_percent: 100
+      disk_overcommit_percent: 200
+
+    # No platform, group or definition: "other" exists so a cluster can be
+    # recorded before its hypervisor is known, and its VMs get the shared
+    # user-data artifact only.
+    - name: other
+      label: Other
+      vmid_requirement: unused
