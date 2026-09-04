@@ -266,6 +266,13 @@ jobs:
           version: ${{ env.UV_VERSION }}
       - run: uv sync
         working-directory: ./
+      # `invoke docs` builds against this site's own route base, where a site-absolute link is
+      # valid, so it cannot see the one class of link that breaks infrahub-docs. This test can.
+      # It runs here rather than only in unit-test because that job is gated on python_all, which
+      # a documentation-only pull request does not match.
+      - name: Check documentation links stay portable
+        run: uv run pytest tests/unit/test_docs_links.py
+        working-directory: ./
       - name: Build docs website
         run: uv run invoke docs
 

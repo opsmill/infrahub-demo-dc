@@ -125,3 +125,8 @@ docs/
 3. **Title case headings** - Use sentence case instead
 4. **Missing code language** - Always specify language in code fences
 5. **Skipping linters** - Always run rumdl and vale before committing
+6. **Site-absolute internal links** - Link to a sibling page as `./page.mdx`, never as `/page`.
+   This site serves docs at its own root, but `opsmill/infrahub-docs` re-hosts the same files
+   under `/demo-dc/`, where a `/page` target 404s and fails that build with
+   `onBrokenLinks: 'throw'`. `invoke docs` passes either way, so
+   `tests/unit/test_docs_links.py` is what catches it
