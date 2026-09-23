@@ -46,6 +46,11 @@ jobs:
       cancel-in-progress: false
     steps:
       - uses: actions/checkout@v7
+        with:
+          # The persisted GITHUB_TOKEN header (contents: read) would override the
+          # GH_UPDATE_PACKAGE_OTTO token the commit step pushes with, and the push
+          # would be denied to github-actions[bot].
+          persist-credentials: false
 
       # A shell `case` on the dispatch type, not job-level `env:` expressions: nesting the
       # attribution into ${{ }} is what put an Infrahub version onto the infrahub-sdk specifier in
