@@ -555,7 +555,7 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "infrahub-testcontainers", specifier = ">=1.11.4" },
+    { name = "infrahub-testcontainers", specifier = ">=1.10.11" },
     { name = "j2lint", specifier = ">=1.2.0" },
     { name = "mypy", specifier = ">=2.3.1" },
     { name = "pytest", specifier = ">=9.0.0" },
