@@ -1,0 +1,76 @@
+---
+# Demo accounts for role-based access control: emma (read-only) and otto (schema reviewer).
+#
+# Hierarchy: accounts are members of groups, groups hold roles, roles hold permissions.
+# Decision values: 1 = deny, 6 = allow_all.
+#
+# Each role lists its permissions inline as {kind, data} items. The loader upserts each
+# permission first, without touching its `roles`, then sets the role's `permissions`. That
+# matters because Infrahub creates some of these permissions on first start for its built-in
+# roles (General Access, Proposed Change Reviewer, Anonymous User):
+#   - setting `roles` on a permission instead would replace those links and strip the built-in roles
+#   - referencing a permission by HFID fails, because the CoreBasePermission generic has no HFID
+# The permissions Infrahub already creates carry no description here, so the upsert keeps theirs.
+#
+# Loaded on the default branch without --branch, because accounts, account groups and
+# global permissions are branch-agnostic in Infrahub.
+#
+# The passwords are demo values. Every load sets them back to these values.
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: CoreAccountRole
+  data:
+    - name: read-only-role
+      permissions:
+        - kind: CoreObjectPermission
+          data: {namespace: "*", name: "*", action: view, decision: 6}
+        - kind: CoreObjectPermission
+          data: {namespace: "*", name: "*", action: create, decision: 1, description: Deny object creation}
+        - kind: CoreObjectPermission
+          data: {namespace: "*", name: "*", action: update, decision: 1, description: Deny object updates}
+        - kind: CoreObjectPermission
+          data: {namespace: "*", name: "*", action: delete, decision: 1, description: Deny object deletion}
+    - name: schema-reviewer-role
+      permissions:
+        - kind: CoreGlobalPermission
+          data: {action: manage_schema, decision: 6}
+        - kind: CoreGlobalPermission
+          data: {action: review_proposed_change, decision: 6}
+        - kind: CoreGlobalPermission
+          data: {action: edit_default_branch, decision: 6}
+        - kind: CoreObjectPermission
+          data:
+            namespace: "*"
+            name: "*"
+            action: any
+            decision: 6
+            description: Allow every action on all objects in every branch
+---
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: CoreAccountGroup
+  data:
+    - name: read-only-users
+      description: Users with read-only access to Infrahub
+      roles: [read-only-role]
+    - name: schema-reviewers
+      description: Users who can manage schemas and review proposed changes
+      roles: [schema-reviewer-role]
+---
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: CoreAccount
+  data:
+    - name: emma
+      password: emma123
+      account_type: User
+      description: Read-only user account
+      member_of_groups: [read-only-users]
+    - name: otto
+      password: otto123
+      account_type: User
+      description: Schema reviewer with full object permissions
+      member_of_groups: [schema-reviewers]

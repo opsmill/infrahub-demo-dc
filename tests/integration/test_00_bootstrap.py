@@ -147,3 +147,88 @@ async def test_event_actions_and_triggers_loaded(async_client_main: InfrahubClie
     rule_names = {node.name.value for node in rules}
     expected_rules = {"dc-on-create", "pop-on-create", "segment-on-create"}
     assert expected_rules <= rule_names, f"Trigger rules missing: {sorted(expected_rules - rule_names)}"
+
+
+ROLE_PERMISSIONS_QUERY = """
+query {
+  CoreAccountRole {
+    edges {
+      node {
+        name { value }
+        permissions {
+          edges {
+            node {
+              ... on CoreObjectPermission {
+                namespace { value }
+                name { value }
+                action { value }
+                decision { value }
+              }
+              ... on CoreGlobalPermission {
+                action { value }
+                decision { value }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+"""
+"""Every role with its permissions, each rendered by :func:`_permission_key`."""
+
+EXPECTED_ROLE_PERMISSIONS = {
+    "read-only-role": {"*:*:view:6", "*:*:create:1", "*:*:update:1", "*:*:delete:1"},
+    "schema-reviewer-role": {"manage_schema:6", "review_proposed_change:6", "edit_default_branch:6", "*:*:any:6"},
+    # Built-in roles Infrahub creates on first start that share permissions with the demo roles.
+    # Loading the demo roles must leave these links in place.
+    "General Access": {"*:*:view:6", "manage_schema:6"},
+    "Proposed Change Reviewer": {"edit_default_branch:6", "review_proposed_change:6"},
+    "Anonymous User": {"*:*:view:6"},
+}
+"""Permissions each role must hold after the RBAC objects load; built-in roles may hold more."""
+
+
+def _permission_key(permission: dict[str, Any]) -> str:
+    """Render a permission as its attribute values joined by colons, in query order.
+
+    Args:
+        permission: One permission node from :data:`ROLE_PERMISSIONS_QUERY`.
+
+    Returns:
+        ``namespace:name:action:decision`` for an object permission, ``action:decision`` for a global one.
+    """
+    return ":".join(str(attribute["value"]) for attribute in permission.values())
+
+
+async def test_rbac_objects_load_idempotently(
+    async_client_main: InfrahubClient, infrahub_bootstrap: dict[str, Any]
+) -> None:
+    """The demo accounts load from ``objects/rbac`` twice, leaving the built-in roles intact.
+
+    The second load proves the file can be rerun by ``invoke bootstrap``. The built-in role
+    assertions guard against the file setting ``roles`` on a permission, which replaces the links
+    Infrahub created on first start instead of adding to them.
+    """
+    for _ in range(2):
+        h.load_objects(c.RBAC_OBJECTS_PATH, address=infrahub_bootstrap["address"])
+
+    result = await async_client_main.execute_graphql(query=ROLE_PERMISSIONS_QUERY)
+    held = {
+        edge["node"]["name"]["value"]: {
+            _permission_key(permission["node"]) for permission in edge["node"]["permissions"]["edges"]
+        }
+        for edge in result["CoreAccountRole"]["edges"]
+    }
+    for role, expected in EXPECTED_ROLE_PERMISSIONS.items():
+        missing = sorted(expected - held.get(role, set()))
+        assert not missing, f"Role {role!r} is missing permissions after loading {c.RBAC_OBJECTS_PATH}: {missing}"
+
+    accounts = await async_client_main.filters(
+        kind="CoreAccount", name__values=["emma", "otto"], include=["member_of_groups"], prefetch_relationships=True
+    )
+    groups = {
+        account.name.value: {group.peer.name.value for group in account.member_of_groups.peers} for account in accounts
+    }
+    assert groups == {"emma": {"read-only-users"}, "otto": {"schema-reviewers"}}, f"Unexpected memberships: {groups}"
