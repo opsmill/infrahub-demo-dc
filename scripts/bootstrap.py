@@ -13,7 +13,7 @@ Bootstrap Process (7 steps):
 3. Load Bootstrap Data - Create foundation objects (locations, platforms, roles,
                          manufacturers, device types, ASNs, IP prefixes, pools, designs)
 4. Load Security Data - Create security zones, policies, and rules
-5. Create Users & Roles - Set up user accounts (emma, otto) with permissions
+5. Create Users & Roles - Load user accounts (emma, otto), roles and permissions from objects/rbac
 6. Add Repository - Register demo-dc Git repository (local or GitHub)
 7. Load Event Actions - Configure automation triggers (optional, may need repository sync)
 
@@ -315,7 +315,7 @@ def main(branch: str = "main") -> int:
     4. Load menu definitions (UI navigation structure)
     5. Load bootstrap data (locations, platforms, roles, devices, etc.)
     6. Load security data (zones, policies, rules)
-    7. Create user accounts and roles (emma, otto)
+    7. Load user accounts and roles (emma, otto) from objects/rbac
     8. Add demo-dc Git repository (local or GitHub)
     9. Wait for repository sync (120 seconds)
     10. Load event actions (optional - may fail if repo not synced)
@@ -427,7 +427,8 @@ def main(branch: str = "main") -> int:
         {
             "step": "[5/7]",
             "description": "Creating user accounts and roles",
-            "command": "uv run python scripts/create_users_roles.py",
+            # No --branch: accounts, account groups and global permissions are branch-agnostic
+            "command": "uv run infrahubctl object load objects/rbac/",
             "color": "bright_blue",
             "icon": "👥",
         },

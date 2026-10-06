@@ -84,6 +84,7 @@ MENU_PATH = "menus/menu-full.yml"
 BOOTSTRAP_OBJECTS_PATH = "objects/bootstrap"
 SECURITY_OBJECTS_PATH = "objects/security"
 EVENT_OBJECTS_PATH = "objects/events"
+RBAC_OBJECTS_PATH = "objects/rbac"
 
 # --- topology fixtures ---------------------------------------------------------------------------
 
