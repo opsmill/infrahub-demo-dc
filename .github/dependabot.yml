@@ -1,48 +1,25 @@
 ---
 version: 2
 updates:
-  # Maintain dependencies for uv. Only `uv`, not `pip` as well: both ecosystems read the same
-  # `pyproject.toml`/`uv.lock` for `/`, so declaring both produced two pull requests per bump.
+  # Regular dependency upgrades target main after cooldown.
+  # Security updates target the default branch and are reviewed manually.
   - package-ecosystem: "uv"
     directory: "/"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-      time: "12:00"
-    open-pull-requests-limit: 10
     target-branch: main
-    labels:
-      - "dependencies"
-    groups:
-      all:
-        # infrahub-sdk is excluded here and grouped alone below, so an SDK bump gets a reviewable
-        # pull request of its own instead of being buried in a bundle.
-        #
-        # `exclude-patterns`, not a regex lookahead in `patterns`. Dependabot matches these as globs,
-        # so the previous `^(?!infrahub-sdk$).*` matched nothing and the group silently covered no
-        # package -- every dependency arrived as its own pull request.
-        #
-        # The trailing `*` is not decoration: Dependabot names the dependency by its specifier
-        # including extras, `infrahub-sdk[all,ctl]`, so a bare `infrahub-sdk` matches neither the
-        # exclusion here nor the group below.
-        patterns:
-          - "*"
-        exclude-patterns:
-          - "infrahub-sdk*"
-      infrahub-sdk:
-        patterns:
-          - "infrahub-sdk*"
-  # Maintain dependencies for GitHub Actions
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+      semver-minor-days: 14
+      semver-major-days: 30
+
   - package-ecosystem: "github-actions"
     directory: "/"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-      time: "09:00"
     target-branch: main
-    labels:
-      - "dependencies"
-    groups:
-      all-actions:
-        patterns:
-          - "*"
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+      semver-major-days: 30
+    ignore:
+      - dependency-name: "github/gh-aw-actions/**"  # managed by gh aw compile
