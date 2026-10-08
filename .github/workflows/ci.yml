@@ -197,22 +197,18 @@ jobs:
         # core regressions and infrastructure failures on exactly the bump PRs whose only QA is
         # this run.
         run: exec tini -s -g -- uv run invoke test-integration --tier=core
-      - name: "Run the full integration tier (advisory)"
+      - name: "Run the full integration tier (blocking for Infrahub bumps)"
         id: full
-        # Reports the whole suite without blocking: Infrahub intermittently returns HTTP 500 while
-        # resolving its own CoreGeneratorGroup / CoreGraphQLQueryGroup members -- intermittent, so
-        # not xfail-able. Delete this step's
-        # `continue-on-error` and collapse the two steps back into one blocking `--tier=full` run
-        # the day that fault is fixed. A `full` scope boots the stack twice; that is bounded to
-        # Infrahub bumps and explicit full-tier dispatches. No `always()`: a failed core run
-        # already blocks the merge, so the advisory hour of huge-runner time would buy nothing.
+        # A full run blocks release bumps. Explicit full-tier rehearsals remain
+        # advisory while the upstream group-resolution fault is intermittent.
+        # A failed core run already blocks the merge, so the full run is skipped.
         if: needs.files-changed.outputs.run_full == 'true'
-        continue-on-error: true
+        # Release bumps merge only when the full end-to-end tier succeeds.
+        # Explicit full-tier rehearsals remain advisory while upstream is flaky.
+        continue-on-error: ${{ !startsWith(github.head_ref, 'update-infrahub-') || startsWith(github.head_ref, 'update-infrahub-sdk-') }}
         run: exec tini -s -g -- uv run invoke test-integration --tier=full
-      - name: "Report what the advisory full tier did"
-        # `continue-on-error` above keeps the job green, so the checks list stops carrying the
-        # advisory signal -- write it into the run summary instead. `skipped` is a real outcome
-        # (the core step failed first). Delete this step together with the advisory one.
+      - name: "Report what the full tier did"
+        # Keep the full result visible even for an advisory rehearsal.
         if: always() && needs.files-changed.outputs.run_full == 'true'
         env:
           OUTCOME: ${{ steps.full.outcome }}
@@ -221,12 +217,11 @@ jobs:
             echo "### Integration tiers"
             echo ""
             echo "- **core** (blocking): this job's own conclusion is the merge gate."
-            echo "- **full** (advisory, non-blocking): \`${OUTCOME}\`"
+            echo "- **full** (blocking for Infrahub bumps, advisory otherwise): \`${OUTCOME}\`"
             if [ "${OUTCOME}" = "failure" ]; then
               echo ""
-              echo "**The advisory full tier FAILED.** It does not block this merge -- see the"
-              echo "upstream CoreGeneratorGroup / CoreGraphQLQueryGroup resolution fault -- but read"
-              echo "the log before assuming that fault is what happened."
+              echo "**The full tier FAILED.** Infrahub bump PRs cannot merge until it passes."
+              echo "For other runs, check the log before attributing it to the upstream fault."
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 
