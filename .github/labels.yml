@@ -182,3 +182,7 @@
 - name: "cd/preview"
   description: "Deploy preview branch"
   color: "d77e96"
+
+- name: "dependencies"
+  description: "Pull requests that update a dependency file"
+  color: "0366d6"

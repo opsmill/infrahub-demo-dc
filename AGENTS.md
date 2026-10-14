@@ -51,8 +51,9 @@ it does not use `invoke start`. It is split into two tiers by marker: `core` run
 request, and `extended` adds the second vendor data center, the POP and segment services, day-two
 operations and the conflict workflow. `ci.yml` selects it for a pull request whose branch bumps the
 Infrahub version (`update-infrahub-*`, but not `update-infrahub-sdk-*`) and for a manual run of the
-CI workflow with `tier=full`. That tier does not block a merge, because an upstream Infrahub fault
-stops it passing reliably — see
+CI workflow with `tier=full`. On an Infrahub-version bump pull request the full suite runs once and
+blocks the merge. On a manual run it does not block, because an upstream Infrahub fault stops it
+passing reliably — see
 [tests/AGENTS.md](./tests/AGENTS.md), which records the signature and what to check before blaming
 the demo.
 

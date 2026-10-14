@@ -102,12 +102,12 @@ Modules are marked `core` or `extended`:
   but not `update-infrahub-sdk-*`), and on a manual run of the CI workflow with its `tier` input set
   to `full`. The `scope` step in `.github/workflows/ci.yml` picks the tier.
 
-The extended tier runs under `continue-on-error` and so does not block a merge, and that is a
-**temporary concession**, not the design. A version bump is the change most likely to break a
-workflow and the least likely to be caught by reading the diff, so it is exactly what this tier
-exists to cover. It cannot block while the upstream fault below stands: an intermittent failure
-would leave every bump pull request red, which trains everyone to ignore it. Delete the
-`continue-on-error` line in `ci.yml` once that fault is fixed.
+On a pull request that bumps the Infrahub version, the extended tier blocks the merge. On an
+Infrahub-only bump branch (no `-sdk-` in the name), CI runs the full suite once instead of core and
+then full. A version bump is the change most likely to break a workflow and the least likely to be
+caught by reading the diff, so it is exactly what this tier exists to cover. On a manual run of the
+CI workflow the tier runs under `continue-on-error` and does not block, because of the upstream
+fault below. Delete the `continue-on-error` line in `ci.yml` once that fault is fixed.
 
 Dispatch the tier deliberately when changing a generator or a transform, and read any failure
 against the known fault before concluding the demo is broken.

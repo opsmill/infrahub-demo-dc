@@ -79,9 +79,10 @@ ones merged. They are split into two tiers:
   and the conflict workflow. It runs on a pull request that bumps the Infrahub version, and on a
   manual run of the CI workflow with its `tier` input set to `full`.
 
-The extended tier does not block a merge, because it cannot currently pass: Infrahub intermittently
-fails to resolve a member of its own internal generator group, which fails whichever generator is
-running at the time. Dispatch it deliberately when changing a generator or a transform, and read a
+On a pull request that bumps the Infrahub version, a failure in the extended tier blocks the merge.
+On a manual run it does not, because it does not pass reliably: Infrahub intermittently fails to
+resolve a member of its own internal generator group, which fails whichever generator is running at
+the time. Dispatch it deliberately when changing a generator or a transform, and read a
 failure there against that known fault before assuming the demo is broken. To test a specific
 Infrahub version, set `INFRAHUB_TESTING_IMAGE_VER`.
 
