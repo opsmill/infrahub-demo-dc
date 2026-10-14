@@ -1,0 +1,24 @@
+tests/integration/helpers.py
+  s_dbffae5f29ed4d::t_48b776be530e0b 770-773
+  s_dbffae5f29ed4d::t_6fcdfd72ff0a15 812
+  s_dbffae5f29ed4d::t_7fc76c703309f2 23
+  s_dbffae5f29ed4d::t_d1263e576ec932 701-754
+tests/AGENTS.md
+  s_dbffae5f29ed4d::t_4a3b13bc939ede 233-258
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "934300a189ce09394c6ce8225c422573070b6095",
+  "prompts": {},
+  "sessions": {
+    "s_dbffae5f29ed4d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f6ff1ea6-4dac-4731-83ea-612451057d6d",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Pol Michel <polmichel29@gmail.com>"
+    }
+  }
+}
