@@ -1,0 +1,30 @@
+# The image build uses the repository root as context. Keep the context small:
+# the Dockerfile copies only service_catalog/, docs/static/img/ and objects/dc/.
+.git
+.github
+.venv
+.env
+.mypy_cache
+.pytest_cache
+.ruff_cache
+__pycache__
+*.py[cod]
+.agents
+.specify
+dev
+checks
+generators
+transforms
+templates
+schemas
+queries
+menus
+scripts
+tests
+docs/**
+!docs/static/img/**
+objects/**
+!objects/dc/**
+service_catalog/tests
+service_catalog/AGENTS.md
+service_catalog/pyrightconfig.json

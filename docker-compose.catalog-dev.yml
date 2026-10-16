@@ -1,0 +1,15 @@
+---
+# Builds the Streamlit Service Catalog from this checkout and mounts its
+# sources, so edits show up without rebuilding.
+#
+# `invoke start --rebuild`, or INFRAHUB_SERVICE_CATALOG_BUILD=true in .env,
+# layers this file on top of docker-compose.override.yml.
+services:
+  streamlit-service-catalog:
+    build:
+      context: .
+      dockerfile: service_catalog/Dockerfile
+    volumes:
+      - ./service_catalog:/app
+      - ./objects:/objects:ro
+      - ./docs/static/img:/app/assets:ro

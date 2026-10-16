@@ -23,6 +23,12 @@ dependencies = [
 ]
 
 [dependency-groups]
+# Packages of the Streamlit Service Catalog image (service_catalog/Dockerfile). The image build
+# reads their versions from uv.lock, so they move through the same bump pull requests as the rest.
+catalog = [
+    "streamlit>=1.30.0",
+    "pandas>=2.0.0",
+]
 dev = [
     "infrahub-testcontainers>=1.11.5",
     "mypy>=2.3.1",

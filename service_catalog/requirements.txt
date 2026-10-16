@@ -1,6 +1,11 @@
-streamlit>=1.30.0
-infrahub-sdk>=1.15.1,<2.0.0
-requests>=2.31.0
-pyyaml>=6.0
-pandas>=2.0.0
-python-dotenv>=1.0.0
+# Packages the Streamlit Service Catalog image installs.
+#
+# Names only, on purpose: the versions come from uv.lock, and the Docker build
+# constrains every package here to the locked version. Move a version floor in
+# pyproject.toml (the `catalog` dependency group for streamlit and pandas), not here.
+streamlit
+infrahub-sdk
+requests
+pyyaml
+pandas
+python-dotenv

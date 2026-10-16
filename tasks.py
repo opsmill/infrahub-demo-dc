@@ -24,33 +24,41 @@ console = Console()
 INFRAHUB_VERSION = os.getenv("INFRAHUB_VERSION", "stable")
 INFRAHUB_ENTERPRISE = os.getenv("INFRAHUB_ENTERPRISE", "false").lower() == "true"
 INFRAHUB_SERVICE_CATALOG = os.getenv("INFRAHUB_SERVICE_CATALOG", "false").lower() == "true"
+# Build the service catalog image from this checkout instead of pulling the published one,
+# and bind-mount its sources for live editing.
+INFRAHUB_SERVICE_CATALOG_BUILD = os.getenv("INFRAHUB_SERVICE_CATALOG_BUILD", "false").lower() == "true"
 INFRAHUB_GIT_LOCAL = os.getenv("INFRAHUB_GIT_LOCAL", "false").lower() == "true"
 MAIN_DIRECTORY_PATH = Path(__file__).parent
 INFRAHUB_PROJECT_NAME = os.getenv("INFRAHUB_PROJECT_NAME", MAIN_DIRECTORY_PATH.name)
 
 
 # Download compose file and use with override
-def get_compose_command() -> str:
+def get_compose_command(local_build: bool = False) -> str:
     """Generate docker compose command with override support.
 
     Supports layered compose files:
     1. docker-compose.yml (base, downloaded or local)
     2. docker-compose.override.yml (committed overrides, uses env vars for ports)
+    3. docker-compose.catalog-dev.yml, only with ``local_build``: builds the service catalog
+       image from this checkout and mounts its sources
 
     The project name is controlled by INFRAHUB_PROJECT_NAME env var,
     defaulting to the directory name.
     """
     local_compose_file = MAIN_DIRECTORY_PATH / "docker-compose.yml"
     override_file = MAIN_DIRECTORY_PATH / "docker-compose.override.yml"
+    catalog_dev_file = MAIN_DIRECTORY_PATH / "docker-compose.catalog-dev.yml"
 
     base_cmd = f"docker compose -p {INFRAHUB_PROJECT_NAME}"
+    extra_files = ""
+    if override_file.exists():
+        extra_files += f" -f {override_file}"
+    if local_build and catalog_dev_file.exists():
+        extra_files += f" -f {catalog_dev_file}"
 
     # If we have a local docker-compose.yml, use it directly
     if local_compose_file.exists():
-        cmd = f"{base_cmd} -f {local_compose_file}"
-        if override_file.exists():
-            cmd += f" -f {override_file}"
-        return cmd
+        return f"{base_cmd} -f {local_compose_file}{extra_files}"
 
     # Fall back to downloading from infrahub.opsmill.io
     if INFRAHUB_ENTERPRISE:
@@ -58,10 +66,7 @@ def get_compose_command() -> str:
     else:
         base_url = f"https://infrahub.opsmill.io/{INFRAHUB_VERSION}"
 
-    cmd = f"curl -s {base_url} | {base_cmd} -f -"
-    if override_file.exists():
-        cmd += f" -f {override_file}"
-    return cmd
+    return f"curl -s {base_url} | {base_cmd} -f -{extra_files}"
 
 
 def get_compose_source() -> str:
@@ -150,7 +155,11 @@ def info(context: Context) -> None:
 
 @task(optional=["rebuild"])
 def start(context: Context, rebuild: bool = False) -> None:
-    """Start all containers (use --rebuild to force rebuild images)."""
+    """Start all containers.
+
+    The service catalog runs the published image from registry.opsmill.io. Use --rebuild
+    (or set INFRAHUB_SERVICE_CATALOG_BUILD=true) to build it from this checkout instead.
+    """
     edition = "Enterprise" if INFRAHUB_ENTERPRISE else "Community"
 
     # Get infrahub-sdk version
@@ -161,8 +170,10 @@ def start(context: Context, rebuild: bool = False) -> None:
     except Exception:
         sdk_version = "unknown"
 
+    local_build = rebuild or INFRAHUB_SERVICE_CATALOG_BUILD
+
     # Build the compose command with optional service catalog profile
-    compose_cmd = COMPOSE_COMMAND
+    compose_cmd = get_compose_command(local_build)
     if INFRAHUB_SERVICE_CATALOG:
         compose_cmd = f"{compose_cmd} --profile service-catalog"
 
@@ -176,12 +187,16 @@ def start(context: Context, rebuild: bool = False) -> None:
         status_msg += "\n[cyan]Service Catalog:[/cyan] Enabled"
     if INFRAHUB_GIT_LOCAL:
         status_msg += "\n[cyan]Local Git Repository:[/cyan] Enabled"
-    if rebuild:
-        status_msg += "\n[yellow]Rebuild:[/yellow] Enabled"
+    if local_build:
+        status_msg += "\n[yellow]Local image build:[/yellow] Enabled"
 
     console.print(Panel(status_msg, border_style="green", box=box.SIMPLE))
 
-    build_flag = "--build" if rebuild else ""
+    if INFRAHUB_SERVICE_CATALOG and not local_build:
+        # The image uses a moving tag, so refresh it. An offline run keeps the local copy.
+        context.run(f"{compose_cmd} pull --quiet --ignore-pull-failures streamlit-service-catalog")
+
+    build_flag = "--build" if local_build else ""
     context.run(f"{compose_cmd} up -d {build_flag}")
 
     console.print("[green]✓[/green] Infrahub started successfully")

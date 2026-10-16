@@ -31,10 +31,10 @@ services:
     volumes:
       - ./:/upstream
 
+  # Published by .github/workflows/publish-images.yml. To build it from this
+  # checkout instead, see docker-compose.catalog-dev.yml.
   streamlit-service-catalog:
-    build:
-      context: ./service_catalog
-      dockerfile: Dockerfile
+    image: ${STREAMLIT_IMAGE:-registry.opsmill.io/opsmill/infrahub-demo-dc-streamlit:main}
     container_name: service-catalog
     ports:
       - "${STREAMLIT_PORT:-8501}:8501"
@@ -44,10 +44,6 @@ services:
       - INFRAHUB_API_TOKEN=${INFRAHUB_API_TOKEN:-06438eb2-8019-4776-878c-0941b1f1d1ec}
       - DEFAULT_BRANCH=main
       - GENERATOR_WAIT_TIME=60
-    volumes:
-      - ./service_catalog:/app
-      - ./objects:/objects:ro
-      - ./docs/static/img:/app/assets:ro
     depends_on:
       - infrahub-server
     profiles:

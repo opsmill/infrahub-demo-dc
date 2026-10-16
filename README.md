@@ -34,19 +34,15 @@ This repository includes an optional Streamlit-based Service Catalog that provid
 
 ### Quick Start
 
-To start Infrahub with the Service Catalog enabled:
+To start Infrahub with the Service Catalog enabled, set `INFRAHUB_SERVICE_CATALOG=true` in `.env`, then run:
 
 ```bash
-docker-compose --profile service-catalog up
+uv run invoke start
 ```
 
-The Service Catalog will be accessible at `http://localhost:8501`
+The Service Catalog will be accessible at `http://localhost:8501`. It runs the published image `registry.opsmill.io/opsmill/infrahub-demo-dc-streamlit`, so there is nothing to build. To build it from this checkout instead, run `uv run invoke start --rebuild`.
 
-To start Infrahub without the Service Catalog:
-
-```bash
-docker-compose up
-```
+To start Infrahub without the Service Catalog, leave `INFRAHUB_SERVICE_CATALOG` unset or set it to `false`.
 
 ### Documentation
 
