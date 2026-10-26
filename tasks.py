@@ -210,6 +210,21 @@ def bootstrap_py(context: Context, branch: str = "main") -> None:
     context.run(f"uv run python scripts/bootstrap.py --branch {branch}", pty=True)
 
 
+@task(name="sandbox-setup")
+def sandbox_setup(context: Context) -> None:
+    """Build the whole demo on an Infrahub that already runs (the public sandbox entry point).
+
+    The public sandbox pipeline runs this after it deploys an empty Infrahub. It reads only
+    environment variables, starts no container and never calls localhost:
+
+    - ``INFRAHUB_ADDRESS`` and ``INFRAHUB_API_TOKEN``: the Infrahub to build the demo on
+    - ``INFRAHUB_REPO_URL`` and ``INFRAHUB_REPO_REF``: the repository to register
+
+    It runs the same steps as ``invoke bootstrap`` on main, so running it again gives the same result.
+    """
+    context.run("uv run python scripts/bootstrap.py --branch main", pty=True)
+
+
 def _load_virtualization_objects(context: Context, branch: str, deployment: str | None = None) -> None:
     """Load virtualization objects (clusters, physical hosts, VMs) onto the given branch.
 

@@ -313,6 +313,18 @@ uv run infrahubctl object load objects/events/
 Loading schemas and data can take several minutes. Watch the console output to monitor progress.
 :::
 
+### Build the demo on an Infrahub that already runs
+
+To load the demo into an empty Infrahub that runs elsewhere, for example a public sandbox, point the variables at it and run `sandbox-setup`:
+
+```bash
+export INFRAHUB_ADDRESS=https://infrahub.example.com
+export INFRAHUB_API_TOKEN=<token>
+uv run invoke sandbox-setup
+```
+
+`sandbox-setup` runs the same steps as `uv run invoke bootstrap` on the `main` branch and starts no container. It waits until Infrahub has imported the repository before it loads the event actions, and stops if the import fails. To register a fork or another ref, set `INFRAHUB_REPO_URL` and `INFRAHUB_REPO_REF`.
+
 ## Step 8: verify the installation
 
 To verify that everything is set up correctly:
