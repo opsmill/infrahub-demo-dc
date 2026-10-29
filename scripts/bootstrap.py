@@ -286,10 +286,48 @@ def repository_name(repo_file: str) -> str:
     return str(yaml.safe_load(Path(repo_file).read_text())["spec"]["data"][0]["name"])
 
 
+def check_repository_configuration(repo_file: str, branch: str) -> bool:
+    """Allow fresh registration or an unchanged repository, without updating its configuration.
+
+    Object load uses upsert, which does not schedule the read-only repository update's import
+    in Infrahub 1.11.8. Its previous in-sync status cannot prove the changed configuration was
+    imported. Reject a change before loading the object rather than accepting that stale status.
+    """
+    spec = yaml.safe_load(Path(repo_file).read_text())["spec"]
+    desired = spec["data"][0]
+    client = InfrahubClientSync(address=INFRAHUB_ADDRESS)
+    repository = client.get(
+        kind="CoreGenericRepository",
+        name__value=desired["name"],
+        branch=branch,
+        fragment=True,
+        raise_when_missing=False,
+    )
+    if repository is None:
+        return True
+
+    ref_field = "ref" if spec["kind"] == "CoreReadOnlyRepository" else "default_branch"
+    if repository.get_kind() == spec["kind"] and all(
+        getattr(repository, field).value == desired[field] for field in ("location", ref_field)
+    ):
+        return True
+
+    console.print(
+        f"Repository {desired['name']} on Infrahub branch {branch} has a different kind, URL or ref. "
+        "Bootstrap cannot verify a new import after changing an existing repository. "
+        "Restore INFRAHUB_GIT_LOCAL, INFRAHUB_REPO_URL and INFRAHUB_REPO_REF to match the repository "
+        "shown in Infrahub, or use a fresh Infrahub instance to register the new configuration.",
+        style="bold red",
+        markup=False,
+    )
+    return False
+
+
 def wait_for_repository_sync(
     name: str,
     timeout: int = REPOSITORY_SYNC_TIMEOUT,
     poll_interval: int = REPOSITORY_SYNC_POLL_INTERVAL,
+    branch: str = "main",
 ) -> bool:
     """
     Wait until Infrahub has imported the repository.
@@ -303,6 +341,7 @@ def wait_for_repository_sync(
         name: Name of the repository in Infrahub
         timeout: Seconds to wait before giving up
         poll_interval: Seconds between two checks
+        branch: Infrahub branch containing the repository (default: "main")
 
     Returns:
         True when the repository is in sync, False when the import failed or timed out
@@ -312,7 +351,9 @@ def wait_for_repository_sync(
     status = "unknown"
     with console.status(f"[bold bright_yellow]🔄 Waiting for the import of repository {name}[/bold bright_yellow]"):
         while time.monotonic() < deadline:
-            repository = client.get(kind="CoreGenericRepository", name__value=name, raise_when_missing=False)
+            repository = client.get(
+                kind="CoreGenericRepository", name__value=name, branch=branch, raise_when_missing=False
+            )
             status = repository.sync_status.value if repository else "missing"  # type: ignore[attr-defined]
             if status == "in-sync":
                 msg = "[bold bright_green on black]✓[/bold bright_green on black] "
@@ -501,6 +542,9 @@ def main(branch: str = "main") -> int:
         location = INFRAHUB_REPO_URL or "https://github.com/opsmill/infrahub-demo-dc.git"
         console.print(f"[dim]Using GitHub repository: {location} ({INFRAHUB_REPO_REF or 'main'})[/dim]")
 
+    if not check_repository_configuration(repo_file, branch=branch):
+        return 1
+
     # Execute repository addition command
     # capture_output=True prevents streaming to terminal (we handle output manually)
     result = subprocess.run(
@@ -523,6 +567,7 @@ def main(branch: str = "main") -> int:
         else:
             console.print("[bold red]✗[/bold red] 📚 [red]Failed to add repository[/red]")
             console.print(f"[dim]{result.stderr}[/dim]")
+            return 1
 
     console.print(Rule(style="dim bright_magenta"))
 
@@ -532,7 +577,7 @@ def main(branch: str = "main") -> int:
     # After adding the repository, Infrahub clones it and imports its generators, transforms and
     # checks. The event actions reference those generators, so wait until the import has ended.
     console.print()  # Add spacing
-    if not wait_for_repository_sync(repository_name(repo_file)):
+    if not wait_for_repository_sync(repository_name(repo_file), branch=branch):
         console.print("\n[bold red]✗ Bootstrap failed![/bold red]")
         return 1
 

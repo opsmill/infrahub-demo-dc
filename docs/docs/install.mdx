@@ -328,7 +328,9 @@ export INFRAHUB_API_TOKEN=<token>
 uv run invoke sandbox-setup
 ```
 
-`sandbox-setup` runs the same steps as `uv run invoke bootstrap` on the `main` branch and starts no container. It waits until Infrahub has imported the repository before it loads the event actions, and stops if the import fails. To register a fork or another ref, set `INFRAHUB_REPO_URL` and `INFRAHUB_REPO_REF`.
+`sandbox-setup` runs the same steps as `uv run invoke bootstrap` on the `main` branch and starts no container. It waits until Infrahub has imported the repository before it loads the event actions, and stops if the import fails. To register a fork or another ref, set `INFRAHUB_REPO_URL` and `INFRAHUB_REPO_REF` before the first bootstrap.
+
+Reruns must use the existing repository's kind, URL and ref. Bootstrap rejects changes to these settings before loading the repository or event actions: an existing `in-sync` status does not prove the new configuration was imported. Restore the settings to match the repository shown in Infrahub, or use a fresh Infrahub instance for a different configuration.
 
 ## Step 8: verify the installation
 
