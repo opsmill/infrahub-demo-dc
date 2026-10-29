@@ -883,6 +883,13 @@ nodes:
     order_by:
       - index__value
     display_label: "{{ name__value }}"
+    # A rule is identified by its ACL and its index, so loading the object file again updates the
+    # rules instead of adding a second copy of each
+    human_friendly_id:
+      - acl__name__value
+      - index__value
+    uniqueness_constraints:
+      - ["acl", "index__value"]
     attributes:
       - name: index
         kind: Number

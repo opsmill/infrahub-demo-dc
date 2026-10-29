@@ -43,9 +43,14 @@ Usage:
 
 Environment Variables:
 ======================
+    INFRAHUB_ADDRESS: Infrahub to load the demo into (default: http://localhost:8000).
+    INFRAHUB_API_TOKEN: Token for that Infrahub.
     INFRAHUB_GIT_LOCAL: Set to 'true' to use local repository (/upstream mount)
                        instead of GitHub. Requires docker-compose.override.yml
                        volume mount configuration.
+    INFRAHUB_REPO_URL: Repository to register when INFRAHUB_GIT_LOCAL is off
+                       (default: the opsmill repository on GitHub). A fork sets its own.
+    INFRAHUB_REPO_REF: Git ref of that repository (default: main).
 
 Exit Codes:
 ===========
@@ -57,9 +62,13 @@ import argparse
 import os
 import subprocess
 import sys
+import tempfile
 import time
+from pathlib import Path
 
 import requests
+import yaml
+from infrahub_sdk import InfrahubClientSync
 from rich import box
 from rich.console import Console
 from rich.panel import Panel
@@ -69,7 +78,6 @@ from rich.progress import (
     SpinnerColumn,
     TextColumn,
     TimeElapsedColumn,
-    TimeRemainingColumn,
 )
 from rich.rule import Rule
 
@@ -80,13 +88,22 @@ from rich.rule import Rule
 # Initialize Rich console for beautiful terminal output
 console = Console()
 
-# Infrahub connection settings
-INFRAHUB_ADDRESS = "http://localhost:8000"  # Local Infrahub instance
+# Infrahub connection settings: the local stack unless INFRAHUB_ADDRESS names another Infrahub,
+# such as a public sandbox
+INFRAHUB_ADDRESS = os.getenv("INFRAHUB_ADDRESS", "http://localhost:8000")
 
 # Repository mode: local development or GitHub
 # When True, uses /upstream mount for local generator/transform development
 # When False, uses GitHub repository (read-only)
 INFRAHUB_GIT_LOCAL = os.getenv("INFRAHUB_GIT_LOCAL", "false").lower() == "true"
+
+# Repository and ref to register in GitHub mode. Empty keeps the values in objects/git-repo/github.yml
+INFRAHUB_REPO_URL = os.getenv("INFRAHUB_REPO_URL", "")
+INFRAHUB_REPO_REF = os.getenv("INFRAHUB_REPO_REF", "")
+
+# How long the repository import may take before the bootstrap stops, and how often it is checked
+REPOSITORY_SYNC_TIMEOUT = 900
+REPOSITORY_SYNC_POLL_INTERVAL = 5
 
 
 # ============================================================================
@@ -239,64 +256,116 @@ def run_command(command: str, description: str, step: str, color: str = "cyan", 
         return False
 
 
-def wait_for_repository_sync(seconds: int = 120) -> None:
+def repository_file(template: str, url: str, ref: str) -> str:
     """
-    Wait for repository synchronization with visual progress feedback.
-
-    After adding a Git repository to Infrahub, the system needs time to:
-    - Clone the repository contents
-    - Process Python generators and transforms
-    - Make these components available for execution
-
-    This function provides a visual countdown timer to give the repository
-    adequate time to sync before attempting to use its generators/transforms.
-
-    The progress bar displays:
-    - Spinning animation (indicates waiting activity)
-    - Progress bar showing time remaining
-    - Percentage completion
-    - Time elapsed and time remaining counters
+    Return the repository object file to load, with the URL and ref replaced when given.
 
     Args:
-        seconds: Number of seconds to wait (default: 120 seconds / 2 minutes)
+        template: Path of the repository object file in objects/git-repo/
+        url: Repository URL to register instead of the one in the file, or "" to keep it
+        ref: Git ref to register instead of the one in the file, or "" to keep it
 
-    Note:
-        The wait time may need adjustment based on repository size and
-        network speed. For large repositories or slow connections, increase
-        the wait time. For local development (INFRAHUB_GIT_LOCAL=true),
-        syncing is typically faster.
-
-    Example:
-        >>> wait_for_repository_sync(120)  # Wait 2 minutes
-        [7/7] 🔄 Waiting for repository sync ████████████ 100% • 0:02:00 • 0:00:00
-        ✓ Repository sync complete
+    Returns:
+        The template itself when nothing is replaced, else a temporary copy with the new values
     """
-    with Progress(
-        SpinnerColumn(spinner_name="dots12", style="bold bright_yellow"),
-        TextColumn("[progress.description]{task.description}", style="bold white"),
-        BarColumn(
-            bar_width=60,
-            style="yellow",
-            complete_style="bright_green",
-            finished_style="bold bright_green",
-            pulse_style="bright_yellow",
-        ),
-        TextColumn("[bold bright_cyan]{task.percentage:>3.0f}%"),
-        TextColumn("•", style="dim"),
-        TimeElapsedColumn(),
-        TextColumn("•", style="dim"),
-        TimeRemainingColumn(),
-        console=console,
-    ) as progress:
-        task = progress.add_task("[7/7] 🔄 Waiting for repository sync", total=seconds)
+    if not url and not ref:
+        return template
+    spec = yaml.safe_load(Path(template).read_text())
+    repository = spec["spec"]["data"][0]
+    if url:
+        repository["location"] = url
+    if ref:
+        repository["ref"] = ref
+    with tempfile.NamedTemporaryFile("w", suffix=".yml", prefix="git-repo-", delete=False) as rendered:
+        yaml.safe_dump(spec, rendered, sort_keys=False)
+    return rendered.name
 
-        for _ in range(seconds):
-            time.sleep(1)
-            progress.update(task, advance=1)
 
-    msg = "[bold bright_green on black]✓[/bold bright_green on black] "
-    msg += "🔄 [bold bright_yellow]Repository sync complete[/bold bright_yellow]\n"
-    console.print(msg)
+def repository_name(repo_file: str) -> str:
+    """Return the name of the repository that a repository object file registers."""
+    return str(yaml.safe_load(Path(repo_file).read_text())["spec"]["data"][0]["name"])
+
+
+def check_repository_configuration(repo_file: str, branch: str) -> bool:
+    """Allow fresh registration or an unchanged repository, without updating its configuration.
+
+    Object load uses upsert, which does not schedule the read-only repository update's import
+    in Infrahub 1.11.8. Its previous in-sync status cannot prove the changed configuration was
+    imported. Reject a change before loading the object rather than accepting that stale status.
+    """
+    spec = yaml.safe_load(Path(repo_file).read_text())["spec"]
+    desired = spec["data"][0]
+    client = InfrahubClientSync(address=INFRAHUB_ADDRESS)
+    repository = client.get(
+        kind="CoreGenericRepository",
+        name__value=desired["name"],
+        branch=branch,
+        fragment=True,
+        raise_when_missing=False,
+    )
+    if repository is None:
+        return True
+
+    ref_field = "ref" if spec["kind"] == "CoreReadOnlyRepository" else "default_branch"
+    if repository.get_kind() == spec["kind"] and all(
+        getattr(repository, field).value == desired[field] for field in ("location", ref_field)
+    ):
+        return True
+
+    console.print(
+        f"Repository {desired['name']} on Infrahub branch {branch} has a different kind, URL or ref. "
+        "Bootstrap cannot verify a new import after changing an existing repository. "
+        "Restore INFRAHUB_GIT_LOCAL, INFRAHUB_REPO_URL and INFRAHUB_REPO_REF to match the repository "
+        "shown in Infrahub, or use a fresh Infrahub instance to register the new configuration.",
+        style="bold red",
+        markup=False,
+    )
+    return False
+
+
+def wait_for_repository_sync(
+    name: str,
+    timeout: int = REPOSITORY_SYNC_TIMEOUT,
+    poll_interval: int = REPOSITORY_SYNC_POLL_INTERVAL,
+    branch: str = "main",
+) -> bool:
+    """
+    Wait until Infrahub has imported the repository.
+
+    After adding a Git repository, Infrahub clones it and imports .infrahub.yml: the generators,
+    transforms and checks. The event actions load only once that import has ended, so wait for
+    the repository's sync status instead of a fixed time: the import takes longer on a remote
+    Infrahub than on a laptop.
+
+    Args:
+        name: Name of the repository in Infrahub
+        timeout: Seconds to wait before giving up
+        poll_interval: Seconds between two checks
+        branch: Infrahub branch containing the repository (default: "main")
+
+    Returns:
+        True when the repository is in sync, False when the import failed or timed out
+    """
+    client = InfrahubClientSync(address=INFRAHUB_ADDRESS)
+    deadline = time.monotonic() + timeout
+    status = "unknown"
+    with console.status(f"[bold bright_yellow]🔄 Waiting for the import of repository {name}[/bold bright_yellow]"):
+        while time.monotonic() < deadline:
+            repository = client.get(
+                kind="CoreGenericRepository", name__value=name, branch=branch, raise_when_missing=False
+            )
+            status = repository.sync_status.value if repository else "missing"  # type: ignore[attr-defined]
+            if status == "in-sync":
+                msg = "[bold bright_green on black]✓[/bold bright_green on black] "
+                msg += "🔄 [bold bright_yellow]Repository sync complete[/bold bright_yellow]\n"
+                console.print(msg)
+                return True
+            if status.startswith("error"):
+                console.print(f"[bold red]✗[/bold red] 🔄 [red]Repository {name} import failed: {status}[/red]")
+                return False
+            time.sleep(poll_interval)
+    console.print(f"[bold red]✗[/bold red] 🔄 [red]Repository {name} still {status} after {timeout} s[/red]")
+    return False
 
 
 def main(branch: str = "main") -> int:
@@ -317,8 +386,8 @@ def main(branch: str = "main") -> int:
     6. Load security data (zones, policies, rules)
     7. Load user accounts and roles (emma, otto) from objects/rbac
     8. Add demo-dc Git repository (local or GitHub)
-    9. Wait for repository sync (120 seconds)
-    10. Load event actions (optional - may fail if repo not synced)
+    9. Wait until the repository import has ended
+    10. Load event actions
     11. Display success message with next steps
 
     Visual Feedback:
@@ -335,7 +404,7 @@ def main(branch: str = "main") -> int:
     - Exits immediately if Infrahub is not ready
     - Exits immediately if any required step fails
     - Allows repository addition to fail gracefully (if already exists)
-    - Allows event actions to fail gracefully (optional step)
+    - Exits if the repository import fails or the event actions do not load
 
     Args:
         branch: Infrahub branch to load data into (default: "main")
@@ -469,8 +538,12 @@ def main(branch: str = "main") -> int:
         repo_file = "objects/git-repo/local-dev.yml"
         console.print("[dim]Using local repository: /upstream[/dim]")
     else:
-        repo_file = "objects/git-repo/github.yml"
-        console.print("[dim]Using GitHub repository: https://github.com/opsmill/infrahub-demo-dc.git[/dim]")
+        repo_file = repository_file("objects/git-repo/github.yml", INFRAHUB_REPO_URL, INFRAHUB_REPO_REF)
+        location = INFRAHUB_REPO_URL or "https://github.com/opsmill/infrahub-demo-dc.git"
+        console.print(f"[dim]Using GitHub repository: {location} ({INFRAHUB_REPO_REF or 'main'})[/dim]")
+
+    if not check_repository_configuration(repo_file, branch=branch):
+        return 1
 
     # Execute repository addition command
     # capture_output=True prevents streaming to terminal (we handle output manually)
@@ -494,47 +567,36 @@ def main(branch: str = "main") -> int:
         else:
             console.print("[bold red]✗[/bold red] 📚 [red]Failed to add repository[/red]")
             console.print(f"[dim]{result.stderr}[/dim]")
+            return 1
 
     console.print(Rule(style="dim bright_magenta"))
 
     # ========================================================================
-    # Repository Sync Wait Period
+    # Repository Import
     # ========================================================================
-    # After adding the repository, Infrahub needs time to:
-    # - Clone the Git repository
-    # - Process Python generators and transforms
-    # - Make these components available for execution
-    # We wait 120 seconds to allow this synchronization to complete
+    # After adding the repository, Infrahub clones it and imports its generators, transforms and
+    # checks. The event actions reference those generators, so wait until the import has ended.
     console.print()  # Add spacing
-    wait_for_repository_sync(120)
+    if not wait_for_repository_sync(repository_name(repo_file), branch=branch):
+        console.print("\n[bold red]✗ Bootstrap failed![/bold red]")
+        return 1
 
     console.print(Rule(style="dim bright_yellow"))
 
     # ========================================================================
-    # Step 7: Load Event Actions (Optional)
+    # Step 7: Load Event Actions
     # ========================================================================
-    # Event actions define automated triggers and responses in Infrahub.
-    # This step is optional because it may fail if the repository hasn't
-    # fully synced yet. Users can manually load event actions later if needed.
-    msg = "\n[bold bright_cyan on black][7/7][/bold bright_cyan on black] "
-    msg += "⚡ [bold white]Loading event actions (optional)[/bold white]"
-    console.print(msg)
-    events_loaded = run_command(
+    # Event actions define automated triggers and responses in Infrahub, such as the generator
+    # that builds a data center when its topology object is created.
+    if not run_command(
         f"uv run infrahubctl object load objects/events/ --branch {branch}",
-        "Event actions loading",
-        "",
+        "Loading event actions",
+        "[7/7]",
         "bright_cyan",
         "⚡",
-    )
-
-    if not events_loaded:
-        msg = "[bold yellow on black]⚠[/bold yellow on black] "
-        msg += "⚡ [bold bright_cyan]Event actions skipped (repository may need time to sync)[/bold bright_cyan]"
-        console.print(msg)
-        console.print(
-            "[dim]Event actions can be loaded later with:[/dim]\n"
-            f"  [bold]uv run infrahubctl object load objects/events/ --branch {branch}[/bold]"
-        )
+    ):
+        console.print("\n[bold red]✗ Bootstrap failed![/bold red]")
+        return 1
 
     console.print(Rule(style="dim bright_cyan"))
 
