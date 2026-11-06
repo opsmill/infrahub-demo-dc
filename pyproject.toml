@@ -17,7 +17,7 @@ dependencies = [
     # way, and the difference is only who moves the version -- and the bump pull request is the
     # designated mover. No upper bound: a relock is the deliberate act, and a stale ceiling costs
     # more than it buys.
-    "infrahub-sdk[all,ctl]>=1.23.0",
+    "infrahub-sdk[all,ctl]>=1.24.0b1",
     "invoke>=2.2.1,<3.0.0",
     "rich>=13.9.4,<14.0.0",
 ]
