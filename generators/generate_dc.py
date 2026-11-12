@@ -407,7 +407,8 @@ class DCTopologyCreator(TopologyCreator):
         2. OSPF scenario: Creates only overlay ASN
            - OVERLAY-ASN: Shared by all devices for iBGP EVPN
 
-        All ASNs are allocated from the PRIVATE-ASN4 pool.
+        Each ASN is allocated from the PRIVATE-ASN4 pool the first time the generator runs, and reused
+        on later runs (see :meth:`_ensure_autonomous_system`).
 
         Args:
             scenario: Either "ebgp" or "ospf"
@@ -423,80 +424,68 @@ class DCTopologyCreator(TopologyCreator):
             branch=self.branch,
         )
 
+        # (store key, description) for every ASN the scenario needs.
+        wanted: list[tuple[str, str]] = []
         if scenario == "ebgp":
-            # Create spine ASN using pool
-            await self._create(
-                kind="RoutingAutonomousSystem",
-                data={
-                    "payload": {
-                        "asn": asn_pool,
-                        "status": "active",
-                        "description": f"{topology_name} SPINES ASN for eBGP UNDERLAY",
-                        "location": self.client.store.get(
-                            kind="LocationBuilding",
-                            key=self.data["name"],
-                            branch=self.branch,
-                        ),
-                    },
-                    "store_key": f"SPINE-ASN-{topology_name}",
-                },
-            )
-
-            # Create leaf ASNs (one per leaf and border_leaf for maximum flexibility)
-            leaf_devices = [device for device in self.devices if device.role.value in ["leaf", "border_leaf"]]
-            for device in leaf_devices:
-                await self._create(
-                    kind="RoutingAutonomousSystem",
-                    data={
-                        "payload": {
-                            "asn": asn_pool,
-                            "status": "active",
-                            "description": f"{topology_name} {device.name.value} ASN for eBGP UNDERLAY",
-                            "location": self.client.store.get(
-                                kind="LocationBuilding",
-                                key=self.data["name"],
-                                branch=self.branch,
-                            ),
-                        },
-                        "store_key": f"LEAF-ASN-{device.name.value}",
-                    },
-                )
-
-            # Create overlay ASN for iBGP EVPN using pool
-            await self._create(
-                kind="RoutingAutonomousSystem",
-                data={
-                    "payload": {
-                        "asn": asn_pool,
-                        "status": "active",
-                        "description": f"{topology_name} OVERLAY ASN for iBGP EVPN over eBGP UNDERLAY",
-                        "location": self.client.store.get(
-                            kind="LocationBuilding",
-                            key=self.data["name"],
-                            branch=self.branch,
-                        ),
-                    },
-                    "store_key": f"OVERLAY-ASN-{topology_name}",
-                },
+            wanted.append((f"SPINE-ASN-{topology_name}", f"{topology_name} SPINES ASN for eBGP UNDERLAY"))
+            # One ASN per leaf and border_leaf for maximum flexibility
+            wanted += [
+                (f"LEAF-ASN-{device.name.value}", f"{topology_name} {device.name.value} ASN for eBGP UNDERLAY")
+                for device in self.devices
+                if device.role.value in ["leaf", "border_leaf"]
+            ]
+            wanted.append(
+                (f"OVERLAY-ASN-{topology_name}", f"{topology_name} OVERLAY ASN for iBGP EVPN over eBGP UNDERLAY")
             )
         else:
-            # OSPF scenario: only create overlay ASN for iBGP EVPN
-            await self._create(
-                kind="RoutingAutonomousSystem",
-                data={
-                    "payload": {
-                        "asn": asn_pool,
-                        "status": "active",
-                        "description": f"{topology_name} OVERLAY ASN for iBGP EVPN over OSPF UNDERLAY",
-                        "location": self.client.store.get(
-                            kind="LocationBuilding",
-                            key=self.data["name"],
-                            branch=self.branch,
-                        ),
-                    },
-                    "store_key": f"OVERLAY-ASN-{topology_name}",
-                },
+            # OSPF scenario: only the overlay ASN for iBGP EVPN
+            wanted.append(
+                (f"OVERLAY-ASN-{topology_name}", f"{topology_name} OVERLAY ASN for iBGP EVPN over OSPF UNDERLAY")
             )
+
+        for store_key, description in wanted:
+            await self._ensure_autonomous_system(asn_pool=asn_pool, store_key=store_key, description=description)
+
+    async def _ensure_autonomous_system(self, asn_pool: CoreNumberPool, store_key: str, description: str) -> None:
+        """Reuse the ASN this topology already holds for ``description``, or allocate one from the pool.
+
+        The ASN's identity is its number (``name`` is computed as ``AS<asn>``), so allocating from the
+        pool on every run gives a re-run a new number and a new node, and generator tracking then
+        deletes the previous one. Reusing the existing node keeps a re-run idempotent. The node is saved
+        again, because the SDK adds a node to the generator's tracked group only when it is saved; a
+        node that is only read would be deleted at the end of the run.
+
+        Args:
+            asn_pool: The PRIVATE-ASN4 number pool, used only when no ASN exists yet.
+            store_key: Key under which the ASN is stored for the BGP and peering steps.
+            description: Description that identifies this ASN within the topology's building.
+        """
+        location = self.client.store.get(kind="LocationBuilding", key=self.data["name"], branch=self.branch)
+        existing = await self.client.filters(
+            kind="RoutingAutonomousSystem",
+            description__value=description,
+            location__ids=[location.id],
+            branch=self.branch,
+        )
+        if existing:
+            asn = existing[0]
+            await asn.save(allow_upsert=True)
+            self.client.store.set(key=store_key, node=asn, branch=self.branch)
+            self.log.info(f"- Reused [RoutingAutonomousSystem] AS{asn.asn.value} for '{description}'")
+            return
+
+        await self._create(
+            kind="RoutingAutonomousSystem",
+            data={
+                "payload": {
+                    "asn": asn_pool,
+                    "status": "active",
+                    "description": description,
+                    "location": location,
+                },
+                "store_key": store_key,
+            },
+        )
 
     async def create_ebgp_underlay(self, loopback_name: str) -> None:
         """Create eBGP underlay peering sessions between spine and leaf devices.

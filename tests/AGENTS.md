@@ -217,6 +217,27 @@ things follow for anyone touching this:
   second test starts failing the same way, confirm the signature in the `task-worker` log first; a
   merge blocked by a *demo* data problem looks similar from the outside and must not be waved through.
 
+### A re-run that replaced the ASNs
+
+From Infrahub 1.12.0b1, `test_10_dc_workflow::test_08_merge` failed on every run of the full suite
+(runs [42216940914](https://github.com/opsmill/infrahub-demo-dc/actions/runs/42216940914),
+[42845987253](https://github.com/opsmill/infrahub-demo-dc/actions/runs/42845987253) and
+[43199274875](https://github.com/opsmill/infrahub-demo-dc/actions/runs/43199274875)).
+The `create_dc` check on the proposed change failed with an HTTP 500 on `CoreGeneratorGroup(...).members`
+and a `KeyError` from `query_peers` in `core/manager.py`, the same signature as the section above.
+The cause was in this repository. Each `create_dc` run took a new number from the `PRIVATE-ASN4` pool.
+`RoutingAutonomousSystem` is branch-agnostic and is identified by its number, so `test_05`'s re-run
+created new ASN nodes, and generator tracking deleted the previous ones. On 1.12 the generator group
+still lists the deleted ASN as a member, and reading that group fails. With the same generator code,
+the full suite passed on 1.11.12
+([run 42795722711](https://github.com/opsmill/infrahub-demo-dc/actions/runs/42795722711)).
+
+`create_dc` now reuses the ASN the topology's building already holds for each description, and saves
+it again so that it stays in the generator group. `test_05` asserts that the topology's ASN node IDs
+are the same before and after the re-run. Passing an `identifier` in `from_pool` was not used: in the
+Infrahub source on `develop` after the 1.12 release merge, `pools/attribute_pool_applier.py` keeps only
+the pool `id` for a number pool on an attribute. This was read in the source, not tested.
+
 ### A race the cable count used to lose
 
 `test_10_dc_workflow::test_04_fabric_is_complete` used to fail intermittently in CI with
