@@ -173,6 +173,8 @@ async def test_05_generator_rerun_is_idempotent(
     """
     client = async_client_main
     before = await client.count(kind="DcimGenericDevice", branch=BRANCH)
+    asns_before = await _topology_asn_ids(client)
+    assert asns_before, f"No RoutingAutonomousSystem found for {TOPOLOGY} before the re-run."
 
     task = await h.run_generator(
         client,
@@ -194,6 +196,23 @@ async def test_05_generator_rerun_is_idempotent(
 
     total_after = await client.count(kind="DcimGenericDevice", branch=BRANCH)
     assert total_after == before, f"Device total changed on re-run: {before} -> {total_after}"
+
+    # The ASN is identified by its number, so a re-run that draws a new number from the pool creates
+    # a new node and deletes the old one. From Infrahub 1.12 that deletion leaves the generator
+    # group's ``members`` pointing at the deleted node, and the next create_dc run (the proposed
+    # change check) fails with HTTP 500 on that group. Same nodes before and after, or nothing.
+    asns_after = await _topology_asn_ids(client)
+    assert asns_after == asns_before, (
+        f"Re-running create_dc replaced the topology's ASNs.\n  Before: {sorted(asns_before)}\n"
+        f"  After:  {sorted(asns_after)}"
+    )
+
+
+async def _topology_asn_ids(client: InfrahubClient) -> set[str]:
+    """Return the IDs of the ASNs ``create_dc`` placed in the topology's building on the branch."""
+    building = await client.get(kind="LocationBuilding", name__value=TOPOLOGY, branch=BRANCH)
+    asns = await client.filters(kind="RoutingAutonomousSystem", location__ids=[building.id], branch=BRANCH)
+    return {asn.id for asn in asns}
 
 
 @pytest.mark.dependency(name="dc_diff", depends=["dc_rerun"])
