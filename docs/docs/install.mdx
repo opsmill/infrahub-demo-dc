@@ -198,7 +198,7 @@ Wait for all containers to be healthy. You can check the status with:
 docker ps
 ```
 
-You should see one container for each of these Docker Compose services:
+You should see one container for each of these Docker Compose services, and two for `task-worker`, which runs two replicas by default:
 
 - `infrahub-server` - Infrahub API server and web interface
 - `task-worker` - runs Generators, Transformations, checks and repository imports
@@ -207,6 +207,9 @@ You should see one container for each of these Docker Compose services:
 - `database` - Neo4j graph database
 - `cache` - Redis cache
 - `message-queue` - RabbitMQ message broker
+- `streamlit-service-catalog` - the Service Catalog, a Streamlit application that `docker-compose.override.yml` adds (container `service-catalog`)
+
+With Infrahub Enterprise (`INFRAHUB_ENTERPRISE=true`), the Enterprise Docker Compose file also starts `task-manager-background-svc`.
 
 ## Step 6: access the Infrahub web interface
 
